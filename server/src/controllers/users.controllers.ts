@@ -18,6 +18,7 @@ export async function createUser(req:FastifyRequest<{Body: UserBody}>, res:Fasti
             const existing = await search(column, value)
             if(existing.rows.length >= 1) {
                 res.code(409).send({ error: `Usuário ${column}: ${value} já cadastrado(a).`})
+                return
             }
         }
 

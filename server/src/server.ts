@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import 'dotenv/config';
 import { db } from './db/database';
 import { userRoutes } from './routes/users.routes';
-import { authRoutes } from './types/auth.routes';
+import { authRoutes } from './routes/auth.routes';
 
 const app = Fastify();
 
