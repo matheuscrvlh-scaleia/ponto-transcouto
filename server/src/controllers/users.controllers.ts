@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { UserBody } from "../types/users.types";
 import { insertUser, search } from "../models/users.models";
+import { hashPassword } from "../utils/hash";
 
 export async function createUser(req:FastifyRequest<{Body: UserBody}>, res:FastifyReply) {
     const { nome, email, senha, ativo } = req.body
@@ -20,7 +21,9 @@ export async function createUser(req:FastifyRequest<{Body: UserBody}>, res:Fasti
             }
         }
 
-        const result = await insertUser({ nome, email, senha, ativo })
+        const hashedPassword = await hashPassword(senha);
+
+        const result = await insertUser({ nome, email, hashedPassword, ativo })
         if(!result.rows[0].id) {
             console.error('Erro ao inserir usuário.');
             return

@@ -2,9 +2,11 @@ import Fastify from 'fastify';
 import 'dotenv/config';
 import { db } from './db/database';
 import { userRoutes } from './routes/users.routes';
+import { authRoutes } from './types/auth.routes';
 
 const app = Fastify();
 
+app.register(authRoutes)
 app.register(userRoutes)
 
 async function start() {

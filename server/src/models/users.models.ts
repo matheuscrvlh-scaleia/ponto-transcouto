@@ -10,7 +10,7 @@ export async function search(column: string, data: string | number | null) {
 }
 
 export async function insertUser(data:UserBody) {
-    const { nome, email, senha, ativo } = data
+    const { nome, email, hashedPassword, ativo } = data
 
     const result = await db.query(`
         INSERT INTO usuarios
@@ -18,7 +18,7 @@ export async function insertUser(data:UserBody) {
         VALUES
         ($1, $2, $3, $4)
         RETURNING id
-    `,[nome, email, senha, ativo || null])
+    `,[nome, email, hashedPassword, ativo || null])
 
     return result
 }
