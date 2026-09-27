@@ -11,6 +11,7 @@ export async function createUser(req:FastifyRequest<{Body: UserBody}>, res:Fasti
             ['nome', nome],
             ['email', email],
         ]
+        // falta crypt email e fazer o email hash de pesquisa (cpf tb)
 
         for(const [column, value] of fieldsToCheck) {
             if(value === undefined) continue
