@@ -1,27 +1,38 @@
 {
-  "name": "server",
+  "name": "copiloto-ponto-server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "API e worker do Copiloto de Ponto",
   "scripts": {
-    "start": "tsx --watch src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
+    "start": "tsx src/server.ts",
+    "start:worker": "tsx src/worker.ts",
+    "migrate": "tsx src/db/migrate.ts",
+    "seed:admin": "tsx src/db/seeds/admin.ts",
+    "seed:dev": "tsx src/db/seeds/dev.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^18.0.3",
     "fastify": "^5.12.5",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.0",
-    "tsx": "^4.23.15"
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.2",
     "@types/pg": "^8.23.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
   }
 }

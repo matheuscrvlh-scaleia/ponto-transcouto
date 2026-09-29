@@ -1,17 +1,19 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
-import { RequireAuth } from './components/RequireAuth'
-import { RequireAdmin } from './components/RequireAdmin'
-import { RequirePermissao } from './components/RequirePermissao'
 import { AppLayout } from './components/AppLayout'
+import { Carregando } from './components/Estados'
+import { RequireAuth } from './components/RequireAuth'
+import { RequirePerfil } from './components/RequirePerfil'
+import { DashboardUnidade } from './pages/DashboardUnidade'
+import { DetalheColaborador } from './pages/DetalheColaborador'
+import { Inicio } from './pages/Inicio'
 import { Login } from './pages/Login'
-import { Dashboard } from './pages/Dashboard'
-import { AdminLayout } from './pages/admin/AdminLayout'
-import { AdminIndex } from './pages/admin/AdminIndex'
-import { CargosPanel } from './pages/admin/cadastros/CargosPanel'
-import { FiliaisPanel } from './pages/admin/cadastros/FiliaisPanel'
-import { UsuariosPanel } from './pages/admin/cadastros/UsuariosPanel'
+import { SelecionarUnidade } from './pages/SelecionarUnidade'
+import { TrocarSenha } from './pages/TrocarSenha'
+
+const AdminRotas = lazy(() => import('./pages/admin/AdminRotas'))
 
 export default function App() {
   return (
@@ -21,20 +23,22 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<RequireAuth />}>
+              <Route path="/trocar-senha" element={<TrocarSenha />} />
               <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route element={<RequireAdmin />}>
-                  <Route path="/admin" element={<AdminLayout />}>
-                    <Route index element={<AdminIndex />} />
-                    <Route element={<RequirePermissao chave="podeGerenciarCargosFiliais" />}>
-                      <Route path="cargos" element={<CargosPanel />} />
-                      <Route path="filiais" element={<FiliaisPanel />} />
-                    </Route>
-                    <Route element={<RequirePermissao chave="podeGerenciarUsuarios" />}>
-                      <Route path="usuarios" element={<UsuariosPanel />} />
-                    </Route>
-                  </Route>
-                </Route>
+                <Route index element={<Inicio />} />
+                <Route path="unidades" element={<SelecionarUnidade />} />
+                <Route path="unidades/:unidadeId" element={<DashboardUnidade />} />
+                <Route path="unidades/:unidadeId/colaboradores/:colaboradorId" element={<DetalheColaborador />} />
+                <Route
+                  path="admin/*"
+                  element={
+                    <RequirePerfil perfis={['admin', 'rh']}>
+                      <Suspense fallback={<Carregando />}>
+                        <AdminRotas />
+                      </Suspense>
+                    </RequirePerfil>
+                  }
+                />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

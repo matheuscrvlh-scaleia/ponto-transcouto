@@ -1,38 +1,38 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import bannerLogin from '../assets/banners/banner-login.avif'
-import logo from '../assets/logos/logo.avif'
+import { ApiError } from '../lib/api'
+import { CartaoAcesso } from '../components/CartaoAcesso'
+import { CampoSenha } from '../components/CampoSenha'
 
-const MENSAGEM_CREDENCIAIS_INVALIDAS = 'Usuário, email, CPF ou senha incorretos. Confira os dados e tente novamente.'
+function mensagemErro(erro: unknown): string {
+  if (!(erro instanceof ApiError)) return 'Não foi possível entrar. Tente novamente em instantes.'
+  if (erro.status === 401 || erro.status === 400) return 'E-mail/CPF ou senha incorretos. Confira os dados e tente novamente.'
+  return erro.message
+}
 
-function mensagemErroAmigavel(mensagem: string): string {
-  const normalizada = mensagem.toLowerCase()
-
-  if (normalizada.includes('invalid login credentials')) {
-    return MENSAGEM_CREDENCIAIS_INVALIDAS
-  }
-  if (normalizada.includes('email not confirmed')) {
-    return 'Este e-mail ainda não foi confirmado. Verifique sua caixa de entrada.'
-  }
-  if (normalizada.includes('too many requests')) {
-    return 'Muitas tentativas seguidas. Aguarde um momento e tente novamente.'
-  }
-
-  return 'Não foi possível entrar. Tente novamente em instantes.'
+function mascararCpf(valor: string) {
+  if (/[^\d.\-\s]/.test(valor)) return valor
+  const d = valor.replace(/\D/g, '').slice(0, 11)
+  return d
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2')
 }
 
 export function Login() {
-  const { session, loading } = useAuth()
+  const { usuario, carregando, entrar } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [params] = useSearchParams()
   const [identificador, setIdentificador] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
 
-  if (!loading && session) {
-    return <Navigate to="/" replace />
-  }
+  const destino = (location.state as { de?: string } | null)?.de ?? '/'
+
+  if (!carregando && usuario) return <Navigate to={destino} replace />
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -40,63 +40,49 @@ export function Login() {
     setEnviando(true)
 
     const valor = identificador.trim()
-    let email = valor
+    const login = valor.includes('@') ? valor : valor.replace(/\D/g, '')
 
-    if (!valor.includes('@')) {
-      const { data, error: erroResolucao } = await supabase.rpc('login_email_de', {
-        p_identificador: valor,
-      })
-      if (erroResolucao || !data) {
-        setErro(MENSAGEM_CREDENCIAIS_INVALIDAS)
-        setEnviando(false)
-        return
-      }
-      email = data
+    try {
+      const logado = await entrar(login, senha)
+      navigate(logado.deve_trocar_senha ? '/trocar-senha' : destino, { replace: true })
+    } catch (e) {
+      setErro(mensagemErro(e))
+      setEnviando(false)
     }
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
-    setEnviando(false)
-    if (error) setErro(mensagemErroAmigavel(error.message))
   }
 
   return (
-    <div className="login-page" style={{ backgroundImage: `url(${bannerLogin})` }}>
-      <div className="login-card">
-        <div className="login-brand">
-          <img src={logo} alt="Transcouto" className="login-logo" />
-          <span className="login-wordmark">Copiloto de Ponto</span>
+    <CartaoAcesso>
+      <form className="login-form" onSubmit={handleSubmit} noValidate>
+        {params.get('expirou') && !erro && (
+          <p className="form-info" role="status">
+            Sua sessão expirou. Entre novamente.
+          </p>
+        )}
+        <div className="field">
+          <label htmlFor="identificador">E-mail ou CPF</label>
+          <input
+            id="identificador"
+            type="text"
+            value={identificador}
+            onChange={(event) => setIdentificador(mascararCpf(event.target.value))}
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+          />
         </div>
-        <div className="login-body">
-          <form className="login-form" onSubmit={handleSubmit}>
-            <div className="field">
-              <label htmlFor="identificador">Usuário, email ou CPF</label>
-              <input
-                id="identificador"
-                type="text"
-                value={identificador}
-                onChange={(event) => setIdentificador(event.target.value)}
-                autoComplete="username"
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="senha">Senha</label>
-              <input
-                id="senha"
-                type="password"
-                value={senha}
-                onChange={(event) => setSenha(event.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </div>
-            {erro && <p className="form-erro">{erro}</p>}
-            <button className="btn-primary" type="submit" disabled={enviando}>
-              {enviando ? 'Entrando...' : 'Entrar'}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+        <CampoSenha id="senha" rotulo="Senha" valor={senha} onChange={setSenha} autoComplete="current-password" />
+        {erro && (
+          <p className="form-erro" role="alert">
+            {erro}
+          </p>
+        )}
+        <button className="btn-primary" type="submit" disabled={enviando || !identificador.trim() || !senha}>
+          {enviando ? 'Entrando...' : 'Entrar'}
+        </button>
+        <p className="login-ajuda">Esqueceu a senha? Fale com o RH.</p>
+      </form>
+    </CartaoAcesso>
   )
 }

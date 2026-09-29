@@ -1,19 +1,24 @@
-import Fastify from 'fastify';
-import 'dotenv/config';
-import { db } from './db/database';
-import { userRoutes } from './routes/users.routes';
-import { authRoutes } from './routes/auth.routes';
-
-const app = Fastify();
-
-app.register(authRoutes)
-app.register(userRoutes)
+import { buildApp } from './app'
+import { env } from './config/env'
+import { db } from './db/database'
 
 async function start() {
-    await app.listen({ port: 3000 });
-    console.log('Server rodando em porta 3000')
+    const app = await buildApp()
 
-    await db.query(`SELECT NOW()`);
-    console.log('Supabase conectado.')
+    await db.query('SELECT 1')
+    await app.listen({ port: env.PORT, host: '0.0.0.0' })
+    console.log(`API rodando na porta ${env.PORT}`)
+
+    const encerrar = async () => {
+        await app.close()
+        await db.end()
+        process.exit(0)
+    }
+    process.on('SIGINT', encerrar)
+    process.on('SIGTERM', encerrar)
 }
-start()
+
+start().catch(err => {
+    console.error(err)
+    process.exit(1)
+})

@@ -1,35 +1,48 @@
-import type { FastifyReply, FastifyRequest } from "fastify"
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import jwt from 'jsonwebtoken'
+import { env } from '../config/env'
+import { buscarPorId } from '../models/auth.models'
+import type { Perfil, TokenPayload } from '../types/auth.types'
+import { naoAutorizado, proibido } from '../utils/errors'
 
-declare module 'fastify'  {
-    interface FastifyRequest {
-        user: string
+const rotasLiberadasSemTrocaDeSenha = ['/api/v1/auth/me', '/api/v1/auth/trocar-senha']
+
+export async function authenticate(req: FastifyRequest) {
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+    if (!token) throw naoAutorizado('Token não encontrado.')
+
+    let payload: TokenPayload
+    try {
+        payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as unknown as TokenPayload
+    } catch (err) {
+        throw naoAutorizado(err instanceof jwt.TokenExpiredError ? 'Sessão expirada.' : 'Token inválido.')
+    }
+
+    const usuario = await buscarPorId(Number(payload.sub))
+    if (!usuario || !usuario.ativo || usuario.token_versao !== payload.tv) {
+        throw naoAutorizado('Sessão inválida.')
+    }
+
+    req.usuario = {
+        id: usuario.id,
+        nome: usuario.nome,
+        perfil: usuario.perfil,
+        empresaId: usuario.empresa_id,
+        deveTrocarSenha: usuario.deve_trocar_senha,
+    }
+
+    const rota = req.routeOptions.url ?? ''
+    if (usuario.deve_trocar_senha && !rotasLiberadasSemTrocaDeSenha.includes(rota)) {
+        throw proibido('Troque sua senha para continuar.')
     }
 }
 
-export async function authenticate(req:FastifyRequest, res:FastifyReply) {
-    const authHeader = req.headers.authorization
-
-    try {
-        const token = authHeader?.split(' ')[1]
-
-        if(!token) {
-            res.code(401).send({ error: 'Token não encontrado.'})
-            return
-        }
-
-        const decodedPayload = jwt.verify(token, process.env.JWT_SECRET)
-
-        return req.user = decodedPayload.id
-    } catch(err) {
-        if(err instanceof jwt.TokenExpiredError) {
-            res.code(500).send({ error: 'Token expirado.' })
-            return
-        }
-        if(err instanceof jwt.JsonWebTokenError) {
-            res.code(500).send({ error: 'Token inválido.' })
-            return
-        }
-        res.code(500).send({ error: 'Erro interno do servidor.'})
+export function exigirPerfil(...permitidos: Perfil[]) {
+    return async (req: FastifyRequest, _res: FastifyReply) => {
+        if (!permitidos.includes(req.usuario.perfil)) throw proibido()
     }
+}
+
+export function assinarToken(usuarioId: number, tokenVersao: number) {
+    return jwt.sign({ sub: usuarioId, tv: tokenVersao }, env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '8h' })
 }

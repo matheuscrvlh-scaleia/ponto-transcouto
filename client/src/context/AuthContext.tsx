@@ -1,101 +1,102 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabaseClient'
-import type { Cargo, Permissoes, Usuario } from '../types/database'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { api, sessao } from '../lib/api'
+import type { LoginResposta, MeResposta, Perfil, TrocarSenhaResposta, UnidadeRef, UsuarioSessao } from '../types/api'
 
 interface AuthState {
-  session: Session | null
-  usuario: Usuario | null
-  cargos: Cargo[]
-  permissoes: Permissoes
-  loading: boolean
+  usuario: UsuarioSessao | null
+  unidades: UnidadeRef[]
+  perfil: Perfil | null
+  carregando: boolean
+  entrar: (login: string, senha: string) => Promise<UsuarioSessao>
+  sair: () => void
+  trocarSenha: (senhaAtual: string, novaSenha: string) => Promise<void>
+  recarregar: () => Promise<void>
 }
 
-const permissoesVazias: Permissoes = {
-  podeVerTodasFiliais: false,
-  podeGerenciarExtracao: false,
-  podeGerenciarUsuarios: false,
-  podeGerenciarCargosFiliais: false,
-  podeGerenciarConfiguracoes: false,
-}
-
-const estadoInicial: AuthState = {
-  session: null,
-  usuario: null,
-  cargos: [],
-  permissoes: permissoesVazias,
-  loading: true,
-}
-
-const AuthContext = createContext<AuthState>(estadoInicial)
-
-function mesclarPermissoes(cargos: Cargo[]): Permissoes {
-  return cargos.reduce<Permissoes>(
-    (acc, cargo) => ({
-      podeVerTodasFiliais: acc.podeVerTodasFiliais || cargo.pode_ver_todas_filiais,
-      podeGerenciarExtracao: acc.podeGerenciarExtracao || cargo.pode_gerenciar_extracao,
-      podeGerenciarUsuarios: acc.podeGerenciarUsuarios || cargo.pode_gerenciar_usuarios,
-      podeGerenciarCargosFiliais: acc.podeGerenciarCargosFiliais || cargo.pode_gerenciar_cargos_filiais,
-      podeGerenciarConfiguracoes: acc.podeGerenciarConfiguracoes || cargo.pode_gerenciar_configuracoes,
-    }),
-    permissoesVazias,
-  )
-}
+const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>(estadoInicial)
+  const navigate = useNavigate()
+  const [usuario, setUsuario] = useState<UsuarioSessao | null>(null)
+  const [unidades, setUnidades] = useState<UnidadeRef[]>([])
+  const [carregando, setCarregando] = useState(() => Boolean(sessao.obter()))
 
-  useEffect(() => {
-    let ativo = true
-
-    async function carregarPerfil(session: Session | null) {
-      if (!session) {
-        if (ativo) setState({ ...estadoInicial, loading: false })
-        return
-      }
-
-      const [{ data: usuario }, { data: vinculos }] = await Promise.all([
-        supabase.from('usuarios').select('*').eq('id', session.user.id).single(),
-        supabase
-          .from('usuario_cargos')
-          .select('cargos(*)')
-          .eq('usuario_id', session.user.id) as unknown as Promise<{
-          data: { cargos: Cargo | Cargo[] | null }[] | null
-        }>,
-      ])
-
-      const cargos = (vinculos ?? []).flatMap((vinculo) => {
-        const cargo = vinculo.cargos
-        if (!cargo) return []
-        return Array.isArray(cargo) ? cargo : [cargo]
-      })
-
-      if (ativo) {
-        setState({
-          session,
-          usuario: usuario ?? null,
-          cargos,
-          permissoes: mesclarPermissoes(cargos),
-          loading: false,
-        })
-      }
-    }
-
-    supabase.auth.getSession().then(({ data }) => carregarPerfil(data.session))
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      carregarPerfil(session)
-    })
-
-    return () => {
-      ativo = false
-      listener.subscription.unsubscribe()
-    }
+  const limpar = useCallback(() => {
+    sessao.definir(null)
+    setUsuario(null)
+    setUnidades([])
   }, [])
 
-  return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
+  const recarregar = useCallback(async () => {
+    const dados = await api<MeResposta>('/auth/me')
+    setUsuario(dados.usuario)
+    setUnidades(dados.unidades)
+  }, [])
+
+  useEffect(() => {
+    sessao.aoExpirar(() => {
+      setUsuario(null)
+      setUnidades([])
+      navigate('/login?expirou=1', { replace: true })
+    })
+  }, [navigate])
+
+  useEffect(() => {
+    if (!sessao.obter()) return
+    api<MeResposta>('/auth/me')
+      .then((dados) => {
+        setUsuario(dados.usuario)
+        setUnidades(dados.unidades)
+      })
+      .catch(() => limpar())
+      .finally(() => setCarregando(false))
+  }, [limpar])
+
+  const entrar = useCallback(async (login: string, senha: string) => {
+    const dados = await api<LoginResposta>('/auth/login', { method: 'POST', json: { login, senha } })
+    sessao.definir(dados.token)
+    setUsuario(dados.usuario)
+    setUnidades(dados.unidades)
+    return dados.usuario
+  }, [])
+
+  const sair = useCallback(() => {
+    limpar()
+    navigate('/login', { replace: true })
+  }, [limpar, navigate])
+
+  const trocarSenha = useCallback(
+    async (senhaAtual: string, novaSenha: string) => {
+      const { token } = await api<TrocarSenhaResposta>('/auth/trocar-senha', {
+        method: 'POST',
+        json: { senha_atual: senhaAtual, nova_senha: novaSenha },
+      })
+      sessao.definir(token)
+      await recarregar()
+    },
+    [recarregar],
+  )
+
+  const valor = useMemo<AuthState>(
+    () => ({
+      usuario,
+      unidades,
+      perfil: usuario?.perfil ?? null,
+      carregando,
+      entrar,
+      sair,
+      trocarSenha,
+      recarregar,
+    }),
+    [usuario, unidades, carregando, entrar, sair, trocarSenha, recarregar],
+  )
+
+  return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
-  return useContext(AuthContext)
+  const contexto = useContext(AuthContext)
+  if (!contexto) throw new Error('useAuth precisa estar dentro de <AuthProvider>')
+  return contexto
 }

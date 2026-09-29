@@ -1,52 +1,22 @@
 import crypto from 'node:crypto'
+import { env } from '../config/env'
 
-const algorithm = 'aes-256-gcm';
+const algoritmo = 'aes-256-gcm'
+const chave = Buffer.from(env.ENCRYPTION_KEY, 'hex')
 
-export async function encrypt(data: string | number) {
-    const iv = crypto.randomBytes(16);
-    console.log(iv)
+export function encrypt(texto: string) {
+    const iv = crypto.randomBytes(12)
+    const cipher = crypto.createCipheriv(algoritmo, chave, iv)
+    const cifrado = Buffer.concat([cipher.update(texto, 'utf8'), cipher.final()])
+    const tag = cipher.getAuthTag()
 
-    const cipher = crypto.createCipheriv(
-        algorithm,
-        process.env.ENCRYPTION_KEY,
-        iv
-    );
-
-    let encrypted = cipher.update(data, 'utf8', 'hex')
-
-    encrypted += cipher.final('hex');
-
-    const authTag = cipher.getAuthTag()
-    console.log(`${encrypted}:${iv}:${authTag}`)
-
-    return (`${encrypted}:${iv}:${authTag}`)
+    return [iv, tag, cifrado].map(b => b.toString('hex')).join(':')
 }
 
-export async function decrypt(data: string) {
-    const { encrypted, iv, authTag } = data.split(':')
-    console.log({
-        encrypt,
-        iv,
-        authTag
-    })
+export function decrypt(valor: string) {
+    const [iv, tag, cifrado] = valor.split(':').map(p => Buffer.from(p, 'hex'))
+    const decipher = crypto.createDecipheriv(algoritmo, chave, iv)
+    decipher.setAuthTag(tag)
 
-    const decipher = crypto.createCipheriv(
-        algorithm,
-        process.env.ENCRYPTION_KEY,
-        Buffer.from(iv, 'hex')
-    );
-
-    decipher.setAuthTag(
-        Buffer.from(authTag, 'hex')
-    );
-
-    let decrypted = decipher.update(
-        encrypted,
-        'hex',
-        'utf8'
-    );
-
-    decrypted += decipher.final('utf8');
-
-    return decrypted
+    return Buffer.concat([decipher.update(cifrado), decipher.final()]).toString('utf8')
 }
