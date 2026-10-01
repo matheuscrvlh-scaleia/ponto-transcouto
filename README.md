@@ -36,13 +36,16 @@ Usuários da Demo: `gestor@demo.local` e `rh@demo.local`, senha `demo12345`.
 | `dev` / `start` | API |
 | `dev:worker` / `start:worker` | Worker (`--uma-vez` roda um ciclo e sai) |
 | `migrate` | Aplica migrations pendentes |
-| `seed:admin` | Cria/atualiza um admin (sem `--senha`, gera temporária) |
+| `seed:admin` | Cria/atualiza alguém da equipe Scale IA (sem `--senha`, gera temporária) |
 | `seed:dev` | Recria os dados da empresa Demo |
 | `typecheck` / `test` | TypeScript e vitest |
 
 ## Arquitetura
 
 - `server/src`: `routes → controllers → models` (SQL) com `types` (zod), `services` (regras puras), `integrations/secullum`, `jobs` e `middlewares`.
-- Perfis: `admin` (Scale, todas as empresas), `rh` (própria empresa), `gestor` (unidades vinculadas). Escopo aplicado no SQL por `unidades_permitidas()`.
+- Multi-empresa, com duas tabelas de login (e-mail/CPF únicos entre elas):
+  - `usuarios` = equipe Scale IA (perfil `admin`, sem empresa): Administração (empresas, integração, fechamentos, calendário, equipe) e acesso a tudo.
+  - `clientes` = usuários das empresas atendidas: `rh` (Gestão + Configuração da própria empresa) e `gestor` (Gestão das unidades vinculadas em `cliente_unidades`).
+  - Escopo aplicado no SQL por `unidades_permitidas(tipo, id)`; o token leva o tipo (`equipe`/`cliente`).
 - Extração: `/Calcular/SomenteTotais` da Secullum, um colaborador por chamada, limitado por `configuracoes.cota_calcular_por_hora` (padrão 90/h).
-- Para ligar a Transcouto: em Admin → Empresas, cadastre o usuário de integração da Secullum, teste a conexão, escolha o banco, sincronize, faça o de-para das unidades e o mapeamento de colunas.
+- Para ligar a Transcouto: em Administração → Empresas, cadastre o usuário de integração da Secullum, teste a conexão, escolha o banco, sincronize, faça o de-para das unidades e o mapeamento de colunas.

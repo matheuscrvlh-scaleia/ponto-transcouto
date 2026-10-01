@@ -1,4 +1,9 @@
+/** 'admin' = equipe Scale IA; 'rh' e 'gestor' = usuários das empresas clientes. */
 export type Perfil = 'admin' | 'rh' | 'gestor'
+/** 'equipe' = tabela usuarios (Scale IA); 'cliente' = tabela clientes (empresas atendidas). */
+export type TipoUsuario = 'equipe' | 'cliente'
+/** Perfis possíveis de um usuário cliente. */
+export type PerfilCliente = Exclude<Perfil, 'admin'>
 /** Sempre inteiro; negativo = débito. */
 export type Minutos = number
 /** 'YYYY-MM-DD' */
@@ -15,10 +20,13 @@ export interface ErroApi {
 export interface UnidadeRef {
   id: number
   nome_exibicao: string
+  empresa_id: number
 }
 
 export interface UsuarioSessao {
+  /** Ids de equipe e clientes podem coincidir: use `tipo` junto para identificar a pessoa. */
   id: number
+  tipo: TipoUsuario
   nome: string
   email: string | null
   perfil: Perfil
@@ -83,14 +91,37 @@ export interface ResumoDashboard {
   pagas_total_min: Minutos
 }
 
+/** Unidade dentro do painel consolidado (GET /dashboard). */
+export interface UnidadePainel {
+  id: number
+  nome: string
+  fechamento: FechamentoPublicado | null
+  alerta_pos: Minutos
+  alerta_neg: Minutos
+}
+
+/** Linha do painel consolidado: traz a unidade e os limites da empresa dela. */
+export interface LinhaDashboardGeral extends LinhaDashboard {
+  unidade_id: number
+  unidade_nome: string
+  alerta_pos: Minutos
+  alerta_neg: Minutos
+}
+
+/**
+ * Resposta de GET /unidades/:id/dashboard (uma unidade) e de GET /dashboard
+ * (todas as unidades: `unidade` vem null e chegam `unidades` e `limites_variam`).
+ */
 export interface DashboardUnidade {
-  unidade: { id: number; nome: string }
+  unidade: { id: number; nome: string } | null
+  unidades?: UnidadePainel[]
   fechamento: FechamentoPublicado | null
   aviso_fechamento_mes: boolean
   proximo_fechamento_previsto: DataHoraISO | null
   limites: Limites
+  limites_variam?: boolean
   resumo: ResumoDashboard | null
-  colaboradores: LinhaDashboard[]
+  colaboradores: (LinhaDashboard & Partial<Omit<LinhaDashboardGeral, keyof LinhaDashboard>>)[]
   total: number
   pagina: number
   por_pagina: number
@@ -279,12 +310,13 @@ export interface MapeamentoResposta {
   colunas_detectadas: string[]
 }
 
-export interface UsuarioAdmin {
+/** Usuário de uma empresa cliente (GET /clientes). */
+export interface ClienteAdmin {
   id: number
   nome: string
   email: string | null
-  perfil: Perfil
-  empresa_id: number | null
+  perfil: PerfilCliente
+  empresa_id: number
   ativo: boolean
   deve_trocar_senha: boolean
   ultimo_login_em: DataHoraISO | null
@@ -293,8 +325,21 @@ export interface UsuarioAdmin {
   cpf_mascarado: string | null
 }
 
-export interface UsuarioCriado {
+/** Membro da equipe Scale IA (GET /equipe). */
+export interface MembroEquipe {
+  id: number
+  nome: string
+  email: string | null
+  cpf_mascarado: string | null
+  ativo: boolean
+  deve_trocar_senha: boolean
+  ultimo_login_em: DataHoraISO | null
+  criado_em: DataHoraISO | null
+}
+
+/** Resposta de POST /clientes e POST /equipe. */
+export interface ContaCriada<T> {
   id: number
   senha_temporaria: string
-  usuario: UsuarioAdmin | null
+  usuario: T | null
 }

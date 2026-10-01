@@ -1,0 +1,152 @@
+/* ---------- Telas de aviso: não encontrado / erro (carregado pelo TelaAviso) ---------- */
+
+.aviso-tela {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 60svh;
+  padding: 24px 0;
+}
+
+.aviso-tela.cheia {
+  min-height: 100svh;
+  padding: 24px 16px;
+  background: var(--app-bg);
+}
+
+.aviso-cartao {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 32px 36px;
+  background: var(--surface);
+  border: 1px solid var(--app-borda);
+  border-radius: var(--raio-card);
+  box-shadow: var(--sombra-suave);
+}
+
+.aviso-ilustracao {
+  width: 112px;
+  height: 112px;
+  margin-bottom: 8px;
+}
+
+.aviso-ilustracao-fundo {
+  fill: var(--accent-suave);
+}
+
+.aviso-ilustracao-lente {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+
+.aviso-ilustracao-traco {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.aviso-ilustracao-traco.fino {
+  stroke-width: 4;
+  opacity: 0.55;
+}
+
+.aviso-ilustracao-ponto {
+  fill: var(--accent);
+}
+
+.aviso-codigo {
+  margin: 0;
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -2px;
+  background: linear-gradient(135deg, var(--destaque-de), var(--destaque-ate));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.aviso-cartao h1 {
+  margin-top: 10px;
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.aviso-texto {
+  max-width: 36ch;
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.aviso-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.aviso-botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 8px 20px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, filter 0.15s ease;
+}
+
+.aviso-botao:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.aviso-botao-primario,
+.aviso-botao-primario:hover {
+  color: #ffffff;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--destaque-de), var(--destaque-ate));
+}
+
+.aviso-botao-primario:hover {
+  filter: brightness(1.08);
+}
+
+.aviso-botao:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .aviso-cartao {
+    padding: 32px 20px 28px;
+  }
+
+  .aviso-codigo {
+    font-size: 46px;
+  }
+
+  .aviso-acoes {
+    flex-direction: column-reverse;
+    align-self: stretch;
+  }
+}

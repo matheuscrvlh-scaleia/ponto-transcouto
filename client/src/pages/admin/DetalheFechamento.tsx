@@ -67,7 +67,7 @@ export function DetalheFechamento() {
 
   return (
     <section className="pagina">
-      <Link to="/admin/fechamentos" className="voltar">
+      <Link to=".." relative="path" className="voltar">
         ← Voltar ao painel
       </Link>
 

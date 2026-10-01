@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import type { ApiError } from '../lib/api'
+import { TelaNaoEncontrada } from './TelaAviso'
 
 export function Carregando({ texto = 'Carregando...', tela = false }: { texto?: string; tela?: boolean }) {
   return (
@@ -12,14 +12,15 @@ export function Carregando({ texto = 'Carregando...', tela = false }: { texto?: 
 }
 
 export function ErroCarregamento({ erro, onTentarDeNovo }: { erro: ApiError; onTentarDeNovo?: () => void }) {
-  if (erro.status === 404 || erro.status === 403) {
+  // "Rota não encontrada" vem do servidor quando o endpoint não existe (API desatualizada):
+  // é erro de sistema, não "sem acesso" — cai no aviso genérico abaixo
+  const rotaInexistente = erro.status === 404 && erro.message === 'Rota não encontrada.'
+  if ((erro.status === 404 || erro.status === 403) && !rotaInexistente) {
     return (
-      <EstadoVazio titulo="Não encontrado">
-        <p>Esta página não existe ou você não tem acesso a ela.</p>
-        <Link to="/" className="btn-link">
-          Voltar para o início
-        </Link>
-      </EstadoVazio>
+      <TelaNaoEncontrada
+        titulo="Não encontramos o que você procura"
+        texto="Este conteúdo não existe ou você não tem acesso a ele. Confira o endereço ou volte para o início."
+      />
     )
   }
 

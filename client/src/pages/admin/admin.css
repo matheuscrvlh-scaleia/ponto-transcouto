@@ -183,32 +183,37 @@
   font-size: 14px;
 }
 
-.seletor-empresa {
+/* Equipe em "Todas as empresas" numa tela de uma empresa só: botões para escolher */
+.escolha-empresa {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 18px;
   flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
 }
 
-.seletor-empresa label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.seletor-empresa select {
+.escolha-empresa-botao {
+  min-height: 40px;
+  padding: 8px 18px;
   font: inherit;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  min-height: 40px;
-  min-width: 220px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.escolha-empresa-botao:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.escolha-empresa-botao span {
+  font-weight: 400;
+  color: var(--text);
 }
 
 .pilula {
@@ -568,13 +573,6 @@ tr.linha-inativa > * {
   margin: 0;
 }
 
-@media (max-width: 900px) {
-  .seletor-empresa select {
-    flex: 1;
-    min-width: 0;
-  }
-}
-
 @media (max-width: 640px) {
   .cartoes-admin {
     display: flex;
@@ -634,17 +632,6 @@ tr.linha-inativa > * {
   min-width: 200px;
   max-width: 280px;
   margin-top: 4px;
-}
-
-@media (max-width: 900px) {
-  .admin-layout {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-menu-toggle {
-    align-self: flex-start;
-  }
 }
 
 @media (max-width: 640px) {

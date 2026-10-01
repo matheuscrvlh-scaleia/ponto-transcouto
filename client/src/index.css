@@ -21,6 +21,16 @@
   --shadow:
     rgba(0, 0, 0, 0.06) 0 1px 2px, rgba(0, 0, 0, 0.08) 0 8px 24px -8px;
 
+  /* Shell e dashboard */
+  --app-bg: #eff0f4;
+  --app-borda: rgba(17, 24, 39, 0.04);
+  --raio-card: 20px;
+  --sombra-suave: rgba(16, 24, 40, 0.04) 0 1px 2px, rgba(16, 24, 40, 0.06) 0 6px 18px -8px;
+  --accent-suave: #f1ebfe;
+  --destaque-de: #8b5cf6;
+  --destaque-ate: #5b21b6;
+  --destaque-texto: #ffffff;
+
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
 
   font: 15px/150% var(--sans);
@@ -57,6 +67,13 @@
   --aviso-border: rgba(252, 211, 77, 0.35);
   --shadow:
     rgba(0, 0, 0, 0.5) 0 1px 2px, rgba(0, 0, 0, 0.4) 0 8px 24px -8px;
+  --app-bg: #0c0d10;
+  --app-borda: rgba(255, 255, 255, 0.04);
+  --sombra-suave: rgba(0, 0, 0, 0.35) 0 1px 2px, rgba(0, 0, 0, 0.3) 0 6px 18px -8px;
+  --accent-suave: rgba(167, 139, 250, 0.14);
+  --destaque-de: #7c3aed;
+  --destaque-ate: #4c1d95;
+  --destaque-texto: #ffffff;
   color-scheme: dark;
 }
 
@@ -90,71 +107,9 @@ button {
   font-family: inherit;
 }
 
-/* ---------- Login ---------- */
-/* Cores fixas (nao seguem dark mode): o card fica sobre uma foto de
-   banner, entao mantemos sempre um cartao claro e limpo. */
-
-.login-page {
-  --login-bg: #ffffff;
-  --login-text: #6b7280;
-  --login-text-h: #111827;
-  --login-border: #e5e7eb;
-  --login-field-bg: #f9fafb;
-  --login-accent: #7c3aed;
-  --login-accent-hover: #6d28d9;
-
-  flex: 1;
-  min-height: 100svh;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 5vh 10vw;
-  background-color: var(--login-text-h);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-.login-card {
-  width: 100%;
-  max-width: 380px;
-  background: var(--login-bg);
-  border-radius: 16px;
-  box-shadow: rgba(0, 0, 0, 0.12) 0 1px 3px, rgba(0, 0, 0, 0.2) 0 16px 40px -12px;
-  overflow: hidden;
-}
-
-.login-brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: #14336b;
-  padding: 36px 36px 26px;
-}
-
-.login-logo {
-  height: 68px;
-  width: auto;
-  object-fit: contain;
-  margin-bottom: 14px;
-}
-
-.login-wordmark {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.login-body {
-  padding: 32px 36px 40px;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
+/* ---------- Campos e botões de formulário ---------- */
+/* Telas de acesso: components/layout-acesso.css. As variáveis --login-*
+   são definidas por quem usa estes estilos (layout-acesso.css, admin.css). */
 
 .field {
   display: flex;
@@ -224,13 +179,6 @@ button {
   padding: 8px 12px;
 }
 
-@media (max-width: 720px) {
-  .login-page {
-    justify-content: center;
-    padding: 20px;
-  }
-}
-
 .carregando {
   flex: 1;
   display: flex;
@@ -239,151 +187,7 @@ button {
   color: var(--text);
 }
 
-/* ---------- App shell (sidebar principal) ---------- */
-
-.app-shell {
-  min-height: 100svh;
-  display: flex;
-}
-
-.app-sidebar-overlay {
-  display: none;
-}
-
-.app-sidebar {
-  width: 248px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  padding: 20px 14px;
-  position: sticky;
-  top: 0;
-  height: 100svh;
-}
-
-.app-sidebar-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
-  white-space: nowrap;
-}
-
-.brand-logo-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #14336b;
-  border-radius: 7px;
-  padding: 5px 9px;
-}
-
-.brand-logo {
-  height: 18px;
-  width: auto;
-  object-fit: contain;
-}
-
-.app-sidebar-top-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  color: var(--text);
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
-}
-
-.theme-toggle:hover {
-  color: var(--text-h);
-  border-color: var(--accent);
-  background: var(--muted);
-}
-
-.app-sidebar-close {
-  display: none;
-  font-size: 20px;
-  line-height: 1;
-  background: none;
-  border: none;
-  color: var(--text);
-  cursor: pointer;
-  padding: 4px;
-}
-
-.app-sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.app-sidebar-nav a {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  text-decoration: none;
-  padding: 9px 12px;
-  border-radius: 7px;
-  border-left: 3px solid transparent;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.app-sidebar-nav a:hover {
-  color: var(--text-h);
-  background: var(--muted);
-}
-
-.app-sidebar-nav a.active {
-  color: var(--text-h);
-  background: var(--muted);
-  border-left-color: var(--accent);
-  font-weight: 600;
-}
-
-.app-sidebar-bottom {
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.app-sidebar-bottom .user-info {
-  line-height: 135%;
-}
-
-.app-sidebar-bottom .user-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.app-sidebar-bottom .user-cargos {
-  font-size: 12px;
-  color: var(--text);
-}
+/* ---------- App shell, seletor de unidade e tema: components/app-layout.css ---------- */
 
 .btn-secondary {
   font: inherit;
@@ -402,60 +206,6 @@ button {
 .btn-secondary:hover {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-
-.app-menu-toggle {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-h);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 14px;
-  margin-bottom: 20px;
-  cursor: pointer;
-}
-
-.app-main {
-  flex: 1;
-  min-width: 0;
-  padding: 32px 28px;
-}
-
-@media (max-width: 900px) {
-  .app-menu-toggle {
-    display: inline-flex;
-  }
-
-  .app-sidebar {
-    position: fixed;
-    top: 0;
-    left: -260px;
-    width: 240px;
-    z-index: 101;
-    box-shadow: var(--shadow);
-    transition: left 0.2s ease;
-  }
-
-  .app-sidebar.open {
-    left: 0;
-  }
-
-  .app-sidebar-close {
-    display: block;
-  }
-
-  .app-sidebar-overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 17, 20, 0.5);
-    z-index: 100;
-  }
 }
 
 .card {
@@ -511,147 +261,11 @@ button {
 /* ---------- Admin ---------- */
 
 .admin-layout {
-  display: flex;
-  align-items: flex-start;
   min-height: 100%;
 }
 
-.admin-menu-toggle {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-h);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 14px;
-  margin-bottom: 16px;
-  cursor: pointer;
-}
-
-.admin-sidebar-overlay {
-  display: none;
-}
-
-.admin-sidebar {
-  width: 208px;
-  flex-shrink: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 8px;
-  margin-right: 24px;
-  position: sticky;
-  top: 32px;
-}
-
-.admin-sidebar-header {
-  display: none;
-}
-
-.admin-sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.admin-sidebar-nav a {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  text-decoration: none;
-  padding: 9px 12px;
-  border-radius: 7px;
-  border-left: 3px solid transparent;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.admin-sidebar-nav a:hover {
-  color: var(--text-h);
-  background: var(--muted);
-}
-
-.admin-sidebar-nav a.active {
-  color: var(--text-h);
-  background: var(--muted);
-  border-left-color: var(--accent);
-  font-weight: 600;
-}
-
 .admin-content {
-  flex: 1;
   min-width: 0;
-}
-
-@media (max-width: 900px) {
-  .admin-menu-toggle {
-    display: inline-flex;
-  }
-
-  .admin-sidebar {
-    position: fixed;
-    top: 0;
-    left: -260px;
-    height: 100vh;
-    width: 240px;
-    margin-right: 0;
-    border-radius: 0;
-    border: none;
-    border-right: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    z-index: 101;
-    transition: left 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-  }
-
-  .admin-sidebar.open {
-    left: 0;
-  }
-
-  .admin-sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 16px 12px;
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    color: var(--text);
-  }
-
-  .admin-sidebar-close {
-    font-size: 20px;
-    line-height: 1;
-    background: none;
-    border: none;
-    color: var(--text);
-    cursor: pointer;
-    padding: 4px;
-  }
-
-  .admin-sidebar-nav {
-    padding: 0 8px;
-  }
-
-  .admin-sidebar-overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 17, 20, 0.5);
-    z-index: 100;
-  }
-}
-
-@media (min-width: 901px) {
-  .admin-sidebar-close {
-    display: none;
-  }
 }
 
 /* ---------- Card toolbar / buttons ---------- */
@@ -888,11 +502,6 @@ tbody tr:last-child td {
   .spinner {
     animation-duration: 3s;
   }
-
-  .app-sidebar,
-  .admin-sidebar {
-    transition: none;
-  }
 }
 
 .btn-inline {
@@ -903,32 +512,6 @@ tbody tr:last-child td {
 a.btn-link {
   text-decoration: none;
   display: inline-block;
-}
-
-/* ---------- Login / troca de senha ---------- */
-
-.login-titulo {
-  font-size: 18px;
-  color: var(--login-text-h);
-  margin-bottom: 8px;
-}
-
-.login-texto {
-  font-size: 14px;
-  color: var(--login-text);
-  margin-bottom: 18px;
-}
-
-.login-ajuda {
-  font-size: 13px;
-  color: var(--login-text);
-  text-align: center;
-  margin: 0;
-}
-
-.login-page .btn-link {
-  color: var(--login-accent);
-  align-self: center;
 }
 
 .form-info {
@@ -970,44 +553,6 @@ a.btn-link {
   color: var(--login-text);
 }
 
-/* ---------- Shell: topo mobile e seletor de unidade ---------- */
-
-a.brand {
-  text-decoration: none;
-}
-
-.app-sidebar-bottom .btn-link {
-  margin: 0;
-  align-self: flex-start;
-}
-
-.app-topbar {
-  display: none;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.app-topbar .app-menu-toggle {
-  margin-bottom: 0;
-  min-height: 44px;
-}
-
-.seletor-unidade {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.seletor-unidade label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text);
-}
-
-.seletor-unidade select,
 .ordem-mobile select {
   font: inherit;
   font-size: 14px;
@@ -1018,42 +563,6 @@ a.brand {
   border-radius: 8px;
   padding: 8px 10px;
   min-height: 40px;
-}
-
-.seletor-sidebar {
-  margin-bottom: 18px;
-}
-
-.seletor-topbar {
-  flex: 1;
-  min-width: 0;
-}
-
-.seletor-topbar label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-}
-
-.seletor-topbar select {
-  width: 100%;
-  min-height: 44px;
-}
-
-@media (max-width: 900px) {
-  .app-topbar {
-    display: flex;
-  }
-
-  .seletor-sidebar {
-    display: none;
-  }
-
-  .app-main {
-    padding: 16px;
-  }
 }
 
 /* ---------- Páginas ---------- */
@@ -1125,46 +634,6 @@ a.brand {
 
 .rodape-nota {
   font-size: 12px;
-  color: var(--text);
-}
-
-/* ---------- Seleção de unidade ---------- */
-
-.grade-unidades {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.cartao-unidade {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 18px;
-  min-height: 88px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  text-decoration: none;
-  box-shadow: var(--shadow);
-  transition: border-color 0.15s ease;
-}
-
-.cartao-unidade:hover {
-  border-color: var(--accent);
-}
-
-.cartao-unidade-nome {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.cartao-unidade-info {
-  font-size: 13px;
   color: var(--text);
 }
 

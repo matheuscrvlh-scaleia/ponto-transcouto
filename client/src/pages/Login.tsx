@@ -2,8 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../lib/api'
-import { CartaoAcesso } from '../components/CartaoAcesso'
 import { CampoSenha } from '../components/CampoSenha'
+import { IconeCadeado, IconeUsuario, LayoutAcesso } from '../components/LayoutAcesso'
 
 function mensagemErro(erro: unknown): string {
   if (!(erro instanceof ApiError)) return 'Não foi possível entrar. Tente novamente em instantes.'
@@ -52,8 +52,13 @@ export function Login() {
   }
 
   return (
-    <CartaoAcesso>
-      <form className="login-form" onSubmit={handleSubmit} noValidate>
+    <LayoutAcesso
+      tituloPainel="Bem-vindo de volta!"
+      textoPainel="Entre para acompanhar o banco de horas da sua unidade, atualizado toda semana."
+      titulo="Entrar"
+      subtitulo="Use seu e-mail ou CPF cadastrado."
+    >
+      <form className="lg-form" onSubmit={handleSubmit} noValidate>
         {params.get('expirou') && !erro && (
           <p className="form-info" role="status">
             Sua sessão expirou. Entre novamente.
@@ -61,28 +66,40 @@ export function Login() {
         )}
         <div className="field">
           <label htmlFor="identificador">E-mail ou CPF</label>
-          <input
-            id="identificador"
-            type="text"
-            value={identificador}
-            onChange={(event) => setIdentificador(mascararCpf(event.target.value))}
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            required
-          />
+          <div className="lg-pilula">
+            <span className="campo-icone" aria-hidden="true">
+              <IconeUsuario />
+            </span>
+            <input
+              id="identificador"
+              type="text"
+              value={identificador}
+              onChange={(event) => setIdentificador(mascararCpf(event.target.value))}
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              required
+            />
+          </div>
         </div>
-        <CampoSenha id="senha" rotulo="Senha" valor={senha} onChange={setSenha} autoComplete="current-password" />
+        <CampoSenha
+          id="senha"
+          rotulo="Senha"
+          valor={senha}
+          onChange={setSenha}
+          autoComplete="current-password"
+          icone={<IconeCadeado />}
+        />
         {erro && (
           <p className="form-erro" role="alert">
             {erro}
           </p>
         )}
-        <button className="btn-primary" type="submit" disabled={enviando || !identificador.trim() || !senha}>
+        <button className="lg-botao" type="submit" disabled={enviando || !identificador.trim() || !senha}>
           {enviando ? 'Entrando...' : 'Entrar'}
         </button>
-        <p className="login-ajuda">Esqueceu a senha? Fale com o RH.</p>
+        <p className="lg-ajuda">Esqueceu a senha? Fale com o RH.</p>
       </form>
-    </CartaoAcesso>
+    </LayoutAcesso>
   )
 }

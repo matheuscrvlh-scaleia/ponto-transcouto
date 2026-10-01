@@ -1,0 +1,306 @@
+/* ---------- Permissões (carregado pelo Permissoes) ---------- */
+
+.pagina.perm {
+  max-width: 1100px;
+  gap: 20px;
+}
+
+/* ----- Cartões dos perfis ----- */
+
+.perm-perfis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.perm-perfil {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--app-borda);
+  border-radius: var(--raio-card);
+  box-shadow: var(--sombra-suave);
+}
+
+.perm-perfil-admin {
+  color: var(--destaque-texto);
+  background: linear-gradient(135deg, var(--destaque-de), var(--destaque-ate));
+  border-color: transparent;
+}
+
+.perm-perfil-topo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.perm-perfil h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.perm-perfil-admin h2 {
+  color: inherit;
+}
+
+.perm-perfil-icone {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.perm-perfil-admin .perm-perfil-icone {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.perm-perfil p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.perm-perfil-admin p {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.perm-perfil-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-suave);
+  border-radius: 999px;
+  text-decoration: none;
+  transition: filter 0.15s ease;
+}
+
+.perm-perfil-link:hover {
+  filter: brightness(0.96);
+}
+
+.perm-perfil-admin .perm-perfil-link {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.perm-perfil-admin .perm-perfil-link:hover {
+  filter: brightness(1.1);
+}
+
+/* ----- Matriz ----- */
+
+.perm-card {
+  background: var(--surface);
+  border: 1px solid var(--app-borda);
+  border-radius: var(--raio-card);
+  box-shadow: var(--sombra-suave);
+  overflow: hidden;
+}
+
+.perm-tabela-rolagem {
+  overflow-x: auto;
+}
+
+.perm-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.perm-tabela thead th {
+  padding: 14px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: left;
+  color: var(--text);
+  background: var(--muted);
+}
+
+.perm-tabela tbody th,
+.perm-tabela td {
+  padding: 14px 18px;
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--border);
+}
+
+.perm-tabela tbody th {
+  width: 30%;
+  min-width: 200px;
+  font-weight: normal;
+}
+
+/* Cabeçalho de cada grupo de áreas (Gestão, Configuração, Administração...) */
+.perm-tabela tbody .perm-grupo th {
+  width: auto;
+  padding: 9px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.perm-area {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.perm-area-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.perm-tabela td {
+  min-width: 170px;
+}
+
+.perm-celula {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.perm-marca {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.perm-total .perm-marca {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.perm-parcial .perm-marca {
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.perm-nenhum .perm-marca {
+  color: var(--text);
+  background: var(--muted);
+}
+
+.perm-celula-texto {
+  padding-top: 2px;
+  color: var(--text-h);
+  line-height: 1.4;
+}
+
+.perm-parcial .perm-celula-texto {
+  color: var(--text);
+}
+
+.perm-nota {
+  margin: 0;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+.perm-nota a {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ----- Responsivo ----- */
+
+@media (max-width: 900px) {
+  .perm-perfis {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Celular: cada área vira um bloco, com o perfil escrito antes de cada célula. */
+@media (max-width: 640px) {
+  .perm-tabela thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .perm-tabela,
+  .perm-tabela tbody,
+  .perm-tabela tr,
+  .perm-tabela th,
+  .perm-tabela td {
+    display: block;
+    width: auto;
+    min-width: 0;
+  }
+
+  .perm-tabela tr {
+    padding: 14px 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .perm-tabela tr:first-child {
+    border-top: none;
+  }
+
+  .perm-tabela tbody th,
+  .perm-tabela td {
+    padding: 0;
+    border-top: none;
+  }
+
+  .perm-tabela tbody th {
+    margin-bottom: 10px;
+  }
+
+  .perm-tabela td {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 0;
+  }
+
+  .perm-tabela tbody .perm-grupo {
+    padding: 0;
+  }
+
+  .perm-tabela tbody .perm-grupo th {
+    margin: 0;
+    padding: 8px 16px;
+  }
+
+  .perm-tabela td::before {
+    content: attr(data-perfil);
+    padding-top: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+}

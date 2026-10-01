@@ -1,0 +1,942 @@
+/* ---------- App shell: sidebar + topo (carregado pelo AppLayout) ---------- */
+
+.app-shell {
+  min-height: 100svh;
+  display: flex;
+  gap: 16px;
+  padding: 14px;
+  background: var(--app-bg);
+}
+
+.app-sidebar-overlay {
+  display: none;
+}
+
+/* ----- Sidebar ----- */
+
+.app-sidebar {
+  width: 252px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--app-borda);
+  border-radius: var(--raio-card);
+  box-shadow: var(--sombra-suave);
+  padding: 22px 18px 18px;
+  position: sticky;
+  top: 14px;
+  height: calc(100svh - 28px);
+  /* topo e rodapé fixos; só a navegação rola */
+  overflow: hidden;
+}
+
+.app-sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+  text-decoration: none;
+}
+
+.brand-nome {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #14336b;
+  border-radius: 10px;
+  padding: 7px 10px;
+}
+
+.brand-logo {
+  height: 18px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.app-sidebar-close {
+  display: none;
+  font-size: 22px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: none;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.seletor-sidebar {
+  margin-bottom: 20px;
+}
+
+/* ----- Seletor de unidade (botão + lista suspensa) ----- */
+
+.seletor-unidade {
+  position: relative;
+  min-width: 0;
+}
+
+.seletor-gatilho {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--text-h);
+  background: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.seletor-gatilho:hover {
+  background: var(--accent-suave);
+}
+
+.seletor-gatilho:focus-visible,
+.seletor-unidade.aberto .seletor-gatilho {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-suave);
+}
+
+.seletor-gatilho-icone {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: var(--accent-contrast);
+  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #1e0b4b));
+  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.seletor-gatilho-texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.25;
+}
+
+.seletor-rotulo {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text);
+}
+
+.seletor-valor {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seletor-valor.vazio {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.seletor-seta {
+  flex-shrink: 0;
+  color: var(--text);
+  transition: color 0.15s ease;
+}
+
+.seletor-unidade.aberto .seletor-seta {
+  color: var(--accent);
+}
+
+.seletor-lista {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  animation: seletor-entrar 0.14s ease-out;
+}
+
+.seletor-lista:focus {
+  outline: none;
+}
+
+.seletor-opcao {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.seletor-opcao.ativa {
+  background: var(--muted);
+}
+
+.seletor-opcao.selecionada {
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.seletor-opcao-nome {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seletor-opcao-check,
+.seletor-opcao-icone {
+  flex-shrink: 0;
+}
+
+/* "Todas as unidades" separada das unidades por uma linha */
+.seletor-opcao.todas {
+  position: relative;
+  margin-bottom: 7px;
+}
+
+.seletor-opcao.todas::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.seletor-opcao.todas:not(.selecionada) .seletor-opcao-icone {
+  color: var(--text);
+}
+
+@keyframes seletor-entrar {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.app-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  /* rola sem barra visível; a margem negativa deixa o indicador do item
+     ativo (encostado na borda da sidebar) fora da área cortada */
+  overflow-y: auto;
+  margin: 0 -18px;
+  padding: 0 18px;
+  scrollbar-width: none;
+}
+
+.app-sidebar-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.app-sidebar-top,
+.seletor-sidebar,
+.app-sidebar-rodape {
+  flex-shrink: 0;
+}
+
+/* Seção recolhível (Gestão, Administração) */
+.app-nav-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-nav-grupo + .app-nav-grupo {
+  margin-top: 10px;
+}
+
+.app-nav-secao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.app-nav-secao:hover {
+  color: var(--text-h);
+  background: var(--muted);
+}
+
+.app-nav-secao:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.app-nav-secao-nome {
+  flex: 1;
+}
+
+/* seção recolhida com a página atual dentro: um ponto avisa onde você está */
+.app-nav-secao-ponto {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.app-nav-secao-seta {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.app-nav-grupo.recolhido .app-nav-secao-seta {
+  transform: rotate(-90deg);
+}
+
+.app-nav-itens {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-nav-itens[hidden] {
+  display: none;
+}
+
+.app-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.app-nav-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-nav-icone {
+  flex-shrink: 0;
+}
+
+.app-nav-item:hover {
+  color: var(--text-h);
+  background: var(--muted);
+}
+
+.app-nav-item.active {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.app-nav-item.active .app-nav-icone {
+  color: var(--accent);
+}
+
+/* indicador do item ativo, encostado na borda da sidebar */
+.app-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -18px;
+  top: 50%;
+  width: 4px;
+  height: 26px;
+  margin-top: -13px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+}
+
+/* ----- Rodapé da sidebar: tema + notificações, usuário, assinatura ----- */
+
+.app-sidebar-rodape {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.app-sidebar-acoes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tema: botão único em pílula com indicador à direita */
+.tema-botao {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.tema-botao:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.tema-botao:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tema-botao svg {
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.tema-botao-texto {
+  flex: 1;
+  text-align: left;
+}
+
+.tema-botao-indicador {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.45;
+  transition: background-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tema-botao.escuro svg {
+  color: var(--accent);
+}
+
+.tema-botao.escuro .tema-botao-indicador {
+  background: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--accent-suave);
+}
+
+/* Sino de notificações */
+.notif-botao {
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--text-h);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.notif-botao:hover,
+.notif-botao.aberto {
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.notif-botao:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.notif-badge {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+  background: #ef4444;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+}
+
+.notif-painel {
+  position: fixed;
+  z-index: 120;
+  max-height: min(440px, calc(100svh - 40px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: seletor-entrar 0.14s ease-out;
+}
+
+.notif-cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notif-cabecalho strong {
+  font-size: 15px;
+  color: var(--text-h);
+}
+
+.notif-cabecalho span {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.notif-vazio {
+  margin: 0;
+  padding: 24px 16px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--text);
+}
+
+.notif-lista {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.notif-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.notif-item:hover {
+  background: var(--muted);
+}
+
+.notif-item.nova {
+  background: var(--accent-suave);
+}
+
+.notif-ponto {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.notif-item.nova .notif-ponto {
+  background: var(--accent);
+}
+
+.notif-texto {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notif-titulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.notif-detalhe,
+.notif-quando {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.notif-quando {
+  opacity: 0.8;
+}
+
+/* Usuário: avatar + nome + e-mail levam ao perfil; botão de sair ao lado */
+.app-usuario {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-usuario-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.15s ease;
+}
+
+.app-usuario-link:hover,
+.app-usuario-link.active {
+  background: var(--muted);
+}
+
+.app-usuario-link.active .avatar {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.app-usuario-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 135%;
+}
+
+.user-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-cargos {
+  display: block;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-sair {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.app-sair:hover {
+  color: var(--negativo);
+  background: var(--negativo-bg);
+}
+
+.app-assinatura {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text);
+}
+
+.app-assinatura strong {
+  color: var(--text-h);
+  font-weight: 700;
+}
+
+/* ----- Avatar com iniciais (shell e dashboard) ----- */
+
+.avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--accent);
+  background: var(--accent-suave);
+  user-select: none;
+}
+
+/* ----- Área principal e topo ----- */
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  padding: 12px 14px 12px 20px;
+  background: var(--surface);
+  border: 1px solid var(--app-borda);
+  border-radius: var(--raio-card);
+  box-shadow: var(--sombra-suave);
+}
+
+.app-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  color: var(--text-h);
+  background: var(--muted);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.app-topbar-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--muted);
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+
+.app-topbar-nota svg {
+  color: var(--accent);
+}
+
+.seletor-topbar {
+  display: none;
+  flex: 1;
+}
+
+.app-conteudo {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 10px 24px;
+}
+
+/* ----- Responsivo ----- */
+
+@media (max-width: 900px) {
+  .app-shell {
+    padding: 10px;
+  }
+
+  .app-menu-toggle {
+    display: inline-flex;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: -300px;
+    width: 280px;
+    height: 100svh;
+    border-radius: 0 var(--raio-card) var(--raio-card) 0;
+    border-left: none;
+    z-index: 101;
+    box-shadow: var(--shadow);
+    transition: left 0.2s ease;
+  }
+
+  .app-sidebar.open {
+    left: 0;
+  }
+
+  .app-sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .app-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 17, 20, 0.5);
+    z-index: 100;
+  }
+
+  .seletor-sidebar {
+    display: none;
+  }
+
+  .seletor-topbar {
+    display: flex;
+  }
+
+  .app-topbar {
+    padding: 10px;
+    min-height: 0;
+    gap: 10px;
+  }
+
+  .app-topbar-nota {
+    display: none;
+  }
+
+  .app-conteudo {
+    padding: 4px 4px 16px;
+  }
+}
+
+/* No desktop o topo traz o aviso de somente leitura e, para a equipe, o seletor
+   de empresa; sem nenhum dos dois ele ficaria vazio, então some. */
+@media (min-width: 901px) {
+  .app-topbar.sem-nota {
+    display: none;
+  }
+}
+
+/* ----- Seletor de empresa (equipe), à direita do topo ----- */
+
+.app-topbar-acoes {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-topbar-acoes:empty {
+  display: none;
+}
+
+.seletor-empresa-topo {
+  width: 260px;
+}
+
+.seletor-empresa-topo .seletor-gatilho {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.seletor-empresa-topo .seletor-gatilho-icone {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+/* lista alinhada à direita do botão, para não sair da tela */
+.seletor-empresa-topo .seletor-lista {
+  left: auto;
+  right: 0;
+  min-width: 100%;
+}
+
+@media (max-width: 900px) {
+  .app-topbar-acoes {
+    flex: 1;
+  }
+
+  .seletor-empresa-topo {
+    width: auto;
+    flex: 1;
+  }
+
+  .seletor-empresa-topo .seletor-rotulo {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar,
+  .app-nav-secao-seta {
+    transition: none;
+  }
+
+  .seletor-lista,
+  .notif-painel {
+    animation: none;
+  }
+}

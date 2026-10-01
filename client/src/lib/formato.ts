@@ -94,6 +94,19 @@ export function mascararCpfEntrada(texto: string): string {
     .replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2')
 }
 
+/** Confere os dígitos verificadores do CPF (aceita com ou sem máscara). */
+export function cpfValido(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, '')
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false
+  const digito = (tamanho: number) => {
+    const soma = [...d.slice(0, tamanho)].reduce((total, n, i) => total + Number(n) * (tamanho + 1 - i), 0)
+    return ((soma * 10) % 11) % 10
+  }
+  return digito(9) === Number(d[9]) && digito(10) === Number(d[10])
+}
+
+export const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export function formatarDuracao(inicio: DataHoraISO, fim: DataHoraISO | null): string {
   if (!fim) return 'em andamento'
   const segundos = Math.max(0, Math.round((new Date(fim).getTime() - new Date(inicio).getTime()) / 1000))
@@ -133,4 +146,12 @@ export function dataHoraLocalParaIso(valor: string): DataHoraISO | null {
   const p = partesNoFuso(new Date(comoUtc))
   const deslocamento = Date.UTC(p.ano, p.mes - 1, p.dia, p.hora, p.minuto) - comoUtc
   return new Date(comoUtc - deslocamento).toISOString()
+}
+
+/** "Maria da Silva Souza" → "MS" (primeira e última palavra), para avatares. */
+export function iniciais(nome: string | null | undefined): string {
+  const partes = (nome ?? '').trim().split(/\s+/).filter(Boolean)
+  if (partes.length === 0) return '?'
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : ''
+  return (partes[0][0] + ultima).toLocaleUpperCase('pt-BR')
 }

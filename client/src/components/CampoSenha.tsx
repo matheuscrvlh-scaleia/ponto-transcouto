@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 interface Props {
   id: string
@@ -7,15 +7,22 @@ interface Props {
   onChange: (valor: string) => void
   autoComplete: 'current-password' | 'new-password'
   descricao?: string
+  /** Ícone decorativo opcional, renderizado antes do input (aria-hidden). */
+  icone?: ReactNode
 }
 
-export function CampoSenha({ id, rotulo, valor, onChange, autoComplete, descricao }: Props) {
+export function CampoSenha({ id, rotulo, valor, onChange, autoComplete, descricao, icone }: Props) {
   const [visivel, setVisivel] = useState(false)
 
   return (
     <div className="field">
       <label htmlFor={id}>{rotulo}</label>
       <div className="campo-senha">
+        {icone && (
+          <span className="campo-icone" aria-hidden="true">
+            {icone}
+          </span>
+        )}
         <input
           id={id}
           type={visivel ? 'text' : 'password'}

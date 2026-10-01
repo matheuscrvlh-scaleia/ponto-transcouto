@@ -154,7 +154,7 @@ function PainelFechamentos() {
           <p>
             {temFiltro
               ? 'Ajuste ou limpe os filtros.'
-              : 'A régua ainda não gerou fechamentos para esta empresa — confira Configurações e o calendário abaixo.'}
+              : 'A régua ainda não gerou fechamentos para esta empresa — confira o calendário abaixo.'}
           </p>
         </EstadoVazio>
       )}

@@ -3,25 +3,16 @@ import { Campo } from '../../components/Campo'
 import { Modal } from '../../components/Modal'
 import { ApiError, api } from '../../lib/api'
 import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
-import { mascararCpfEntrada } from '../../lib/formato'
+import { cpfValido, EMAIL_VALIDO, mascararCpfEntrada } from '../../lib/formato'
 import { NOME_PERFIL } from '../../lib/preferencias'
-import type { Perfil, UnidadeAdmin, UsuarioAdmin, UsuarioCriado } from '../../types/api'
+import type { ClienteAdmin, ContaCriada, PerfilCliente, UnidadeAdmin } from '../../types/api'
 
-function cpfValido(cpf: string) {
-  const d = cpf.replace(/\D/g, '')
-  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false
-  const digito = (tamanho: number) => {
-    const soma = [...d.slice(0, tamanho)].reduce((total, n, i) => total + Number(n) * (tamanho + 1 - i), 0)
-    return ((soma * 10) % 11) % 10
-  }
-  return digito(9) === Number(d[9]) && digito(10) === Number(d[10])
-}
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PERFIS: PerfilCliente[] = ['gestor', 'rh']
 
 interface Props {
-  usuario: UsuarioAdmin | null
+  usuario: ClienteAdmin | null
   empresaId: number
+  /** Equipe Scale IA: informa a empresa ao criar (o RH usa a própria). */
   ehAdmin: boolean
   ehProprio: boolean
   unidades: UnidadeAdmin[]
@@ -34,7 +25,7 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
   const [nome, setNome] = useState(usuario?.nome ?? '')
   const [email, setEmail] = useState(usuario?.email ?? '')
   const [cpf, setCpf] = useState('')
-  const [perfil, setPerfil] = useState<Perfil>(usuario?.perfil ?? 'gestor')
+  const [perfil, setPerfil] = useState<PerfilCliente>(usuario?.perfil ?? 'gestor')
   const [unidadeIds, setUnidadeIds] = useState<number[]>(() => usuario?.unidades.map((unidade) => unidade.id) ?? [])
   const [erros, setErros] = useState<Record<string, string>>({})
   const [erroGeral, setErroGeral] = useState('')
@@ -43,7 +34,7 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
   function validar() {
     const saida: Record<string, string> = {}
     if (nome.trim().length < 2) saida.nome = 'Informe o nome (mín. 2 caracteres).'
-    if (email.trim() && !EMAIL.test(email.trim())) saida.email = 'E-mail inválido.'
+    if (email.trim() && !EMAIL_VALIDO.test(email.trim())) saida.email = 'E-mail inválido.'
     if (cpf && !cpfValido(cpf)) saida.cpf = 'CPF inválido.'
     const temCpf = Boolean(cpf) || Boolean(usuario?.cpf_mascarado)
     if (!email.trim() && !temCpf) saida.email = 'Informe e-mail ou CPF (usados para entrar).'
@@ -63,14 +54,14 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
     setEnviando(true)
     try {
       if (!usuario) {
-        const criado = await api<UsuarioCriado>('/usuarios', {
+        const criado = await api<ContaCriada<ClienteAdmin>>('/clientes', {
           method: 'POST',
           json: {
             nome: nome.trim(),
             email: emailLimpo,
             cpf: cpfDigitos,
             perfil,
-            empresa_id: ehAdmin && perfil !== 'admin' ? empresaId : undefined,
+            empresa_id: ehAdmin ? empresaId : undefined,
             unidade_ids: perfil === 'gestor' ? unidadeIds : [],
           },
         })
@@ -81,18 +72,15 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
       if (nome.trim() !== usuario.nome) alteracoes.nome = nome.trim()
       if (emailLimpo !== usuario.email) alteracoes.email = emailLimpo
       if (cpfDigitos) alteracoes.cpf = cpfDigitos
-      if (perfil !== usuario.perfil) {
-        alteracoes.perfil = perfil
-        if (ehAdmin && perfil !== 'admin' && usuario.empresa_id == null) alteracoes.empresa_id = empresaId
-      }
+      if (perfil !== usuario.perfil) alteracoes.perfil = perfil
       if (Object.keys(alteracoes).length) {
-        await api(`/usuarios/${usuario.id}`, { method: 'PATCH', json: alteracoes })
+        await api(`/clientes/${usuario.id}`, { method: 'PATCH', json: alteracoes })
       }
 
       const anteriores = usuario.perfil === 'gestor' ? usuario.unidades.map((unidade) => unidade.id) : []
       const mudouUnidades = [...anteriores].sort().join() !== [...unidadeIds].sort().join() || perfil !== usuario.perfil
       if (perfil === 'gestor' && mudouUnidades) {
-        await api(`/usuarios/${usuario.id}/unidades`, { method: 'PUT', json: { unidade_ids: unidadeIds } })
+        await api(`/clientes/${usuario.id}/unidades`, { method: 'PUT', json: { unidade_ids: unidadeIds } })
       }
       onSalvo({ nome: nome.trim() })
     } catch (e) {
@@ -108,7 +96,6 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
     setUnidadeIds((atual) => (atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]))
   }
 
-  const perfisDisponiveis: Perfil[] = ehAdmin ? ['gestor', 'rh', 'admin'] : ['gestor', 'rh']
   const ordenadas = [...unidades].sort((a, b) => (a.nome_exibicao ?? '').localeCompare(b.nome_exibicao ?? '', 'pt-BR'))
 
   return (
@@ -159,8 +146,8 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
         </div>
         <Campo rotulo="Perfil" erro={erros.perfil} ajuda={ehProprio ? 'Você não pode alterar o próprio perfil.' : perfilAjuda(perfil)}>
           {(props) => (
-            <select {...props} value={perfil} disabled={ehProprio} onChange={(event) => setPerfil(event.target.value as Perfil)}>
-              {perfisDisponiveis.map((item) => (
+            <select {...props} value={perfil} disabled={ehProprio} onChange={(event) => setPerfil(event.target.value as PerfilCliente)}>
+              {PERFIS.map((item) => (
                 <option key={item} value={item}>
                   {NOME_PERFIL[item]}
                 </option>
@@ -214,8 +201,7 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
   )
 }
 
-function perfilAjuda(perfil: Perfil) {
+function perfilAjuda(perfil: PerfilCliente) {
   if (perfil === 'gestor') return 'Vê somente as unidades marcadas abaixo.'
-  if (perfil === 'rh') return 'Vê todas as unidades da empresa e acessa a administração.'
-  return 'Acesso técnico a todas as empresas (Scale).'
+  return 'Vê todas as unidades da empresa e cuida da Configuração (usuários, unidades, alertas).'
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
 import { Carregando, ErroCarregamento, EstadoVazio } from '../../components/Estados'
@@ -10,25 +11,31 @@ import { mensagemDeErro } from '../../lib/erros'
 import { formatarDataHora } from '../../lib/formato'
 import { NOME_PERFIL } from '../../lib/preferencias'
 import { useRecurso } from '../../lib/useRecurso'
-import type { Paginado, Perfil, UnidadeAdmin, UsuarioAdmin } from '../../types/api'
+import type { ClienteAdmin, Paginado, PerfilCliente, UnidadeAdmin } from '../../types/api'
 import { ModalUsuario } from './ModalUsuario'
 
 const POR_PAGINA = 20
 
 type Modal =
   | { tipo: 'criar' }
-  | { tipo: 'editar'; usuario: UsuarioAdmin }
-  | { tipo: 'redefinir'; usuario: UsuarioAdmin }
-  | { tipo: 'desativar'; usuario: UsuarioAdmin }
+  | { tipo: 'editar'; usuario: ClienteAdmin }
+  | { tipo: 'redefinir'; usuario: ClienteAdmin }
+  | { tipo: 'desativar'; usuario: ClienteAdmin }
   | { tipo: 'senha'; nome: string; senha: string }
   | null
 
-export function Acessos() {
+/* Usuários das empresas clientes (RH e gestores). A equipe Scale IA fica em Administração > Equipe. */
+export function Usuarios() {
   const { usuario: eu } = useAuth()
   const { empresaId, ehAdmin, query } = useEmpresaSelecionada()
   const [busca, setBusca] = useState('')
   const [buscaAplicada, setBuscaAplicada] = useState('')
-  const [perfil, setPerfil] = useState<Perfil | ''>('')
+  const [params] = useSearchParams()
+  // a tela de Permissões abre esta lista já filtrada por perfil (?perfil=gestor)
+  const [perfil, setPerfil] = useState<PerfilCliente | ''>(() => {
+    const inicial = params.get('perfil')
+    return inicial === 'rh' || inicial === 'gestor' ? inicial : ''
+  })
   const [ativo, setAtivo] = useState<'' | 'true' | 'false'>('')
   const [unidadeId, setUnidadeId] = useState('')
   const [pagina, setPagina] = useState(1)
@@ -36,7 +43,7 @@ export function Acessos() {
   const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
 
   useEffect(() => {
-    document.title = 'Acessos — Copiloto de Ponto'
+    document.title = 'Usuários — Copiloto de Ponto'
   }, [])
 
   useEffect(() => {
@@ -52,14 +59,13 @@ export function Acessos() {
     perfil,
     ativo,
     unidade_id: unidadeId,
-    // Administradores não pertencem a empresa: ao filtrar por eles, a lista não é restrita à empresa.
-    empresa_id: perfil === 'admin' ? undefined : query.empresa_id,
+    empresa_id: query.empresa_id,
     pagina,
     por_pagina: POR_PAGINA,
   }
   const lista = useRecurso(
-    (signal) => api<Paginado<UsuarioAdmin>>('/usuarios', { signal, query: filtros }),
-    `usuarios-${JSON.stringify(filtros)}`,
+    (signal) => api<Paginado<ClienteAdmin>>('/clientes', { signal, query: filtros }),
+    `clientes-${JSON.stringify(filtros)}`,
   )
   const unidades = useRecurso(
     (signal) => api<UnidadeAdmin[]>('/admin/unidades', { signal, query }),
@@ -67,18 +73,21 @@ export function Acessos() {
   )
   const unidadesVinculaveis = (unidades.dados ?? []).filter((unidade) => unidade.nome_exibicao)
 
+  // ids de clientes e da equipe podem coincidir: "sou eu" só vale para quem também é cliente
+  const ehEu = (usuario: ClienteAdmin) => eu?.tipo === 'cliente' && usuario.id === eu.id
+
   function mudarFiltro(aplicar: () => void) {
     aplicar()
     setPagina(1)
   }
 
-  async function alterarAtivo(usuario: UsuarioAdmin, valor: boolean) {
-    await api(`/usuarios/${usuario.id}`, { method: 'PATCH', json: { ativo: valor } })
+  async function alterarAtivo(usuario: ClienteAdmin, valor: boolean) {
+    await api(`/clientes/${usuario.id}`, { method: 'PATCH', json: { ativo: valor } })
     setMensagem({ tipo: 'ok', texto: `${usuario.nome} ${valor ? 'reativado' : 'desativado'}.` })
     lista.recarregar()
   }
 
-  async function reativar(usuario: UsuarioAdmin) {
+  async function reativar(usuario: ClienteAdmin) {
     try {
       await alterarAtivo(usuario, true)
     } catch (e) {
@@ -89,7 +98,7 @@ export function Acessos() {
   const totalPaginas = lista.dados ? Math.max(1, Math.ceil(lista.dados.total / POR_PAGINA)) : 1
   const temFiltro = Boolean(buscaAplicada || perfil || ativo || unidadeId)
 
-  const acoes = (usuario: UsuarioAdmin) => (
+  const acoes = (usuario: ClienteAdmin) => (
     <>
       <button type="button" className="btn-link" onClick={() => setModal({ tipo: 'editar', usuario })} aria-label={`Editar ${usuario.nome}`}>
         Editar
@@ -102,7 +111,7 @@ export function Acessos() {
       >
         Redefinir senha
       </button>
-      {usuario.id !== eu?.id &&
+      {!ehEu(usuario) &&
         (usuario.ativo ? (
           <button
             type="button"
@@ -120,19 +129,17 @@ export function Acessos() {
     </>
   )
 
-  const nomesUnidades = (usuario: UsuarioAdmin) =>
+  const nomesUnidades = (usuario: ClienteAdmin) =>
     usuario.perfil !== 'gestor'
-      ? usuario.perfil === 'admin'
-        ? 'Todas as empresas'
-        : 'Todas da empresa'
+      ? 'Todas da empresa'
       : usuario.unidades.map((unidade) => unidade.nome_exibicao ?? `#${unidade.id}`).join(', ') || 'Nenhuma'
 
   return (
     <section className="pagina">
       <header className="pagina-header-linha">
         <div className="pagina-header">
-          <h1>Acessos</h1>
-          <p className="pagina-sub">Quem entra no Copiloto e quais unidades cada gestor vê.</p>
+          <h1>Usuários</h1>
+          <p className="pagina-sub">Cadastre, edite e desative o RH e os gestores da empresa, e defina as unidades de cada gestor.</p>
         </div>
         <button type="button" className="btn-primary btn-compact" onClick={() => setModal({ tipo: 'criar' })}>
           Novo usuário
@@ -158,11 +165,14 @@ export function Acessos() {
         </div>
         <div className="field">
           <label htmlFor="filtro-perfil">Perfil</label>
-          <select id="filtro-perfil" value={perfil} onChange={(event) => mudarFiltro(() => setPerfil(event.target.value as Perfil | ''))}>
+          <select
+            id="filtro-perfil"
+            value={perfil}
+            onChange={(event) => mudarFiltro(() => setPerfil(event.target.value as PerfilCliente | ''))}
+          >
             <option value="">Todos</option>
             <option value="gestor">{NOME_PERFIL.gestor}</option>
             <option value="rh">{NOME_PERFIL.rh}</option>
-            {ehAdmin && <option value="admin">{NOME_PERFIL.admin}</option>}
           </select>
         </div>
         <div className="field">
@@ -285,7 +295,7 @@ export function Acessos() {
           usuario={modal.tipo === 'editar' ? modal.usuario : null}
           empresaId={empresaId}
           ehAdmin={ehAdmin}
-          ehProprio={modal.tipo === 'editar' && modal.usuario.id === eu?.id}
+          ehProprio={modal.tipo === 'editar' && ehEu(modal.usuario)}
           unidades={unidadesVinculaveis}
           onFechar={() => setModal(null)}
           onSalvo={(resultado) => {
@@ -307,7 +317,7 @@ export function Acessos() {
           rotuloConfirmar="Gerar nova senha"
           onFechar={() => setModal(null)}
           onConfirmar={async () => {
-            const { senha_temporaria } = await api<{ senha_temporaria: string }>(`/usuarios/${modal.usuario.id}/redefinir-senha`, {
+            const { senha_temporaria } = await api<{ senha_temporaria: string }>(`/clientes/${modal.usuario.id}/redefinir-senha`, {
               method: 'POST',
             })
             setModal({ tipo: 'senha', nome: modal.usuario.nome, senha: senha_temporaria })
