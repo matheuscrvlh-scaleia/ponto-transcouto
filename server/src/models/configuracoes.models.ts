@@ -1,4 +1,5 @@
 import { db, type Executor } from '../db/database'
+import type { Ator } from '../types/auth.types'
 import type { Limites } from '../services/dashboard.service'
 import type { AtualizarConfiguracoesBody, CicloCalendario, Configuracoes } from '../types/configuracoes.types'
 
@@ -8,9 +9,11 @@ const selecao = `
            c.teto_horas_pagas_minutos, c.teto_periodicidade,
            c.alerta_saldo_positivo_minutos, c.alerta_saldo_negativo_minutos,
            c.fuso_horario, c.cota_calcular_por_hora, c.atualizado_em,
-           CASE WHEN u.id IS NULL THEN NULL ELSE json_build_object('id', u.id, 'nome', u.nome) END AS atualizado_por
+           CASE WHEN u.id IS NOT NULL THEN json_build_object('id', u.id, 'nome', u.nome)
+                WHEN cl.id IS NOT NULL THEN json_build_object('id', cl.id, 'nome', cl.nome) END AS atualizado_por
       FROM configuracoes c
-      LEFT JOIN usuarios u ON u.id = c.atualizado_por`
+      LEFT JOIN usuarios u ON u.id = c.atualizado_por
+      LEFT JOIN clientes cl ON cl.id = c.atualizado_por_cliente`
 
 export async function buscar(empresaId: number, executor: Executor = db) {
     const { rows } = await executor.query<Configuracoes>(`${selecao} WHERE c.empresa_id = $1`, [empresaId])
@@ -20,14 +23,21 @@ export async function buscar(empresaId: number, executor: Executor = db) {
 export async function atualizar(
     empresaId: number,
     campos: AtualizarConfiguracoesBody,
-    usuarioId: number,
+    ator: Ator,
     executor: Executor = db,
 ) {
     const chaves = Object.keys(campos) as (keyof AtualizarConfiguracoesBody)[]
-    const sets = chaves.map((chave, i) => `${chave} = $${i + 3}`)
+    const sets = chaves.map((chave, i) => `${chave} = $${i + 4}`)
+    // autoria: equipe em atualizado_por, cliente em atualizado_por_cliente
+    const autoria = ['atualizado_por = $2', 'atualizado_por_cliente = $3']
     await executor.query(
-        `UPDATE configuracoes SET ${[...sets, 'atualizado_por = $2'].join(', ')} WHERE empresa_id = $1`,
-        [empresaId, usuarioId, ...chaves.map(c => campos[c])],
+        `UPDATE configuracoes SET ${[...sets, ...autoria].join(', ')} WHERE empresa_id = $1`,
+        [
+            empresaId,
+            ator.tipo === 'equipe' ? ator.id : null,
+            ator.tipo === 'cliente' ? ator.id : null,
+            ...chaves.map(c => campos[c]),
+        ],
     )
     return buscar(empresaId, executor)
 }

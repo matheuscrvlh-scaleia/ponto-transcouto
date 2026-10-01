@@ -37,7 +37,7 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
         await unidadesAdminModel.atualizar(unidade.id, nome, ativo, client)
         await auditoria.registrar(
             {
-                usuarioId: req.usuario.id,
+                ator: req.usuario,
                 empresaId: unidade.empresa_id,
                 acao: 'unidade.de_para',
                 entidade: 'unidades',
@@ -64,7 +64,7 @@ export async function solicitarSincronizacao(req: FastifyRequest, res: FastifyRe
         for (const empresa of solicitadas) {
             await auditoria.registrar(
                 {
-                    usuarioId: req.usuario.id,
+                    ator: req.usuario,
                     empresaId: empresa.id,
                     acao: 'sincronizacao.solicitada',
                     entidade: 'empresas',

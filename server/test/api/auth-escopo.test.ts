@@ -114,7 +114,7 @@ describe('escopo do gestor', () => {
     })
 
     it('não acessa rotas de RH/admin', async () => {
-        for (const url of ['/api/v1/usuarios', '/api/v1/configuracoes', '/api/v1/admin/fechamentos']) {
+        for (const url of ['/api/v1/clientes', '/api/v1/equipe', '/api/v1/configuracoes', '/api/v1/admin/fechamentos']) {
             const res = await ctx.app.inject({ method: 'GET', url, headers: autorizado(ctx.tokens.gestor) })
             expect(res.statusCode, url).toBe(403)
         }

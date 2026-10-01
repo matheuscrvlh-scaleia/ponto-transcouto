@@ -1,18 +1,22 @@
 import { db } from '../db/database'
+import { unidadesPermitidasSql } from '../db/escopo'
+import type { Ator } from '../types/auth.types'
 import type { Limites } from '../services/dashboard.service'
 import type {
     DashboardQuery,
     FechamentoPublicado,
     LinhaDashboard,
+    LinhaDashboardGeral,
     ResumoDashboard,
     UnidadeAcessivel,
+    UnidadePainel,
     UnidadeUsuario,
 } from '../types/unidades.types'
 
 const foraDaCurvaSql = (saldo: string, pos: string, neg: string) =>
     `CASE WHEN ${saldo} >= ${pos} THEN 'positivo' WHEN ${saldo} <= -${neg} THEN 'negativo' END`
 
-export async function listarDoUsuario(usuarioId: number, empresaId: number | null, padrao: Limites) {
+export async function listarDoUsuario(ator: Ator, empresaId: number | null, padrao: Limites) {
     const { rows } = await db.query<UnidadeUsuario>(
         `SELECT un.id, un.nome_exibicao, un.empresa_id,
                 CASE WHEN uf.id IS NULL THEN NULL
@@ -37,22 +41,22 @@ export async function listarDoUsuario(usuarioId: number, empresaId: number | nul
                   FROM registros_horas r
                  WHERE r.fechamento_id = uf.id
            ) st ON true
-          WHERE un.id IN (SELECT unidades_permitidas($1))
+          WHERE un.id IN (SELECT ${unidadesPermitidasSql(ator)})
             AND un.nome_exibicao IS NOT NULL
             AND un.ativo
             AND ($2::int IS NULL OR un.empresa_id = $2)
           ORDER BY un.nome_exibicao`,
-        [usuarioId, empresaId, padrao.alerta_pos, padrao.alerta_neg],
+        [ator.id, empresaId, padrao.alerta_pos, padrao.alerta_neg],
     )
     return rows
 }
 
-export async function buscarPermitida(usuarioId: number, unidadeId: number) {
+export async function buscarPermitida(ator: Ator, unidadeId: number) {
     const { rows } = await db.query<UnidadeAcessivel>(
         `SELECT un.id, coalesce(un.nome_exibicao, un.razao_social) AS nome, un.empresa_id
            FROM unidades un
-          WHERE un.id = $2 AND un.id IN (SELECT unidades_permitidas($1))`,
-        [usuarioId, unidadeId],
+          WHERE un.id = $2 AND un.id IN (SELECT ${unidadesPermitidasSql(ator)})`,
+        [ator.id, unidadeId],
     )
     return rows[0] ?? null
 }
@@ -129,6 +133,98 @@ export async function resumoDashboard(fechamentoId: number, limites: Limites) {
            FROM registros_horas
           WHERE fechamento_id = $1`,
         [fechamentoId, limites.alerta_pos, limites.alerta_neg],
+    )
+    return rows[0]
+}
+
+// ---------- Painel consolidado (todas as unidades do usuário) ----------
+
+/** Unidades visíveis no painel, cada uma com o último fechamento publicado e os limites da empresa dela. */
+export async function unidadesDoPainel(ator: Ator, empresaId: number | null, padrao: Limites) {
+    const { rows } = await db.query<UnidadePainel>(
+        `SELECT un.id, un.nome_exibicao AS nome, un.empresa_id,
+                coalesce(cf.alerta_saldo_positivo_minutos, $3)::int AS alerta_pos,
+                coalesce(cf.alerta_saldo_negativo_minutos, $4)::int AS alerta_neg,
+                CASE WHEN uf.id IS NULL THEN NULL
+                     ELSE json_build_object('id', uf.id, 'periodo_inicio', uf.periodo_inicio,
+                                            'data_referencia', uf.data_referencia, 'publicado_em', uf.publicado_em,
+                                            'semana_fechamento_mes', uf.semana_fechamento_mes) END AS fechamento
+           FROM unidades un
+           LEFT JOIN configuracoes cf ON cf.empresa_id = un.empresa_id
+           LEFT JOIN LATERAL (
+                SELECT f.id, c.periodo_inicio::text AS periodo_inicio, c.data_referencia::text AS data_referencia,
+                       f.publicado_em, c.tipo = 'fechamento_mes' AS semana_fechamento_mes
+                  FROM fechamentos f
+                  JOIN ciclos c ON c.id = f.ciclo_id
+                 WHERE f.unidade_id = un.id AND f.status = 'sucesso'
+                 ORDER BY c.data_referencia DESC, f.publicado_em DESC
+                 LIMIT 1
+           ) uf ON true
+          WHERE un.id IN (SELECT ${unidadesPermitidasSql(ator)})
+            AND un.nome_exibicao IS NOT NULL
+            AND un.ativo
+            AND ($2::int IS NULL OR un.empresa_id = $2)
+          ORDER BY un.nome_exibicao`,
+        [ator.id, empresaId, padrao.alerta_pos, padrao.alerta_neg],
+    )
+    return rows
+}
+
+/* Os fechamentos do painel viram uma tabela (unnest) com os limites de cada um,
+   para que filtro e "fora da curva" usem o limite da empresa de cada unidade. */
+const fechamentosDoPainel = `unnest($1::int[], $2::int[], $3::int[], $4::int[], $5::text[])
+        AS lim(fechamento_id, pos, neg, unidade_id, unidade_nome)
+   JOIN registros_horas r ON r.fechamento_id = lim.fechamento_id`
+
+function parametrosDoPainel(unidades: UnidadePainel[]) {
+    const comDados = unidades.filter(u => u.fechamento)
+    return [
+        comDados.map(u => u.fechamento!.id),
+        comDados.map(u => u.alerta_pos),
+        comDados.map(u => u.alerta_neg),
+        comDados.map(u => u.id),
+        comDados.map(u => u.nome),
+    ]
+}
+
+export async function linhasDashboardGeral(unidades: UnidadePainel[], q: DashboardQuery) {
+    const filtroSql = `($6::text IS NULL OR col.nome ILIKE '%' || $6 || '%') AND ${filtrosDashboard[q.filtro]}`
+    const { rows } = await db.query<LinhaDashboardGeral & { total: number }>(
+        `SELECT col.id, col.nome, col.funcao,
+                r.extra_periodo AS extra_min, r.negativa_periodo AS negativa_min,
+                r.pagas_periodo AS pagas_min, r.banco_periodo AS banco_min,
+                r.saldo_banco_total AS saldo_min,
+                ${foraDaCurvaSql('r.saldo_banco_total', 'lim.pos', 'lim.neg')} AS fora_da_curva,
+                lim.unidade_id, lim.unidade_nome, lim.pos AS alerta_pos, lim.neg AS alerta_neg,
+                count(*) OVER ()::int AS total
+           FROM ${fechamentosDoPainel}
+           JOIN colaboradores col ON col.id = r.colaborador_id
+          WHERE ${filtroSql}
+          ORDER BY ${ordensDashboard[q.ordem]}, lim.unidade_nome
+          LIMIT $7 OFFSET $8`,
+        [...parametrosDoPainel(unidades), q.busca || null, q.por_pagina, (q.pagina - 1) * q.por_pagina],
+    )
+    if (rows[0]) return { linhas: rows.map(({ total: _total, ...linha }) => linha), total: rows[0].total }
+
+    // página além do fim: o total vem de uma contagem à parte
+    const contagem = await db.query<{ total: number }>(
+        `SELECT count(*)::int AS total
+           FROM ${fechamentosDoPainel}
+           JOIN colaboradores col ON col.id = r.colaborador_id
+          WHERE ${filtroSql}`,
+        [...parametrosDoPainel(unidades), q.busca || null],
+    )
+    return { linhas: [], total: contagem.rows[0].total }
+}
+
+export async function resumoDashboardGeral(unidades: UnidadePainel[]) {
+    const { rows } = await db.query<ResumoDashboard>(
+        `SELECT count(*)::int AS total,
+                count(*) FILTER (WHERE r.saldo_banco_total >= lim.pos)::int AS fora_positivo,
+                count(*) FILTER (WHERE r.saldo_banco_total <= -lim.neg)::int AS fora_negativo,
+                coalesce(sum(r.pagas_periodo), 0)::int AS pagas_total_min
+           FROM ${fechamentosDoPainel}`,
+        parametrosDoPainel(unidades),
     )
     return rows[0]
 }

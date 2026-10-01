@@ -42,11 +42,11 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
     const mudouRegua = camposRegua.some(c => campos[c] !== undefined && campos[c] !== anterior[c])
 
     const atualizada = await withTransaction(async client => {
-        const config = await configuracoesModel.atualizar(empresaId, campos, req.usuario.id, client)
+        const config = await configuracoesModel.atualizar(empresaId, campos, req.usuario, client)
         const ciclosDescartados = mudouRegua ? await configuracoesModel.descartarCiclosNaoIniciados(empresaId, client) : 0
         await auditoria.registrar(
             {
-                usuarioId: req.usuario.id,
+                ator: req.usuario,
                 empresaId,
                 acao: 'configuracao.alterada',
                 entidade: 'configuracoes',

@@ -1,8 +1,10 @@
 import { db } from '../db/database'
+import { unidadesPermitidasSql } from '../db/escopo'
+import type { Ator } from '../types/auth.types'
 import type { ColaboradorAcessivel, RegistroAtual, SemanaHistorico } from '../types/colaboradores.types'
 
 // Quem trocou de unidade continua visível para a unidade antiga (pelos fechamentos publicados dela).
-export async function buscarPermitido(usuarioId: number, colaboradorId: number) {
+export async function buscarPermitido(ator: Ator, colaboradorId: number) {
     const { rows } = await db.query<ColaboradorAcessivel>(
         `SELECT col.id, col.nome, col.funcao, col.departamento, col.ativo, col.empresa_id,
                 json_build_object('id', un.id, 'nome', coalesce(un.nome_exibicao, un.razao_social)) AS unidade
@@ -16,18 +18,18 @@ export async function buscarPermitido(usuarioId: number, colaboradorId: number) 
                           JOIN fechamentos f ON f.id = r.fechamento_id AND f.status = 'sucesso'
                           JOIN ciclos c ON c.id = f.ciclo_id
                          WHERE r.colaborador_id = col.id) x
-                 WHERE x.unidade_id IN (SELECT unidades_permitidas($1))
+                 WHERE x.unidade_id IN (SELECT ${unidadesPermitidasSql(ator)})
                  ORDER BY x.prioridade, x.data_referencia DESC
                  LIMIT 1
            ) visivel ON true
            JOIN unidades un ON un.id = visivel.unidade_id
           WHERE col.id = $2`,
-        [usuarioId, colaboradorId],
+        [ator.id, colaboradorId],
     )
     return rows[0] ?? null
 }
 
-export async function registroAtual(usuarioId: number, colaboradorId: number) {
+export async function registroAtual(ator: Ator, colaboradorId: number) {
     const { rows } = await db.query<RegistroAtual>(
         `SELECT f.id AS fechamento_id, c.data_referencia::text,
                 r.extra_periodo AS extra_min, r.negativa_periodo AS negativa_min,
@@ -37,15 +39,15 @@ export async function registroAtual(usuarioId: number, colaboradorId: number) {
            JOIN fechamentos f ON f.id = r.fechamento_id AND f.status = 'sucesso'
            JOIN ciclos c ON c.id = f.ciclo_id
           WHERE r.colaborador_id = $2
-            AND f.unidade_id IN (SELECT unidades_permitidas($1))
+            AND f.unidade_id IN (SELECT ${unidadesPermitidasSql(ator)})
           ORDER BY c.data_referencia DESC, f.publicado_em DESC
           LIMIT 1`,
-        [usuarioId, colaboradorId],
+        [ator.id, colaboradorId],
     )
     return rows[0] ?? null
 }
 
-export async function historico(usuarioId: number, colaboradorId: number, limite: number) {
+export async function historico(ator: Ator, colaboradorId: number, limite: number) {
     const { rows } = await db.query<SemanaHistorico>(
         `SELECT f.id AS fechamento_id, c.periodo_inicio::text, c.data_referencia::text,
                 c.tipo = 'fechamento_mes' AS semana_fechamento_mes,
@@ -58,10 +60,10 @@ export async function historico(usuarioId: number, colaboradorId: number, limite
            JOIN ciclos c ON c.id = f.ciclo_id
            JOIN unidades un ON un.id = f.unidade_id
           WHERE r.colaborador_id = $2
-            AND f.unidade_id IN (SELECT unidades_permitidas($1))
+            AND f.unidade_id IN (SELECT ${unidadesPermitidasSql(ator)})
           ORDER BY c.data_referencia DESC, f.publicado_em DESC
           LIMIT $3`,
-        [usuarioId, colaboradorId, limite],
+        [ator.id, colaboradorId, limite],
     )
     return rows
 }

@@ -93,6 +93,15 @@ describe('dashboard da unidade', () => {
         expect(corpo.fechamento.semana_fechamento_mes).toBe(false)
     })
 
+    it('rejeita parâmetros inválidos no painel consolidado', async () => {
+        const res = await ctx.app.inject({
+            method: 'GET',
+            url: '/api/v1/dashboard?ordem=xpto',
+            headers: autorizado(ctx.tokens.rh),
+        })
+        expect(res.statusCode).toBe(400)
+    })
+
     it('rejeita parâmetros inválidos', async () => {
         const res = await ctx.app.inject({
             method: 'GET',
@@ -100,5 +109,98 @@ describe('dashboard da unidade', () => {
             headers: autorizado(ctx.tokens.gestor),
         })
         expect(res.statusCode).toBe(400)
+    })
+})
+
+type LinhaGeral = Linha & { unidade_id: number; unidade_nome: string; alerta_pos: number; alerta_neg: number }
+
+async function painelGeral(token: string, query = '') {
+    const res = await ctx.app.inject({ method: 'GET', url: `/api/v1/dashboard${query}`, headers: autorizado(token) })
+    expect(res.statusCode, res.body).toBe(200)
+    return res.json()
+}
+
+async function dashboardComo(token: string, unidadeId: number) {
+    const res = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/unidades/${unidadeId}/dashboard`,
+        headers: autorizado(token),
+    })
+    expect(res.statusCode, res.body).toBe(200)
+    return res.json()
+}
+
+describe('painel consolidado (todas as unidades)', () => {
+    it('soma as unidades do RH e marca cada colaborador com a unidade e o limite dela', async () => {
+        const corpo = await painelGeral(ctx.tokens.rh)
+        // mesmas unidades da lista do usuário (só as com nome de exibição e ativas)
+        const lista = await ctx.app.inject({ method: 'GET', url: '/api/v1/unidades', headers: autorizado(ctx.tokens.rh) })
+        const ids: number[] = lista.json().map((u: { id: number }) => u.id)
+
+        expect(corpo.unidade).toBeNull()
+        expect(corpo.unidades.map((u: { id: number }) => u.id).sort()).toEqual([...ids].sort())
+
+        const porUnidade = await Promise.all(ids.map(id => dashboardComo(ctx.tokens.rh, id)))
+        const soma = (campo: 'total' | 'fora_positivo' | 'fora_negativo' | 'pagas_total_min') =>
+            porUnidade.reduce((total, d) => total + (d.resumo?.[campo] ?? 0), 0)
+
+        expect(corpo.resumo.total).toBe(soma('total'))
+        expect(corpo.resumo.fora_positivo).toBe(soma('fora_positivo'))
+        expect(corpo.resumo.fora_negativo).toBe(soma('fora_negativo'))
+        expect(corpo.resumo.pagas_total_min).toBe(soma('pagas_total_min'))
+        expect(corpo.total).toBe(soma('total'))
+
+        const linhas: LinhaGeral[] = corpo.colaboradores
+        expect(new Set(linhas.map(l => l.unidade_id))).toEqual(
+            new Set(porUnidade.filter(d => d.fechamento).map(d => d.unidade.id)),
+        )
+        for (const l of linhas) {
+            const esperado = l.saldo_min >= l.alerta_pos ? 'positivo' : l.saldo_min <= -l.alerta_neg ? 'negativo' : null
+            expect(l.fora_da_curva).toBe(esperado)
+        }
+        expect(linhas.map(l => l.saldo_min)).toEqual([...linhas.map(l => l.saldo_min)].sort((a, b) => b - a))
+        expect(corpo.fechamento).not.toBeNull()
+    })
+
+    it('mostra ao gestor só as unidades vinculadas', async () => {
+        const corpo = await painelGeral(ctx.tokens.gestor)
+        const sessao = await ctx.app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: autorizado(ctx.tokens.gestor) })
+        const vinculadas: number[] = sessao.json().unidades.map((u: { id: number }) => u.id)
+
+        expect(corpo.unidades.map((u: { id: number }) => u.id).sort()).toEqual([...vinculadas].sort())
+        expect(corpo.colaboradores.every((l: LinhaGeral) => vinculadas.includes(l.unidade_id))).toBe(true)
+    })
+
+    it('filtra fora da curva e pagina no conjunto inteiro', async () => {
+        const fora = await painelGeral(ctx.tokens.rh, '?filtro=fora')
+        expect(fora.colaboradores.every((l: LinhaGeral) => l.fora_da_curva !== null)).toBe(true)
+        expect(fora.total).toBe(fora.resumo.fora_positivo + fora.resumo.fora_negativo)
+
+        const todos = await painelGeral(ctx.tokens.rh, '?ordem=nome')
+        const pagina2 = await painelGeral(ctx.tokens.rh, '?ordem=nome&pagina=2&por_pagina=5')
+        expect(pagina2.total).toBe(todos.total)
+        expect(pagina2.colaboradores.map((l: LinhaGeral) => l.id)).toEqual(
+            todos.colaboradores.slice(5, 10).map((l: LinhaGeral) => l.id),
+        )
+
+        const alem = await painelGeral(ctx.tokens.rh, '?pagina=99&por_pagina=5')
+        expect(alem.colaboradores).toEqual([])
+        expect(alem.total).toBe(todos.total)
+    })
+})
+
+describe('painel consolidado por empresa', () => {
+    it('a equipe filtra uma empresa; o cliente não sai da dele', async () => {
+        const daDemo = await painelGeral(ctx.tokens.admin, `?empresa_id=${ctx.empresaId}`)
+        const lista = await ctx.app.inject({ method: 'GET', url: '/api/v1/unidades', headers: autorizado(ctx.tokens.rh) })
+        const idsDemo: number[] = lista.json().map((u: { id: number }) => u.id)
+        expect(daDemo.unidades.map((u: { id: number }) => u.id).sort()).toEqual([...idsDemo].sort())
+
+        // RH informando outra empresa continua vendo só a própria
+        const rhOutra = await painelGeral(ctx.tokens.rh, '?empresa_id=999999')
+        expect(rhOutra.unidades.map((u: { id: number }) => u.id).sort()).toEqual([...idsDemo].sort())
+
+        const sessao = await ctx.app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: autorizado(ctx.tokens.rh) })
+        expect(sessao.json().unidades.every((u: { empresa_id: number }) => u.empresa_id === ctx.empresaId)).toBe(true)
     })
 })

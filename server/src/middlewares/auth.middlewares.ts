@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env'
 import { buscarPorId } from '../models/auth.models'
-import type { Perfil, TokenPayload } from '../types/auth.types'
+import type { Ator, Perfil, TokenPayload } from '../types/auth.types'
 import { naoAutorizado, proibido } from '../utils/errors'
 
 const rotasLiberadasSemTrocaDeSenha = ['/api/v1/auth/me', '/api/v1/auth/trocar-senha']
@@ -18,12 +18,16 @@ export async function authenticate(req: FastifyRequest) {
         throw naoAutorizado(err instanceof jwt.TokenExpiredError ? 'Sessão expirada.' : 'Token inválido.')
     }
 
-    const usuario = await buscarPorId(Number(payload.sub))
+    // tokens emitidos antes da separação equipe/clientes não têm o tipo: pedem login de novo
+    if (payload.t !== 'e' && payload.t !== 'c') throw naoAutorizado('Sessão inválida.')
+
+    const usuario = await buscarPorId({ tipo: payload.t === 'e' ? 'equipe' : 'cliente', id: Number(payload.sub) })
     if (!usuario || !usuario.ativo || usuario.token_versao !== payload.tv) {
         throw naoAutorizado('Sessão inválida.')
     }
 
     req.usuario = {
+        tipo: usuario.tipo,
         id: usuario.id,
         nome: usuario.nome,
         perfil: usuario.perfil,
@@ -43,6 +47,7 @@ export function exigirPerfil(...permitidos: Perfil[]) {
     }
 }
 
-export function assinarToken(usuarioId: number, tokenVersao: number) {
-    return jwt.sign({ sub: usuarioId, tv: tokenVersao }, env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '8h' })
+export function assinarToken(ator: Ator, tokenVersao: number) {
+    const payload = { sub: ator.id, tv: tokenVersao, t: ator.tipo === 'equipe' ? 'e' : 'c' }
+    return jwt.sign(payload, env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '8h' })
 }

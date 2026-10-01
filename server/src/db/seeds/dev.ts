@@ -97,7 +97,7 @@ async function limparDemo(client: PoolClient, empresaId: number) {
         'DELETE FROM registros_horas WHERE fechamento_id IN (SELECT id FROM fechamentos WHERE empresa_id = $1)',
         'DELETE FROM fechamentos WHERE empresa_id = $1',
         'DELETE FROM ciclos WHERE empresa_id = $1',
-        'DELETE FROM usuarios WHERE empresa_id = $1',
+        'DELETE FROM clientes WHERE empresa_id = $1',
         'DELETE FROM colaboradores WHERE empresa_id = $1',
         'DELETE FROM unidades WHERE empresa_id = $1',
         'DELETE FROM chamadas_api WHERE empresa_id = $1',
@@ -127,7 +127,7 @@ async function semear(client: PoolClient) {
         )
         empresaId = nova.rows[0].id
     }
-    await client.query(`DELETE FROM usuarios WHERE lower(email) IN ('rh@demo.local', 'gestor@demo.local')`)
+    await client.query(`DELETE FROM clientes WHERE lower(email) IN ('rh@demo.local', 'gestor@demo.local')`)
 
     await client.query(
         `INSERT INTO configuracoes (empresa_id, dia_semana_extracao, hora_extracao, dia_fechamento_mes,
@@ -323,18 +323,18 @@ async function semear(client: PoolClient) {
 
     const senha = await hashPassword(SENHA_DEMO)
     const rh = await client.query<{ id: number }>(
-        `INSERT INTO usuarios (nome, email, cpf, senha, perfil, empresa_id, ativo, deve_trocar_senha)
+        `INSERT INTO clientes (nome, email, cpf, senha, perfil, empresa_id, ativo, deve_trocar_senha)
          VALUES ('RH Demo', 'rh@demo.local', $1, $2, 'rh', $3, true, false) RETURNING id`,
         [gerarCpf(812399001), senha, empresaId],
     )
     const gestor = await client.query<{ id: number }>(
-        `INSERT INTO usuarios (nome, email, cpf, senha, perfil, empresa_id, ativo, deve_trocar_senha)
+        `INSERT INTO clientes (nome, email, cpf, senha, perfil, empresa_id, ativo, deve_trocar_senha)
          VALUES ('Gestor Demo', 'gestor@demo.local', $1, $2, 'gestor', $3, true, false) RETURNING id`,
         [gerarCpf(812399002), senha, empresaId],
     )
     for (const unidade of mapeadas.slice(0, 2)) {
         await client.query(
-            'INSERT INTO usuario_unidades (usuario_id, unidade_id, empresa_id, criado_por) VALUES ($1, $2, $3, $4)',
+            'INSERT INTO cliente_unidades (cliente_id, unidade_id, empresa_id, criado_por_cliente) VALUES ($1, $2, $3, $4)',
             [gestor.rows[0].id, unidade.id, empresaId, rh.rows[0].id],
         )
     }

@@ -53,7 +53,7 @@ export async function reprocessar(req: FastifyRequest, res: FastifyReply) {
         }
         await auditoria.registrar(
             {
-                usuarioId: req.usuario.id,
+                ator: req.usuario,
                 empresaId: fechamento.empresa.id,
                 acao: 'fechamento.reprocessado',
                 entidade: 'fechamentos',
@@ -83,7 +83,7 @@ export async function publicar(req: FastifyRequest, res: FastifyReply) {
         }
         await auditoria.registrar(
             {
-                usuarioId: req.usuario.id,
+                ator: req.usuario,
                 empresaId: fechamento.empresa.id,
                 acao: 'fechamento.publicado_forcado',
                 entidade: 'fechamentos',
@@ -117,7 +117,7 @@ export async function ajustarGatilho(req: FastifyRequest, res: FastifyReply) {
         }
         await auditoria.registrar(
             {
-                usuarioId: req.usuario.id,
+                ator: req.usuario,
                 empresaId: ciclo.empresa_id,
                 acao: 'ciclo.gatilho_ajustado',
                 entidade: 'ciclos',

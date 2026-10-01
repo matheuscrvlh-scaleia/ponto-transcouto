@@ -15,10 +15,10 @@ async function criarAdmin() {
 
     const senha = values.senha ?? gerarSenhaTemporaria()
     const { rows } = await db.query<{ id: number }>(
-        `INSERT INTO usuarios (nome, email, senha, perfil, empresa_id, ativo, deve_trocar_senha)
-         VALUES ($1, lower($2), $3, 'admin', NULL, true, $4)
+        `INSERT INTO usuarios (nome, email, senha, perfil, ativo, deve_trocar_senha)
+         VALUES ($1, lower($2), $3, 'admin', true, $4)
          ON CONFLICT (email) DO UPDATE
-            SET perfil = 'admin', empresa_id = NULL, senha = EXCLUDED.senha,
+            SET perfil = 'admin', senha = EXCLUDED.senha,
                 ativo = true, deve_trocar_senha = EXCLUDED.deve_trocar_senha,
                 token_versao = usuarios.token_versao + 1
          RETURNING id`,

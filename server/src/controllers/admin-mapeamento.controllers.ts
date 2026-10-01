@@ -32,7 +32,7 @@ export async function salvar(req: FastifyRequest, res: FastifyReply) {
         await mapeamentoModel.substituir(empresaId, mapeamento, client)
         await auditoria.registrar(
             {
-                usuarioId: req.usuario.id,
+                ator: req.usuario,
                 empresaId,
                 acao: 'mapeamento_colunas.alterado',
                 entidade: 'mapeamento_colunas',

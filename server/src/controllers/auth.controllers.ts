@@ -23,39 +23,39 @@ export async function login(req: FastifyRequest, res: FastifyReply) {
         throw naoAutorizado('Login ou senha inválidos.')
     }
 
-    await authModel.registrarLogin(usuario.id)
+    await authModel.registrarLogin(usuario)
 
-    const token = assinarToken(usuario.id, usuario.token_versao)
+    const token = assinarToken(usuario, usuario.token_versao)
     const { exp } = jwt.decode(token) as { exp: number }
 
     res.send({
         token,
         expira_em: new Date(exp * 1000).toISOString(),
         usuario: authModel.sessao(usuario),
-        unidades: await authModel.listarUnidadesPermitidas(usuario.id),
+        unidades: await authModel.listarUnidadesPermitidas(usuario),
     })
 }
 
 export async function me(req: FastifyRequest, res: FastifyReply) {
-    const usuario = await authModel.buscarPorId(req.usuario.id)
+    const usuario = await authModel.buscarPorId(req.usuario)
     if (!usuario) throw naoAutorizado()
 
     res.send({
         usuario: authModel.sessao(usuario),
-        unidades: await authModel.listarUnidadesPermitidas(usuario.id),
+        unidades: await authModel.listarUnidadesPermitidas(usuario),
     })
 }
 
 export async function trocarSenha(req: FastifyRequest, res: FastifyReply) {
     const { senha_atual, nova_senha } = trocarSenhaSchema.parse(req.body)
 
-    const usuario = await authModel.buscarPorId(req.usuario.id)
+    const usuario = await authModel.buscarPorId(req.usuario)
     if (!usuario || !(await verifyPassword(senha_atual, usuario.senha))) {
         throw invalido('Senha atual incorreta.')
     }
     if (nova_senha === senha_atual) throw invalido('A nova senha deve ser diferente da atual.')
 
-    const tokenVersao = await authModel.atualizarSenha(usuario.id, await hashPassword(nova_senha))
+    const tokenVersao = await authModel.atualizarSenha(usuario, await hashPassword(nova_senha))
 
-    res.send({ token: assinarToken(usuario.id, tokenVersao) })
+    res.send({ token: assinarToken(usuario, tokenVersao) })
 }

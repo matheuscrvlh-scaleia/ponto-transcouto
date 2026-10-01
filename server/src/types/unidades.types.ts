@@ -9,6 +9,8 @@ export const dashboardQuerySchema = z.object({
     ordem: z.enum(['saldo_desc', 'saldo_asc', 'nome']).default('saldo_desc'),
     pagina: paginacao.pagina,
     por_pagina: z.coerce.number().int().min(1).max(500).default(200),
+    // painel consolidado: a equipe pode olhar uma empresa só (cliente fica sempre na dele)
+    empresa_id: idOpcional,
 })
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>
 
@@ -45,6 +47,23 @@ export type LinhaDashboard = {
     banco_min: number
     saldo_min: number
     fora_da_curva: 'positivo' | 'negativo' | null
+}
+
+/** Unidade no painel consolidado: último fechamento publicado e limites da empresa dela. */
+export type UnidadePainel = {
+    id: number
+    nome: string
+    empresa_id: number
+    alerta_pos: number
+    alerta_neg: number
+    fechamento: FechamentoPublicado | null
+}
+
+export type LinhaDashboardGeral = LinhaDashboard & {
+    unidade_id: number
+    unidade_nome: string
+    alerta_pos: number
+    alerta_neg: number
 }
 
 export type ResumoDashboard = {

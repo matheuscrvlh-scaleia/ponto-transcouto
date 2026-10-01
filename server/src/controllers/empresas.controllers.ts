@@ -54,7 +54,7 @@ export async function criar(req: FastifyRequest, res: FastifyReply) {
         await configuracoesModel.criarPadrao(id, client)
         await auditoria.registrar(
             {
-                usuarioId: req.usuario.id,
+                ator: req.usuario,
                 empresaId: id,
                 acao: 'empresa.criada',
                 entidade: 'empresas',
@@ -96,7 +96,7 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
         await empresasModel.atualizar(atual.id, dados, client)
         await auditoria.registrar(
             {
-                usuarioId: req.usuario.id,
+                ator: req.usuario,
                 empresaId: atual.id,
                 acao: 'empresa.alterada',
                 entidade: 'empresas',
