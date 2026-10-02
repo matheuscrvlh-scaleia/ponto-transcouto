@@ -85,6 +85,15 @@ body {
   margin: 0;
 }
 
+/* página rola normalmente (roda do mouse, teclado, toque), só sem a barra de rolagem visível */
+html {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}
+
 #root {
   min-height: 100svh;
   display: flex;
@@ -268,18 +277,7 @@ button {
   min-width: 0;
 }
 
-/* ---------- Card toolbar / buttons ---------- */
-
-.card-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-
-.card-toolbar h2 {
-  margin-bottom: 0;
-}
+/* ---------- Buttons ---------- */
 
 .btn-primary.btn-compact {
   padding: 8px 14px;
@@ -567,8 +565,8 @@ a.btn-link {
 
 /* ---------- Páginas ---------- */
 
+/* sem largura máxima: o conteúdo acompanha a largura do topo */
 .pagina {
-  max-width: 1100px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -741,6 +739,12 @@ a.btn-link {
 
 .card-tabela-titulo {
   padding: 12px 12px 4px;
+}
+
+.card-tabela-sub {
+  padding: 0 12px 8px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 th.num,
@@ -947,6 +951,46 @@ tr.linha-negativo {
   gap: 16px;
 }
 
+.detalhe-link-batidas {
+  margin-top: 8px;
+}
+
+.detalhe-exportar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.detalhe-exportar .btn-secondary {
+  width: auto;
+  min-height: 36px;
+  border-radius: 999px;
+}
+
+.detalhe-exportar .btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.detalhe-exportar .form-erro {
+  flex-basis: 100%;
+}
+
+.impressao-cabecalho {
+  font-size: 12px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.impressao-cabecalho .impressao-titulo {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
 .detalhe-header h1 {
   font-size: 24px;
   display: flex;
@@ -1075,5 +1119,156 @@ tr.linha-negativo {
 
   .card-tabela {
     padding: 4px 2px;
+  }
+}
+
+/* ---------- Selo "Tempo real" (dashboard e detalhe do colaborador) ---------- */
+
+.selo-tempo-real {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--ao-vivo);
+  background: var(--ao-vivo-bg);
+  border: 1px solid color-mix(in srgb, var(--ao-vivo) 30%, transparent);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.selo-tempo-real-ponto {
+  position: relative;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ao-vivo);
+}
+
+.selo-tempo-real-ponto::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--ao-vivo);
+  animation: pulso-tempo-real 2.4s ease-out infinite;
+}
+
+@keyframes pulso-tempo-real {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selo-tempo-real-ponto::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+:root {
+  --ao-vivo: #15803d;
+  --ao-vivo-bg: rgba(22, 163, 74, 0.1);
+}
+
+:root[data-theme='dark'] {
+  --ao-vivo: #86efac;
+  --ao-vivo-bg: rgba(134, 239, 172, 0.1);
+}
+
+/* ---------- Impressão / "Salvar como PDF" (histórico do colaborador) ---------- */
+
+.so-impressao {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  /* papel sempre no tema claro, mesmo com o tema escuro ligado */
+  :root,
+  :root[data-theme='dark'] {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --muted: #f6f6f8;
+    --text: #4b5563;
+    --text-h: #111827;
+    --border: #e5e7eb;
+    --accent: #6d28d9;
+    --positivo: #1d4ed8;
+    --positivo-bg: #eff6ff;
+    --negativo: #b91c1c;
+    --negativo-bg: #fef2f2;
+    --app-bg: #ffffff;
+    --ao-vivo: #15803d;
+    --ao-vivo-bg: rgba(22, 163, 74, 0.1);
+    color-scheme: light;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .app-sidebar,
+  .app-sidebar-overlay,
+  .app-topbar,
+  .voltar,
+  .nao-imprimir {
+    display: none !important;
+  }
+
+  .so-impressao {
+    display: block;
+  }
+
+  .app-shell,
+  .app-main,
+  .app-conteudo {
+    display: block;
+    min-height: 0;
+    padding: 0;
+    gap: 0;
+    background: #ffffff;
+  }
+
+  .pagina {
+    max-width: none;
+    gap: 12px;
+  }
+
+  .card,
+  .kpi {
+    box-shadow: none;
+  }
+
+  /* gráfico e indicadores inteiros na mesma folha; tabelas longas podem quebrar entre linhas */
+  .card:not(.card-tabela),
+  .kpi {
+    break-inside: avoid;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
   }
 }

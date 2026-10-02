@@ -1,9 +1,13 @@
 import { useId } from 'react'
 
+export type GrupoCurva = 'dentro' | 'acima' | 'abaixo'
+
 interface Props {
   dentro: number
   acima: number
   abaixo: number
+  /** clicar numa parte do arco (ou na legenda) abre os colaboradores daquele grupo */
+  onSelecionar?: (grupo: GrupoCurva) => void
 }
 
 const RAIO = 88
@@ -13,13 +17,13 @@ const ARCO = `M${CENTRO_X - RAIO} ${CENTRO_Y}A${RAIO} ${RAIO} 0 0 1 ${CENTRO_X +
 const VAO = 1.2
 
 /** Meio anel com a proporção de colaboradores dentro, acima e abaixo da curva de saldo. */
-export function MedidorCurva({ dentro, acima, abaixo }: Props) {
+export function MedidorCurva({ dentro, acima, abaixo, onSelecionar }: Props) {
   const hachura = `hachura-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const total = dentro + acima + abaixo
   const pct = (n: number) => (total ? (n / total) * 100 : 0)
   const percentualDentro = Math.round(pct(dentro))
 
-  const segmentos = [
+  const segmentos: { chave: GrupoCurva; valor: number; rotulo: string }[] = [
     { chave: 'dentro', valor: dentro, rotulo: 'Dentro da curva' },
     { chave: 'acima', valor: acima, rotulo: 'Acima do limite' },
     { chave: 'abaixo', valor: abaixo, rotulo: 'Abaixo do limite' },
@@ -57,7 +61,9 @@ export function MedidorCurva({ dentro, acima, abaixo }: Props) {
                   key={arco.chave}
                   d={ARCO}
                   pathLength={100}
-                  className={`medidor-segmento medidor-${arco.chave}`}
+                  className={`medidor-segmento medidor-${arco.chave}${onSelecionar ? ' clicavel' : ''}`}
+                  // pelo teclado, a mesma ação fica nos botões da legenda
+                  onClick={onSelecionar ? () => onSelecionar(arco.chave) : undefined}
                   strokeDasharray={`${arco.tamanho} 200`}
                   strokeDashoffset={-arco.inicio}
                   style={arco.chave === 'acima' ? { stroke: `url(#${hachura})` } : undefined}
@@ -71,13 +77,31 @@ export function MedidorCurva({ dentro, acima, abaixo }: Props) {
         </div>
       </div>
       <ul className="medidor-legenda">
-        {segmentos.map((segmento) => (
-          <li key={segmento.chave}>
-            <span className={`medidor-ponto medidor-${segmento.chave}`} aria-hidden="true" />
-            <span className="medidor-legenda-rotulo">{segmento.rotulo}</span>
-            <strong>{segmento.valor}</strong>
-          </li>
-        ))}
+        {segmentos.map((segmento) => {
+          const conteudo = (
+            <>
+              <span className={`medidor-ponto medidor-${segmento.chave}`} aria-hidden="true" />
+              <span className="medidor-legenda-rotulo">{segmento.rotulo}</span>
+              <strong>{segmento.valor}</strong>
+            </>
+          )
+          return (
+            <li key={segmento.chave}>
+              {onSelecionar ? (
+                <button
+                  type="button"
+                  className="medidor-legenda-botao"
+                  onClick={() => onSelecionar(segmento.chave)}
+                  aria-label={`${segmento.rotulo}: ${segmento.valor}. Ver lista`}
+                >
+                  {conteudo}
+                </button>
+              ) : (
+                conteudo
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

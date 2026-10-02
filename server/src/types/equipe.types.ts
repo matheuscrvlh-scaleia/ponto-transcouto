@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { cpf, email, nome } from './clientes.types'
-import { booleanoQuery, paginacao } from './comum.types'
+import { booleanoQuery, cargo, paginacao, telefone } from './comum.types'
 
 export const listarEquipeQuerySchema = z.object({
     busca: z.string().trim().max(100).optional(),
@@ -14,6 +14,8 @@ export const criarMembroSchema = z
         nome,
         email: email.optional().nullable(),
         cpf: cpf.optional().nullable(),
+        cargo: cargo.optional().nullable(),
+        telefone: telefone.optional().nullable(),
     })
     .strict()
     .refine(m => m.email || m.cpf, { message: 'Informe e-mail ou CPF.', path: ['email'] })
@@ -23,6 +25,8 @@ export const atualizarMembroSchema = z
         nome,
         email: email.nullable(),
         cpf: cpf.nullable(),
+        cargo: cargo.nullable(),
+        telefone: telefone.nullable(),
         ativo: z.boolean(),
     })
     .partial()
@@ -33,6 +37,8 @@ export type MembroEquipe = {
     nome: string
     email: string | null
     cpf: string | null
+    cargo: string | null
+    telefone: string | null
     ativo: boolean
     deve_trocar_senha: boolean
     ultimo_login_em: Date | null
@@ -43,5 +49,7 @@ export type DadosMembro = {
     nome: string
     email: string | null
     cpf: string | null
+    cargo: string | null
+    telefone: string | null
     ativo: boolean
 }

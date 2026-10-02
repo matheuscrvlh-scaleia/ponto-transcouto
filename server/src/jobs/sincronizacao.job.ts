@@ -8,6 +8,7 @@ import {
     desativarUnidadesAusentes,
     empresasParaSincronizar,
     marcarSincronizado,
+    preencherNomesUnidades,
     registrarChamadaApi,
     salvarColaboradores,
     salvarUnidades,
@@ -75,6 +76,7 @@ export async function sincronizarEmpresa(empresaId: number, log: Log, ex: Execut
 
     return withTransaction(async client => {
         await salvarUnidades(empresaId, unidades, client)
+        await preencherNomesUnidades(empresaId, client)
         const unidadesDesativadas = await desativarUnidadesAusentes(empresaId, unidades.map(u => u.documento), client)
         const unidadePorDocumento = await unidadesPorDocumento(empresaId, client)
 

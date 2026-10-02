@@ -11,8 +11,10 @@ z.config(z.locales.pt())
 const VIOLACAO_UNICIDADE = '23505'
 
 export async function buildApp() {
+    const saltos = typeof env.TRUST_PROXY === 'number' ? env.TRUST_PROXY : 0
     const app = Fastify({
-        trustProxy: env.TRUST_PROXY,
+        // número de saltos: confia só nos N proxies mais próximos (mesma regra do proxy-addr)
+        trustProxy: typeof env.TRUST_PROXY === 'number' ? (_endereco: string, salto: number) => salto < saltos : env.TRUST_PROXY,
         logger: env.NODE_ENV === 'test' ? false : { level: env.NODE_ENV === 'production' ? 'info' : 'warn' },
     })
 

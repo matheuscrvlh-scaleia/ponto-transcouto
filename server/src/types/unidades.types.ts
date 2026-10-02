@@ -49,13 +49,14 @@ export type LinhaDashboard = {
     fora_da_curva: 'positivo' | 'negativo' | null
 }
 
-/** Unidade no painel consolidado: último fechamento publicado e limites da empresa dela. */
+/** Unidade no painel: último fechamento publicado, limites e modo de atualização da empresa dela. */
 export type UnidadePainel = {
     id: number
     nome: string
     empresa_id: number
     alerta_pos: number
     alerta_neg: number
+    tempo_real: boolean
     fechamento: FechamentoPublicado | null
 }
 
@@ -64,6 +65,9 @@ export type LinhaDashboardGeral = LinhaDashboard & {
     unidade_nome: string
     alerta_pos: number
     alerta_neg: number
+    /** de onde veio o número: valor ao vivo ou o último fechamento publicado */
+    fonte: 'tempo_real' | 'fechamento'
+    atualizado_em: Date | null
 }
 
 export type ResumoDashboard = {

@@ -1,4 +1,5 @@
 import { db, type Executor } from '../db/database'
+import type { Ator } from '../types/auth.types'
 import type {
     Ciclo,
     ErroExecucao,
@@ -9,7 +10,8 @@ import type {
 
 const colunasExecucao = `
     x.id, x.disparo,
-    CASE WHEN ud.id IS NULL THEN NULL ELSE json_build_object('id', ud.id, 'nome', ud.nome) END AS disparado_por,
+    CASE WHEN ud.id IS NOT NULL THEN json_build_object('id', ud.id, 'nome', ud.nome, 'tipo', 'equipe')
+         WHEN cd.id IS NOT NULL THEN json_build_object('id', cd.id, 'nome', cd.nome, 'tipo', 'cliente') END AS disparado_por,
     x.status, x.total_colaboradores, x.processados, x.com_erro, x.mensagem_erro, x.iniciado_em, x.finalizado_em`
 
 const selecaoFechamento = `
@@ -26,6 +28,7 @@ const selecaoFechamento = `
                 SELECT ${colunasExecucao}
                   FROM execucoes_extracao x
                   LEFT JOIN usuarios ud ON ud.id = x.disparado_por
+                  LEFT JOIN clientes cd ON cd.id = x.disparado_por_cliente
                  WHERE x.fechamento_id = f.id
                  ORDER BY x.iniciado_em DESC
                  LIMIT 1) ult) AS ultima_execucao
@@ -69,6 +72,7 @@ export async function execucoes(fechamentoId: number) {
         `SELECT ${colunasExecucao}
            FROM execucoes_extracao x
            LEFT JOIN usuarios ud ON ud.id = x.disparado_por
+           LEFT JOIN clientes cd ON cd.id = x.disparado_por_cliente
           WHERE x.fechamento_id = $1
           ORDER BY x.iniciado_em DESC`,
         [fechamentoId],
@@ -112,17 +116,34 @@ export async function existePublicadoPosterior(fechamentoId: number) {
     return rows.length > 0
 }
 
-export async function reabrir(fechamentoId: number, executor: Executor) {
-    const { rowCount } = await executor.query(
+/**
+ * Volta fechamentos para a fila (apagando os registros, que serão extraídos de novo) e
+ * guarda quem pediu: o worker copia o solicitante para a execução (disparo 'manual').
+ * Os que estão em processamento ficam de fora. Devolve os ids reabertos.
+ */
+export async function reabrirVarios(fechamentoIds: number[], solicitante: Ator, executor: Executor) {
+    if (fechamentoIds.length === 0) return []
+    const { rows } = await executor.query<{ id: number }>(
         `UPDATE fechamentos
             SET status = 'pendente', tentativas = 0, proxima_tentativa_em = now(),
-                heartbeat_em = NULL, publicado_em = NULL
-          WHERE id = $1 AND status <> 'processando'`,
-        [fechamentoId],
+                heartbeat_em = NULL, publicado_em = NULL,
+                solicitado_por_usuario = $2, solicitado_por_cliente = $3
+          WHERE id = ANY($1::int[]) AND status <> 'processando'
+      RETURNING id`,
+        [
+            fechamentoIds,
+            solicitante.tipo === 'equipe' ? solicitante.id : null,
+            solicitante.tipo === 'cliente' ? solicitante.id : null,
+        ],
     )
-    if (!rowCount) return false
-    await executor.query('DELETE FROM registros_horas WHERE fechamento_id = $1', [fechamentoId])
-    return true
+    const ids = rows.map(r => r.id)
+    // um DELETE só: registros de uma semana podem apontar para os da semana anterior (base_semana_registro_id)
+    if (ids.length) await executor.query('DELETE FROM registros_horas WHERE fechamento_id = ANY($1::int[])', [ids])
+    return ids
+}
+
+export async function reabrir(fechamentoId: number, solicitante: Ator, executor: Executor) {
+    return (await reabrirVarios([fechamentoId], solicitante, executor)).length > 0
 }
 
 export async function publicar(fechamentoId: number, executor: Executor) {

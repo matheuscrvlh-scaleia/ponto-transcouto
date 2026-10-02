@@ -7,10 +7,10 @@ import {
     publicar,
     reprocessar,
 } from '../controllers/admin-fechamentos.controllers'
-import { authenticate, exigirPerfil } from '../middlewares/auth.middlewares'
+import { authenticate, exigirPerfil, exigirTela } from '../middlewares/auth.middlewares'
 
 export async function adminFechamentosRoutes(app: FastifyInstance) {
-    const leitura = { preHandler: [authenticate, exigirPerfil('admin', 'rh')] }
+    const leitura = { preHandler: [authenticate, exigirTela('fechamentos')] }
     const acesso = { preHandler: [authenticate, exigirPerfil('admin')] }
 
     app.get('/admin/fechamentos', leitura, listar)

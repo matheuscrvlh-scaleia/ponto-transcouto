@@ -1,22 +1,23 @@
 /* ---------- Meu perfil (carregado pelo Perfil) ---------- */
 
 .pagina.perfil {
-  max-width: 1100px;
   gap: 20px;
 }
 
 /* ----- Cabeçalho com faixa em gradiente ----- */
 
 .perfil-hero {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--app-borda);
   border-radius: var(--raio-card);
   box-shadow: var(--sombra-suave);
-  overflow: hidden;
 }
 
 .perfil-hero-faixa {
   height: 120px;
+  /* o cartão não corta o conteúdo (o menu de opções pode passar da borda): a faixa arredonda sozinha */
+  border-radius: var(--raio-card) var(--raio-card) 0 0;
   background:
     radial-gradient(60% 120% at 85% 0%, rgba(255, 255, 255, 0.18), transparent 60%),
     linear-gradient(135deg, var(--destaque-de), var(--destaque-ate));
@@ -24,7 +25,7 @@
 
 .perfil-hero-corpo {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 20px;
   padding: 0 28px 24px;
   margin-top: -44px;
@@ -47,12 +48,13 @@
   user-select: none;
 }
 
+/* o avatar sobe na faixa; o nome fica todo na parte branca, logo abaixo dela */
 .perfil-identidade {
   min-width: 0;
-  padding-bottom: 6px;
+  padding-top: 56px;
 }
 
-.perfil-identidade h1 {
+.perfil-identidade h2 {
   font-size: 26px;
   line-height: 1.2;
   font-weight: 700;
@@ -121,10 +123,6 @@
   gap: 12px;
 }
 
-.perfil-card-icone {
-  color: var(--accent);
-}
-
 .perfil-contador {
   min-width: 28px;
   padding: 2px 10px;
@@ -180,8 +178,7 @@
   color: var(--text);
 }
 
-.perfil-nota,
-.perfil-texto {
+.perfil-nota {
   margin: 0;
   font-size: 13px;
   color: var(--text);
@@ -189,11 +186,6 @@
 
 .perfil-nota {
   margin-top: auto;
-}
-
-.perfil-texto {
-  font-size: 14px;
-  line-height: 1.55;
 }
 
 /* ----- Unidades ----- */
@@ -255,85 +247,6 @@
   transform: translateX(3px);
 }
 
-/* ----- Ações ----- */
-
-.perfil-acoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: auto;
-}
-
-.perfil-botao {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 8px 18px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-h);
-  text-decoration: none;
-  cursor: pointer;
-  transition: filter 0.15s ease, border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
-}
-
-.perfil-botao-primario {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, var(--destaque-de), var(--destaque-ate));
-}
-
-.perfil-botao-primario:hover {
-  filter: brightness(1.08);
-}
-
-.perfil-botao-sair:hover {
-  color: var(--negativo);
-  border-color: var(--negativo);
-  background: var(--negativo-bg);
-}
-
-.perfil-botao:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* ----- Preferências ----- */
-
-.perfil-preferencia {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.perfil-preferencia > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.perfil-preferencia strong {
-  font-size: 14px;
-  color: var(--text-h);
-}
-
-.perfil-preferencia span {
-  font-size: 13px;
-  color: var(--text);
-}
-
-.perfil-preferencia .tema-botao {
-  flex: 0 0 150px;
-}
-
 /* ----- Responsivo ----- */
 
 @media (max-width: 860px) {
@@ -360,7 +273,12 @@
     font-size: 26px;
   }
 
-  .perfil-identidade h1 {
+  /* no celular o nome fica embaixo do avatar */
+  .perfil-identidade {
+    padding-top: 0;
+  }
+
+  .perfil-identidade h2 {
     font-size: 22px;
   }
 
@@ -372,15 +290,6 @@
     grid-template-columns: 1fr;
     gap: 2px;
   }
-
-  .perfil-preferencia {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .perfil-preferencia .tema-botao {
-    flex-basis: auto;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -388,3 +297,101 @@
     transition: none;
   }
 }
+
+/* ----- Botão de opções no canto do cabeçalho ----- */
+
+.perfil-hero .perfil-hero-menu {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+}
+
+.menu-perfil {
+  position: relative;
+}
+
+.menu-perfil-botao {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.menu-perfil-botao:hover,
+.menu-perfil-botao.aberto {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.menu-perfil-botao:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.menu-perfil-lista {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.menu-perfil-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+  text-align: left;
+  text-decoration: none;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.menu-perfil-item svg {
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.menu-perfil-item:hover,
+.menu-perfil-item:focus-visible {
+  outline: none;
+  background: var(--muted);
+}
+
+.menu-perfil-item.perigo,
+.menu-perfil-item.perigo svg {
+  color: var(--negativo);
+}
+
+.menu-perfil-item.perigo:hover,
+.menu-perfil-item.perigo:focus-visible {
+  background: var(--negativo-bg);
+}
+
+.menu-perfil-divisor {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+

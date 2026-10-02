@@ -3,9 +3,10 @@ import { Campo } from '../../components/Campo'
 import { Modal } from '../../components/Modal'
 import { ApiError, api } from '../../lib/api'
 import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
-import { cpfValido, EMAIL_VALIDO, mascararCpfEntrada } from '../../lib/formato'
+import { cpfValido, EMAIL_VALIDO, formatarTelefone, mascararCpfEntrada, mascararTelefoneEntrada } from '../../lib/formato'
 import { NOME_PERFIL } from '../../lib/preferencias'
 import type { ClienteAdmin, ContaCriada, PerfilCliente, UnidadeAdmin } from '../../types/api'
+import { PreviaCadastro, SecaoCadastro } from './FormCadastro'
 
 const PERFIS: PerfilCliente[] = ['gestor', 'rh']
 
@@ -25,6 +26,8 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
   const [nome, setNome] = useState(usuario?.nome ?? '')
   const [email, setEmail] = useState(usuario?.email ?? '')
   const [cpf, setCpf] = useState('')
+  const [cargo, setCargo] = useState(usuario?.cargo ?? '')
+  const [telefone, setTelefone] = useState(usuario?.telefone ? formatarTelefone(usuario.telefone) : '')
   const [perfil, setPerfil] = useState<PerfilCliente>(usuario?.perfil ?? 'gestor')
   const [unidadeIds, setUnidadeIds] = useState<number[]>(() => usuario?.unidades.map((unidade) => unidade.id) ?? [])
   const [erros, setErros] = useState<Record<string, string>>({})
@@ -36,6 +39,8 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
     if (nome.trim().length < 2) saida.nome = 'Informe o nome (mín. 2 caracteres).'
     if (email.trim() && !EMAIL_VALIDO.test(email.trim())) saida.email = 'E-mail inválido.'
     if (cpf && !cpfValido(cpf)) saida.cpf = 'CPF inválido.'
+    const digitosTelefone = telefone.replace(/\D/g, '')
+    if (digitosTelefone && (digitosTelefone.length < 10 || digitosTelefone.length > 11)) saida.telefone = 'Informe DDD e número.'
     const temCpf = Boolean(cpf) || Boolean(usuario?.cpf_mascarado)
     if (!email.trim() && !temCpf) saida.email = 'Informe e-mail ou CPF (usados para entrar).'
     if (perfil === 'gestor' && unidadeIds.length === 0) saida.unidade_ids = 'Escolha ao menos uma unidade.'
@@ -51,6 +56,8 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
 
     const emailLimpo = email.trim() || null
     const cpfDigitos = cpf.replace(/\D/g, '') || null
+    const cargoLimpo = cargo.trim() || null
+    const telefoneDigitos = telefone.replace(/\D/g, '') || null
     setEnviando(true)
     try {
       if (!usuario) {
@@ -61,6 +68,8 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
             email: emailLimpo,
             cpf: cpfDigitos,
             perfil,
+            cargo: cargoLimpo,
+            telefone: telefoneDigitos,
             empresa_id: ehAdmin ? empresaId : undefined,
             unidade_ids: perfil === 'gestor' ? unidadeIds : [],
           },
@@ -72,6 +81,8 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
       if (nome.trim() !== usuario.nome) alteracoes.nome = nome.trim()
       if (emailLimpo !== usuario.email) alteracoes.email = emailLimpo
       if (cpfDigitos) alteracoes.cpf = cpfDigitos
+      if (cargoLimpo !== usuario.cargo) alteracoes.cargo = cargoLimpo
+      if (telefoneDigitos !== usuario.telefone) alteracoes.telefone = telefoneDigitos
       if (perfil !== usuario.perfil) alteracoes.perfil = perfil
       if (Object.keys(alteracoes).length) {
         await api(`/clientes/${usuario.id}`, { method: 'PATCH', json: alteracoes })
@@ -101,68 +112,92 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
   return (
     <Modal titulo={editando ? `Editar ${usuario.nome}` : 'Novo usuário'} onFechar={onFechar} largo>
       <form className="modal-form" onSubmit={salvar} noValidate>
-        <Campo rotulo="Nome" erro={erros.nome}>
-          {(props) => (
-            <input
-              {...props}
-              type="text"
-              value={nome}
-              maxLength={120}
-              autoComplete="off"
-              onChange={(event) => setNome(event.target.value)}
-              data-autofoco
-            />
-          )}
-        </Campo>
-        <div className="campos-grade">
-          <Campo rotulo="E-mail" erro={erros.email} ajuda="Usado para entrar. Opcional se houver CPF.">
-            {(props) => (
-              <input
-                {...props}
-                type="email"
-                value={email}
-                autoComplete="off"
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            )}
-          </Campo>
-          <Campo
-            rotulo="CPF"
-            erro={erros.cpf}
-            ajuda={usuario?.cpf_mascarado ? `Atual: ${usuario.cpf_mascarado}. Deixe em branco para manter.` : 'Também pode ser usado para entrar.'}
-          >
+        <PreviaCadastro
+          nome={nome}
+          vazio="Nome do usuário"
+          sub={[NOME_PERFIL[perfil], cargo.trim()].filter(Boolean).join(' · ')}
+        />
+
+        <SecaoCadastro titulo="Dados pessoais">
+          <Campo rotulo="Nome completo" erro={erros.nome}>
             {(props) => (
               <input
                 {...props}
                 type="text"
-                inputMode="numeric"
-                placeholder="000.000.000-00"
-                value={cpf}
+                value={nome}
+                maxLength={120}
                 autoComplete="off"
-                onChange={(event) => setCpf(mascararCpfEntrada(event.target.value))}
+                onChange={(event) => setNome(event.target.value)}
+                data-autofoco
               />
             )}
           </Campo>
-        </div>
-        <Campo rotulo="Perfil" erro={erros.perfil} ajuda={ehProprio ? 'Você não pode alterar o próprio perfil.' : perfilAjuda(perfil)}>
-          {(props) => (
-            <select {...props} value={perfil} disabled={ehProprio} onChange={(event) => setPerfil(event.target.value as PerfilCliente)}>
-              {PERFIS.map((item) => (
-                <option key={item} value={item}>
-                  {NOME_PERFIL[item]}
-                </option>
-              ))}
-            </select>
-          )}
-        </Campo>
+          <div className="campos-grade">
+            <Campo rotulo="Cargo" erro={erros.cargo} ajuda="Ex.: Analista de RH, Supervisor de turno.">
+              {(props) => (
+                <input {...props} type="text" value={cargo} maxLength={80} autoComplete="off" onChange={(event) => setCargo(event.target.value)} />
+              )}
+            </Campo>
+            <Campo rotulo="Telefone" erro={erros.telefone}>
+              {(props) => (
+                <input
+                  {...props}
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="(00) 00000-0000"
+                  value={telefone}
+                  autoComplete="off"
+                  onChange={(event) => setTelefone(mascararTelefoneEntrada(event.target.value))}
+                />
+              )}
+            </Campo>
+          </div>
+        </SecaoCadastro>
+
+        <SecaoCadastro titulo="Acesso ao sistema" descricao="E-mail ou CPF servem para entrar no Copiloto.">
+          <div className="campos-grade">
+            <Campo rotulo="E-mail" erro={erros.email} ajuda="Opcional se houver CPF.">
+              {(props) => (
+                <input {...props} type="email" value={email} autoComplete="off" onChange={(event) => setEmail(event.target.value)} />
+              )}
+            </Campo>
+            <Campo
+              rotulo="CPF"
+              erro={erros.cpf}
+              ajuda={usuario?.cpf_mascarado ? `Atual: ${usuario.cpf_mascarado}. Deixe em branco para manter.` : undefined}
+            >
+              {(props) => (
+                <input
+                  {...props}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="000.000.000-00"
+                  value={cpf}
+                  autoComplete="off"
+                  onChange={(event) => setCpf(mascararCpfEntrada(event.target.value))}
+                />
+              )}
+            </Campo>
+          </div>
+          <Campo rotulo="Perfil" erro={erros.perfil} ajuda={ehProprio ? 'Você não pode alterar o próprio perfil.' : perfilAjuda(perfil)}>
+            {(props) => (
+              <select {...props} value={perfil} disabled={ehProprio} onChange={(event) => setPerfil(event.target.value as PerfilCliente)}>
+                {PERFIS.filter((item) => ehAdmin || item === 'gestor' || item === usuario?.perfil).map((item) => (
+                  <option key={item} value={item}>
+                    {NOME_PERFIL[item]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Campo>
+        </SecaoCadastro>
 
         {perfil === 'gestor' && (
-          <fieldset className="form-secao" aria-describedby={erros.unidade_ids ? 'erro-unidades' : undefined}>
-            <legend>Unidades que o gestor vê</legend>
+          <SecaoCadastro titulo="Unidades que o gestor vê" descricao={`${unidadeIds.length} de ${ordenadas.length} marcadas.`}>
             {ordenadas.length === 0 ? (
               <p className="texto-suave">Nenhuma unidade com nome de exibição. Configure em Unidades.</p>
             ) : (
-              <div className="checkbox-list">
+              <div className="checkbox-list" aria-describedby={erros.unidade_ids ? 'erro-unidades' : undefined}>
                 {ordenadas.map((unidade) => (
                   <label key={unidade.id} className="checkbox-item">
                     <input type="checkbox" checked={unidadeIds.includes(unidade.id)} onChange={() => alternarUnidade(unidade.id)} />
@@ -177,7 +212,7 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
                 {erros.unidade_ids}
               </small>
             )}
-          </fieldset>
+          </SecaoCadastro>
         )}
 
         {!editando && (

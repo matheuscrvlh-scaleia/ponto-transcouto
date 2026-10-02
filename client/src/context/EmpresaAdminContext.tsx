@@ -6,10 +6,10 @@ import { useRecurso } from '../lib/useRecurso'
 import type { Empresa } from '../types/api'
 
 interface EmpresaAdminState {
-  /** Equipe Scale IA (perfil admin): escolhe a empresa no seletor do topo. */
+  /** Equipe Scale IA (perfil admin): escolhe a empresa no seletor da barra lateral. */
   ehAdmin: boolean
   /**
-   * Empresa em foco: a escolhida no topo (equipe) ou a do próprio usuário (rh/gestor).
+   * Empresa em foco: a escolhida na barra lateral (equipe) ou a do próprio usuário (rh/gestor).
    * Para a equipe, null = "todas as empresas" (padrão).
    */
   empresaId: number | null
@@ -25,7 +25,7 @@ interface EmpresaAdminState {
 
 const EmpresaAdminContext = createContext<EmpresaAdminState | null>(null)
 
-/* Fica em volta de todo o app logado (AppLayout): a empresa escolhida no topo
+/* Fica em volta de todo o app logado (AppLayout): a empresa escolhida na barra lateral
    vale para Gestão, Configuração e Administração. */
 export function EmpresaAdminProvider({ children }: { children: ReactNode }) {
   const { usuario } = useAuth()

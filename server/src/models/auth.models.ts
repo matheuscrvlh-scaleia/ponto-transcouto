@@ -1,8 +1,11 @@
 import { db } from '../db/database'
 import { unidadesPermitidasSql } from '../db/escopo'
 import type { Ator, Perfil, TipoUsuario, UnidadeResumo, UsuarioSessao } from '../types/auth.types'
+import { TELAS, type Tela } from '../types/permissoes.types'
 
-export type UsuarioComSenha = UsuarioSessao & {
+export type UsuarioComSenha = Omit<UsuarioSessao, 'telas'> & {
+    /** null para a equipe (acesso total) */
+    telas: Tela[] | null
     senha: string
     ativo: boolean
     token_versao: number
@@ -11,9 +14,12 @@ export type UsuarioComSenha = UsuarioSessao & {
 /* Equipe (usuarios) e clientes têm as mesmas colunas de login; a equipe não
    tem empresa. O tipo vem como coluna para a sessão saber de onde veio. */
 const colunasEquipe = `id, 'equipe' AS tipo, nome, email, perfil, NULL::int AS empresa_id,
-                       deve_trocar_senha, ativo, token_versao, senha`
+                       deve_trocar_senha, ativo, token_versao, senha, NULL::text[] AS telas, NULL::json AS grupo`
 const colunasCliente = `id, 'cliente' AS tipo, nome, email, perfil, empresa_id,
-                        deve_trocar_senha, ativo, token_versao, senha`
+                        deve_trocar_senha, ativo, token_versao, senha,
+                        (SELECT g.telas FROM grupos_permissao g WHERE g.id = clientes.grupo_id) AS telas,
+                        (SELECT json_build_object('id', g.id, 'nome', g.nome)
+                           FROM grupos_permissao g WHERE g.id = clientes.grupo_id) AS grupo`
 
 const tabela: Record<TipoUsuario, string> = { equipe: 'usuarios', cliente: 'clientes' }
 
@@ -93,5 +99,12 @@ export function sessao(usuario: UsuarioComSenha): UsuarioSessao {
         perfil: usuario.perfil as Perfil,
         empresa_id: usuario.empresa_id,
         deve_trocar_senha: usuario.deve_trocar_senha,
+        telas: telasDe(usuario),
+        grupo: usuario.grupo ?? null,
     }
+}
+
+/** A equipe Scale IA não tem grupo: vê todas as telas. */
+export function telasDe(usuario: Pick<UsuarioComSenha, 'tipo' | 'telas'>): Tela[] {
+    return usuario.tipo === 'equipe' ? [...TELAS] : (usuario.telas ?? [])
 }

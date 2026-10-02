@@ -1,3 +1,4 @@
+import { isIP } from 'node:net'
 import { db, type Executor } from '../db/database'
 import type { Ator } from '../types/auth.types'
 
@@ -24,7 +25,8 @@ export async function registrar(r: RegistroAuditoria, executor: Executor = db) {
             r.entidade,
             String(r.entidadeId),
             r.dados ?? null,
-            r.ip ?? null,
+            // IP inválido (cabeçalho forjado) não derruba a ação: grava sem IP
+            r.ip && isIP(r.ip) ? r.ip : null,
         ],
     )
 }

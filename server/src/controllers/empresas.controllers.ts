@@ -7,7 +7,9 @@ import * as empresasModel from '../models/empresas.models'
 import { idParamSchema } from '../types/comum.types'
 import {
     atualizarEmpresaSchema,
+    CAMPOS_CADASTRO,
     criarEmpresaSchema,
+    type CadastroEmpresa,
     testarConexaoSchema,
     type DadosEmpresa,
 } from '../types/empresas.types'
@@ -25,9 +27,15 @@ async function validar(dados: DadosEmpresa, ignorarId: number | null) {
     if ((dados.secullum_usuario == null) !== (dados.secullum_senha_cripto == null)) {
         throw invalido('Informe usuário e senha da Secullum juntos.')
     }
-    const campo = await empresasModel.conflitos(dados.nome, dados.secullum_banco_id, ignorarId)
+    const campo = await empresasModel.conflitos(dados, ignorarId)
     if (campo === 'nome') throw conflito('Já existe uma empresa com este nome.')
+    if (campo === 'cnpj') throw conflito('Já existe uma empresa com este CNPJ.')
     if (campo) throw conflito('Este banco Secullum já está vinculado a outra empresa.')
+}
+
+/** Monta os dados cadastrais campo a campo (do corpo da requisição ou do que já está salvo). */
+function cadastro(valor: (campo: keyof CadastroEmpresa) => string | null): CadastroEmpresa {
+    return Object.fromEntries(CAMPOS_CADASTRO.map(campo => [campo, valor(campo)])) as CadastroEmpresa
 }
 
 export async function listar(_req: FastifyRequest, res: FastifyReply) {
@@ -46,6 +54,7 @@ export async function criar(req: FastifyRequest, res: FastifyReply) {
         secullum_senha_cripto: body.secullum_senha ? encrypt(body.secullum_senha) : null,
         secullum_banco_id: body.secullum_banco_id ?? null,
         ativo: body.ativo,
+        ...cadastro(campo => body[campo] ?? null),
     }
     await validar(dados, null)
 
@@ -59,7 +68,12 @@ export async function criar(req: FastifyRequest, res: FastifyReply) {
                 acao: 'empresa.criada',
                 entidade: 'empresas',
                 entidadeId: id,
-                dados: { nome: dados.nome, secullum_usuario: dados.secullum_usuario, secullum_banco_id: dados.secullum_banco_id },
+                dados: {
+                    nome: dados.nome,
+                    cnpj: dados.cnpj,
+                    secullum_usuario: dados.secullum_usuario,
+                    secullum_banco_id: dados.secullum_banco_id,
+                },
                 ip: req.ip,
             },
             client,
@@ -88,10 +102,12 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
         secullum_senha_cripto: usuario == null ? null : senhaCripto,
         secullum_banco_id: body.secullum_banco_id !== undefined ? body.secullum_banco_id : atual.secullum_banco_id,
         ativo: body.ativo ?? atual.ativo,
+        ...cadastro(campo => (body[campo] !== undefined ? body[campo] : atual[campo])),
     }
     await validar(dados, atual.id)
 
-    const { secullum_senha, ...alteracoes } = body
+    // a imagem do logo não vai inteira para a auditoria
+    const { secullum_senha, logo, ...alteracoes } = body
     const empresa = await withTransaction(async client => {
         await empresasModel.atualizar(atual.id, dados, client)
         await auditoria.registrar(
@@ -101,7 +117,7 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
                 acao: 'empresa.alterada',
                 entidade: 'empresas',
                 entidadeId: atual.id,
-                dados: { alteracoes, senha_alterada: secullum_senha !== undefined },
+                dados: { alteracoes, senha_alterada: secullum_senha !== undefined, logo_alterado: logo !== undefined },
                 ip: req.ip,
             },
             client,

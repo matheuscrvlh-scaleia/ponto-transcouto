@@ -1,7 +1,6 @@
 /* ---------- Dashboard da unidade (carregado pelo DashboardUnidade) ---------- */
 
 .pagina.dash {
-  max-width: 1360px;
   gap: 20px;
 }
 
@@ -192,8 +191,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-areas:
     'faixas faixas atualizacao resumo'
-    'atencao atencao medidor resumo'
-    'lista lista lista lista';
+    'atencao atencao medidor resumo';
   gap: 16px;
   align-items: stretch;
 }
@@ -849,8 +847,7 @@
     grid-template-areas:
       'faixas faixas'
       'atualizacao medidor'
-      'atencao resumo'
-      'lista lista';
+      'atencao resumo';
   }
 }
 
@@ -893,8 +890,7 @@
       'medidor'
       'atencao'
       'atualizacao'
-      'resumo'
-      'lista';
+      'resumo';
     gap: 12px;
   }
 
@@ -999,4 +995,175 @@
 
 .dash-unidades-proxima svg {
   color: var(--accent);
+}
+
+/* ----- Tempo real ----- */
+
+.dash-ao-vivo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.dash-atualizacao-topo {
+  align-items: center;
+  margin-bottom: 0;
+}
+
+/* linha que, no tempo real, ainda mostra o último fechamento publicado */
+.marca-fotografia {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  vertical-align: -1px;
+  color: var(--text);
+  opacity: 0.75;
+  cursor: help;
+}
+
+.marca-fotografia-legenda {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.marca-fotografia-legenda svg {
+  opacity: 0.75;
+}
+
+/* ----- Modal de colaboradores (clique nos gráficos) ----- */
+
+.modal-colab-descricao {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.modal-colab-busca {
+  margin-bottom: 12px;
+}
+
+.modal-colab-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(56vh, 520px);
+  overflow-y: auto;
+}
+
+.modal-colab-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.modal-colab-item:hover,
+.modal-colab-item:focus-visible {
+  background: var(--muted);
+}
+
+.modal-colab-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.modal-colab-texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.modal-colab-nome {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-colab-info {
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-colab-saldo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.modal-colab-rodape {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* gráficos clicáveis: barras e partes do medidor abrem o modal */
+.faixa.clicavel {
+  cursor: pointer;
+}
+
+.grafico-dica {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.medidor-segmento.clicavel {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.medidor-segmento.clicavel:hover {
+  opacity: 0.8;
+}
+
+.medidor-legenda-botao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.medidor-legenda-botao:hover {
+  background: var(--muted);
+}
+
+.medidor-legenda-botao:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.medidor-legenda-botao strong {
+  margin-left: auto;
 }

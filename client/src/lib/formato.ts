@@ -86,6 +86,45 @@ export function formatarCnpj(cnpj: string): string {
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
 }
 
+/** Máscara enquanto digita: "11222333000181" → "11.222.333/0001-81". */
+export function mascararCnpjEntrada(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 14)
+  return d
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+}
+
+/** Confere os dígitos verificadores do CNPJ (aceita com ou sem máscara). */
+export function cnpjValido(cnpj: string): boolean {
+  const d = cnpj.replace(/\D/g, '')
+  if (d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false
+  const digito = (base: string) => {
+    const soma = [...base].reduce((acc, n, i) => acc + Number(n) * (((base.length - 1 - i) % 8) + 2), 0)
+    const resto = soma % 11
+    return resto < 2 ? 0 : 11 - resto
+  }
+  return digito(d.slice(0, 12)) === Number(d[12]) && digito(d.slice(0, 13)) === Number(d[13])
+}
+
+/** Telefone com DDD: "11987654321" → "(11) 98765-4321"; "1133334444" → "(11) 3333-4444". */
+export function formatarTelefone(telefone: string | null | undefined): string {
+  const d = (telefone ?? '').replace(/\D/g, '')
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return telefone ?? ''
+}
+
+/** Máscara de telefone enquanto digita (fixo ou celular). */
+export function mascararTelefoneEntrada(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 11)
+  if (d.length <= 2) return d.length ? `(${d}` : ''
+  const meio = d.length === 11 ? 5 : 4
+  const resto = d.slice(2)
+  return `(${d.slice(0, 2)}) ${resto.slice(0, meio)}${resto.length > meio ? `-${resto.slice(meio)}` : ''}`
+}
+
 export function mascararCpfEntrada(texto: string): string {
   const d = texto.replace(/\D/g, '').slice(0, 11)
   return d
@@ -154,4 +193,77 @@ export function iniciais(nome: string | null | undefined): string {
   if (partes.length === 0) return '?'
   const ultima = partes.length > 1 ? partes[partes.length - 1][0] : ''
   return (partes[0][0] + ultima).toLocaleUpperCase('pt-BR')
+}
+
+const fmtDataIso = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO, year: 'numeric', month: '2-digit', day: '2-digit' })
+
+/** Data de hoje no horário de Brasília, como 'YYYY-MM-DD' (valor de <input type="date">). */
+export function hojeISO(): DataISO {
+  return fmtDataIso.format(new Date())
+}
+
+/** Soma (ou subtrai) dias de uma data 'YYYY-MM-DD' sem passar pelo fuso do navegador. */
+export function somarDias(data: DataISO, dias: number): DataISO {
+  const [a, m, d] = data.slice(0, 10).split('-').map(Number)
+  return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10)
+}
+
+/** Dias corridos entre duas datas 'YYYY-MM-DD' (fim − início). */
+export function diasEntre(inicio: DataISO, fim: DataISO): number {
+  const utc = (data: DataISO) => {
+    const [a, m, d] = data.slice(0, 10).split('-').map(Number)
+    return Date.UTC(a, m - 1, d)
+  }
+  return Math.round((utc(fim) - utc(inicio)) / 86_400_000)
+}
+
+const fmtHora = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, hour: '2-digit', minute: '2-digit' })
+
+/** ISO → "HH:MM" no horário de Brasília. */
+export function formatarHora(iso: DataHoraISO): string {
+  return fmtHora.format(new Date(iso))
+}
+
+/** Dia (horário de Brasília) de um instante, como 'YYYY-MM-DD'. */
+export function dataDoInstante(iso: DataHoraISO): DataISO {
+  return fmtDataIso.format(new Date(iso))
+}
+
+/** Último acesso de uma conta: "Hoje às 14:20", "Ontem às 09:10", "Há 3 dias" ou a data. */
+export function formatarUltimoAcesso(iso: DataHoraISO | null | undefined): string {
+  if (!iso) return 'Nunca acessou'
+  const dia = dataDoInstante(iso)
+  const dias = diasEntre(dia, hojeISO())
+  if (dias <= 0) return `Hoje às ${formatarHora(iso)}`
+  if (dias === 1) return `Ontem às ${formatarHora(iso)}`
+  if (dias < 7) return `Há ${dias} dias`
+  return formatarData(dia)
+}
+
+/** ISO → "HH:MM" se for hoje; senão "dd/mm às HH:MM" (ou sempre com data, com `comData`). */
+export function formatarHoraOuData(iso: DataHoraISO, { comData = false } = {}): string {
+  const dia = dataDoInstante(iso)
+  const hora = formatarHora(iso)
+  return comData || dia !== hojeISO() ? `${formatarData(dia, { ano: false })} às ${hora}` : hora
+}
+
+/** Intervalo em minutos → "25 min", "1h", "1h30". */
+export function formatarIntervalo(minutos: number): string {
+  const total = Math.max(1, Math.round(minutos))
+  if (total < 60) return `${total} min`
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
+}
+
+const fmtDiaPorExtenso = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'long', day: '2-digit', month: 'long' })
+
+/** 'YYYY-MM-DD' → "Hoje", "Ontem" ou "terça-feira, 30 de setembro" (com o ano se não for o atual). */
+export function formatarDiaPorExtenso(data: DataISO): string {
+  const hoje = hojeISO()
+  if (data === hoje) return 'Hoje'
+  if (data === somarDias(hoje, -1)) return 'Ontem'
+  const [a, m, d] = data.slice(0, 10).split('-').map(Number)
+  const texto = fmtDiaPorExtenso.format(new Date(Date.UTC(a, m - 1, d)))
+  return a === Number(hoje.slice(0, 4)) ? texto : `${texto} de ${a}`
 }

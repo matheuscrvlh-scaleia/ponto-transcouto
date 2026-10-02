@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import { withTransaction } from '../db/database'
 import * as unidadesAdminModel from '../models/admin-unidades.models'
 import * as auditoria from '../models/auditoria.models'
+import { preencherNomesUnidades } from '../models/sincronizacao.models'
 import { empresaDoUsuario } from '../services/escopo.service'
 import {
     atualizarUnidadeSchema,
@@ -35,6 +36,8 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
 
     const atualizada = await withTransaction(async client => {
         await unidadesAdminModel.atualizar(unidade.id, nome, ativo, client)
+        // nome apagado: volta para a razão social (toda unidade tem nome; para sumir do painel, desative)
+        if (!nome) await preencherNomesUnidades(unidade.empresa_id, client)
         await auditoria.registrar(
             {
                 ator: req.usuario,

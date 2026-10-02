@@ -27,7 +27,7 @@ export type ColaboradorSincronizado = {
     ativo: boolean
 }
 
-const comCredenciais = `e.ativo AND e.secullum_usuario IS NOT NULL AND e.secullum_senha_cripto IS NOT NULL
+export const comCredenciais = `e.ativo AND e.secullum_usuario IS NOT NULL AND e.secullum_senha_cripto IS NOT NULL
                        AND e.secullum_banco_id IS NOT NULL`
 
 export async function empresasParaSincronizar(ex: Executor = db) {
@@ -37,6 +37,10 @@ export async function empresasParaSincronizar(ex: Executor = db) {
           WHERE ${comCredenciais}
             AND (   e.sincronizado_em IS NULL
                  OR e.sincronizacao_solicitada_em > e.sincronizado_em
+                 -- tempo real: cadastros frescos (admissões/transferências) a cada 6 horas
+                 OR (e.sincronizado_em < now() - interval '6 hours'
+                     AND EXISTS (SELECT 1 FROM configuracoes cf
+                                  WHERE cf.empresa_id = e.id AND cf.modo_extracao = 'tempo_real'))
                  OR EXISTS (SELECT 1
                               FROM ciclos c
                               JOIN fechamentos f ON f.ciclo_id = c.id AND f.status = 'pendente'
@@ -66,6 +70,12 @@ export async function salvarUnidades(empresaId: number, unidades: UnidadeSincron
             SET razao_social = EXCLUDED.razao_social, ativo = unidades.ativo AND EXCLUDED.ativo, sincronizado_em = now()`,
         [empresaId, JSON.stringify(unidades)],
     )
+}
+
+/** Unidade nova (ou sem nome) ganha a razão social como nome; o nome continua editável na tela de Unidades. */
+export async function preencherNomesUnidades(empresaId: number, ex: Executor = db) {
+    const result = await ex.query<{ total: number }>('SELECT preencher_nomes_unidades($1) AS total', [empresaId])
+    return result.rows[0].total
 }
 
 export async function desativarUnidadesAusentes(empresaId: number, documentos: string[], ex: Executor = db) {

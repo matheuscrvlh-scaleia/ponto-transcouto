@@ -18,33 +18,35 @@ function comoAdmin(method: 'GET' | 'POST' | 'PATCH' | 'PUT', url: string, payloa
 }
 
 describe('de-para de unidades', () => {
-    it('lista não mapeadas primeiro e responde 409 para nome duplicado', async () => {
+    it('unidade sem nome usa a razão social; o nome é editável e apagar volta para a razão social', async () => {
         const lista = await ctx.app.inject({
             method: 'GET',
             url: '/api/v1/admin/unidades',
             headers: autorizado(ctx.tokens.rh),
         })
         expect(lista.statusCode).toBe(200)
-        const unidades = lista.json()
-        expect(unidades[0].nome_exibicao).toBeNull()
-        expect(unidades.every((u: { empresa_id: number }) => u.empresa_id === ctx.empresaId)).toBe(true)
+        const unidades: { id: number; empresa_id: number; nome_exibicao: string | null; razao_social: string }[] = lista.json()
+        expect(unidades.every(u => u.empresa_id === ctx.empresaId && u.nome_exibicao)).toBe(true)
+        const semNomeAntes = unidades.find(u => u.nome_exibicao === u.razao_social)!
+        expect(semNomeAntes.razao_social).toBe('TC NOVA UNIDADE SERVICOS LTDA')
 
-        const duplicado = await ctx.app.inject({
-            method: 'PATCH',
-            url: `/api/v1/admin/unidades/${unidades[0].id}`,
-            payload: { nome_exibicao: 'gdr' },
-            headers: autorizado(ctx.tokens.rh),
-        })
-        expect(duplicado.statusCode).toBe(409)
+        const editar = (nome: string | null) =>
+            ctx.app.inject({
+                method: 'PATCH',
+                url: `/api/v1/admin/unidades/${semNomeAntes.id}`,
+                payload: { nome_exibicao: nome },
+                headers: autorizado(ctx.tokens.rh),
+            })
 
-        const ok = await ctx.app.inject({
-            method: 'PATCH',
-            url: `/api/v1/admin/unidades/${unidades[0].id}`,
-            payload: { nome_exibicao: 'NOF' },
-            headers: autorizado(ctx.tokens.rh),
-        })
+        expect((await editar('gdr')).statusCode).toBe(409)
+
+        const ok = await editar('NOF')
         expect(ok.statusCode).toBe(200)
         expect(ok.json().nome_exibicao).toBe('NOF')
+
+        const apagado = await editar(null)
+        expect(apagado.statusCode).toBe(200)
+        expect(apagado.json().nome_exibicao).toBe('TC NOVA UNIDADE SERVICOS LTDA')
     })
 
     it('solicita sincronização', async () => {
@@ -167,6 +169,43 @@ describe('empresas e mapeamento', () => {
 
         const semSenha = await comoAdmin('PATCH', `/admin/empresas/${empresa.id}`, { secullum_senha: null })
         expect(semSenha.statusCode).toBe(400)
+    })
+
+    it('guarda os dados cadastrais (CNPJ, logo, contato) e valida CNPJ, logo e UF', async () => {
+        const logo = 'data:image/png;base64,iVBORw0KGgo='
+        const res = await comoAdmin('POST', '/admin/empresas', {
+            nome: 'Empresa Cadastro Completo',
+            razao_social: 'Empresa Cadastro Completo Ltda',
+            cnpj: '11.222.333/0001-81',
+            logo,
+            responsavel: 'Ana Souza',
+            email_contato: 'Contato@Empresa.com.br',
+            telefone: '(11) 98765-4321',
+            cidade: 'Campinas',
+            uf: 'sp',
+            observacoes: 'Cliente desde 2026.',
+        })
+        expect(res.statusCode, res.body).toBe(201)
+        expect(res.json()).toMatchObject({
+            cnpj: '11222333000181',
+            logo,
+            email_contato: 'contato@empresa.com.br',
+            telefone: '11987654321',
+            uf: 'SP',
+            qtd_usuarios: 0,
+        })
+
+        const mesmoCnpj = await comoAdmin('POST', '/admin/empresas', { nome: 'Outra Com Mesmo CNPJ', cnpj: '11222333000181' })
+        expect(mesmoCnpj.statusCode).toBe(409)
+
+        const id = res.json().id
+        for (const invalido of [{ cnpj: '11222333000182' }, { logo: 'data:image/svg+xml;base64,PHN2Zz4=' }, { uf: 'São Paulo' }]) {
+            expect((await comoAdmin('PATCH', `/admin/empresas/${id}`, invalido)).statusCode).toBe(400)
+        }
+
+        const semLogo = await comoAdmin('PATCH', `/admin/empresas/${id}`, { logo: null, cnpj: null })
+        expect(semLogo.statusCode, semLogo.body).toBe(200)
+        expect(semLogo.json()).toMatchObject({ logo: null, cnpj: null, razao_social: 'Empresa Cadastro Completo Ltda' })
     })
 
     it('mapeamento de colunas: lê colunas detectadas e substitui', async () => {

@@ -48,6 +48,8 @@ export async function criar(req: FastifyRequest, res: FastifyReply) {
         nome: body.nome,
         email: body.email ?? null,
         cpf: cpfInformado(body.cpf),
+        cargo: body.cargo ?? null,
+        telefone: body.telefone ?? null,
         ativo: true,
     }
     await validarDados(dados, null)
@@ -87,6 +89,8 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
         nome: body.nome ?? alvo.nome,
         email: body.email !== undefined ? body.email : alvo.email,
         cpf: body.cpf !== undefined ? cpfInformado(body.cpf) : alvo.cpf,
+        cargo: body.cargo !== undefined ? body.cargo : alvo.cargo,
+        telefone: body.telefone !== undefined ? body.telefone : alvo.telefone,
         ativo: body.ativo ?? alvo.ativo,
     }
     await validarDados(dados, alvo.id)
@@ -109,6 +113,30 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
 
     const atualizado = await equipeModel.buscarPorId(alvo.id)
     res.send(atualizado && paraResposta(atualizado))
+}
+
+export async function excluir(req: FastifyRequest, res: FastifyReply) {
+    const alvo = await buscarMembro(req)
+    if (alvo.id === req.usuario.id) throw invalido('Você não pode excluir o próprio usuário.')
+
+    await withTransaction(async client => {
+        // registra antes de apagar, com os dados para consulta futura
+        await auditoria.registrar(
+            {
+                ator: req.usuario,
+                empresaId: null,
+                acao: 'equipe.excluido',
+                entidade: 'usuarios',
+                entidadeId: alvo.id,
+                dados: { nome: alvo.nome, email: alvo.email, cpf: mascararCpf(alvo.cpf) },
+                ip: req.ip,
+            },
+            client,
+        )
+        await equipeModel.excluir(alvo.id, client)
+    })
+
+    res.code(204).send()
 }
 
 export async function redefinirSenha(req: FastifyRequest, res: FastifyReply) {

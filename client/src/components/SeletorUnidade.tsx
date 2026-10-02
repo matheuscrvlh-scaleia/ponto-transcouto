@@ -3,17 +3,22 @@ import { useAuth } from '../context/AuthContext'
 import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
 import { IconePainel, IconeUnidade } from './Icones'
 import { SeletorLista, type OpcaoLista } from './SeletorLista'
+import { caminhoColaboradores } from '../lib/painel'
 
 const TODAS = 'todas'
 
 /* Unidade em foco na Gestão. A primeira opção leva ao painel com todas as
-   unidades; para a equipe, a lista segue a empresa escolhida no topo. */
+   unidades; para a equipe, a lista segue a empresa escolhida na barra lateral.
+   Na tela de Colaboradores, trocar a unidade continua na lista de colaboradores. */
 export function SeletorUnidade({ className = '' }: { className?: string }) {
   const { unidades } = useAuth()
   const { ehAdmin, empresaId } = useEmpresaAdmin()
   const navigate = useNavigate()
   const matchUnidade = useMatch('/unidades/:unidadeId/*')
-  const naVisaoGeral = Boolean(useMatch('/unidades'))
+  const naColaboradoresTodas = Boolean(useMatch('/colaboradores'))
+  const naColaboradoresUnidade = Boolean(useMatch('/unidades/:unidadeId/colaboradores'))
+  const naColaboradores = naColaboradoresTodas || naColaboradoresUnidade
+  const naVisaoGeral = Boolean(useMatch('/unidades')) || naColaboradoresTodas
 
   const visiveis = ehAdmin && empresaId != null ? unidades.filter((unidade) => unidade.empresa_id === empresaId) : unidades
   if (visiveis.length < 2) return null
@@ -31,7 +36,10 @@ export function SeletorUnidade({ className = '' }: { className?: string }) {
       rotulo="Unidade"
       opcoes={opcoes}
       selecionadoId={selecionadoId}
-      onEscolher={(id) => navigate(id === TODAS ? '/unidades' : `/unidades/${id}`)}
+      onEscolher={(id) => {
+        const unidade = id === TODAS ? null : id
+        navigate(naColaboradores ? caminhoColaboradores(unidade) : unidade ? `/unidades/${unidade}` : '/unidades')
+      }}
       icone={selecionadoId === TODAS ? <IconePainel tamanho={18} /> : <IconeUnidade tamanho={18} />}
       iconeGeral={<IconePainel tamanho={16} />}
       vazio="Escolha uma unidade"

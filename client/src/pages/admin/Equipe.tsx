@@ -5,12 +5,34 @@ import { Carregando, ErroCarregamento, EstadoVazio } from '../../components/Esta
 import { Modal } from '../../components/Modal'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { ModalSenhaTemporaria } from '../../components/ModalSenhaTemporaria'
-import { PilulaAtivo } from '../../components/PilulaStatus'
+import { IconeBloqueio, IconeChave, IconeCheck, IconeLapis, IconeLixeira, IconeMais } from '../../components/Icones'
 import { ApiError, api } from '../../lib/api'
 import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
-import { cpfValido, EMAIL_VALIDO, formatarDataHora, mascararCpfEntrada } from '../../lib/formato'
+import {
+  cpfValido,
+  dataDoInstante,
+  EMAIL_VALIDO,
+  formatarData,
+  formatarTelefone,
+  mascararCpfEntrada,
+  mascararTelefoneEntrada,
+} from '../../lib/formato'
 import { useRecurso } from '../../lib/useRecurso'
 import type { ContaCriada, MembroEquipe, Paginado } from '../../types/api'
+import { TituloPagina } from '../../components/TituloPagina'
+import {
+  BarraPessoas,
+  CartaoPessoas,
+  ContatoPessoa,
+  FiltroPessoas,
+  MenuAcoesPessoa,
+  PaginacaoPessoas,
+  Pessoa,
+  Situacao,
+  UltimoAcesso,
+  type AcaoPessoa,
+} from './ListaPessoas'
+import { PreviaCadastro, SecaoCadastro } from './FormCadastro'
 
 const POR_PAGINA = 20
 
@@ -19,6 +41,7 @@ type ModalAberto =
   | { tipo: 'editar'; membro: MembroEquipe }
   | { tipo: 'redefinir'; membro: MembroEquipe }
   | { tipo: 'desativar'; membro: MembroEquipe }
+  | { tipo: 'excluir'; membro: MembroEquipe }
   | { tipo: 'senha'; nome: string; senha: string }
   | null
 
@@ -33,7 +56,7 @@ export function Equipe() {
   const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
 
   useEffect(() => {
-    document.title = 'Equipe Scale IA — Copiloto de Ponto'
+    document.title = 'Usuários gestão — Copiloto de Ponto'
   }, [])
 
   useEffect(() => {
@@ -69,47 +92,36 @@ export function Equipe() {
   const totalPaginas = lista.dados ? Math.max(1, Math.ceil(lista.dados.total / POR_PAGINA)) : 1
   const temFiltro = Boolean(buscaAplicada || ativo)
 
-  const contato = (membro: MembroEquipe) => [membro.email, membro.cpf_mascarado].filter(Boolean).join(' · ')
+  const subtitulo = (membro: MembroEquipe) => membro.cargo ?? membro.email ?? undefined
+  const itens = lista.dados?.itens ?? []
 
-  const acoes = (membro: MembroEquipe) => (
-    <>
-      <button type="button" className="btn-link" onClick={() => setModal({ tipo: 'editar', membro })} aria-label={`Editar ${membro.nome}`}>
-        Editar
-      </button>
-      <button
-        type="button"
-        className="btn-link"
-        onClick={() => setModal({ tipo: 'redefinir', membro })}
-        aria-label={`Redefinir senha de ${membro.nome}`}
-      >
-        Redefinir senha
-      </button>
-      {!ehEu(membro) &&
-        (membro.ativo ? (
-          <button
-            type="button"
-            className="btn-link btn-link-danger"
-            onClick={() => setModal({ tipo: 'desativar', membro })}
-            aria-label={`Desativar ${membro.nome}`}
-          >
-            Desativar
-          </button>
-        ) : (
-          <button type="button" className="btn-link" onClick={() => reativar(membro)} aria-label={`Reativar ${membro.nome}`}>
-            Reativar
-          </button>
-        ))}
-    </>
-  )
+  const acoes = (membro: MembroEquipe): AcaoPessoa[] => [
+    { rotulo: 'Editar', icone: <IconeLapis tamanho={17} />, onClick: () => setModal({ tipo: 'editar', membro }) },
+    { rotulo: 'Redefinir senha', icone: <IconeChave tamanho={17} />, onClick: () => setModal({ tipo: 'redefinir', membro }) },
+    membro.ativo
+      ? {
+          rotulo: 'Desativar',
+          icone: <IconeBloqueio tamanho={17} />,
+          onClick: () => setModal({ tipo: 'desativar', membro }),
+          oculta: ehEu(membro),
+        }
+      : { rotulo: 'Reativar', icone: <IconeCheck tamanho={17} />, onClick: () => reativar(membro) },
+    {
+      rotulo: 'Excluir',
+      icone: <IconeLixeira tamanho={17} />,
+      onClick: () => setModal({ tipo: 'excluir', membro }),
+      perigo: true,
+      oculta: ehEu(membro),
+    },
+  ]
 
   return (
     <section className="pagina">
-      <header className="pagina-header-linha">
-        <div className="pagina-header">
-          <h1>Equipe Scale IA</h1>
-          <p className="pagina-sub">Quem administra o Copiloto: acesso a todas as empresas, à Configuração e à Administração.</p>
-        </div>
-        <button type="button" className="btn-primary btn-compact" onClick={() => setModal({ tipo: 'criar' })}>
+      <TituloPagina>Usuários gestão</TituloPagina>
+      <header className="pessoas-topo">
+        <p>Equipe Scale IA: quem administra o Copiloto, com acesso a todas as empresas, à Configuração e à Administração.</p>
+        <button type="button" className="pessoas-novo" onClick={() => setModal({ tipo: 'criar' })}>
+          <IconeMais tamanho={18} />
           Novo membro
         </button>
       </header>
@@ -120,125 +132,114 @@ export function Equipe() {
         </p>
       )}
 
-      <div className="filtros-admin" role="group" aria-label="Filtros">
-        <div className="field" style={{ flexBasis: 240 }}>
-          <label htmlFor="busca-equipe">Buscar</label>
-          <input
-            id="busca-equipe"
-            type="search"
-            placeholder="Nome, e-mail ou CPF"
-            value={busca}
-            onChange={(event) => setBusca(event.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="filtro-ativo-equipe">Situação</label>
-          <select
-            id="filtro-ativo-equipe"
-            value={ativo}
-            onChange={(event) => {
-              setAtivo(event.target.value as typeof ativo)
+      <CartaoPessoas>
+        <BarraPessoas
+          idBusca="busca-equipe"
+          busca={busca}
+          onBusca={setBusca}
+          placeholder="Buscar por nome, e-mail ou CPF"
+          contagem={lista.dados ? `${lista.dados.total} ${lista.dados.total === 1 ? 'membro' : 'membros'}` : undefined}
+        >
+          <FiltroPessoas
+            rotulo="Situação"
+            valor={ativo}
+            onMudar={(valor) => {
+              setAtivo(valor as typeof ativo)
               setPagina(1)
             }}
           >
             <option value="">Todas</option>
             <option value="true">Ativos</option>
             <option value="false">Inativos</option>
-          </select>
-        </div>
-      </div>
+          </FiltroPessoas>
+        </BarraPessoas>
 
-      {lista.carregando && <Carregando texto="Carregando equipe..." />}
-      {lista.erro && <ErroCarregamento erro={lista.erro} onTentarDeNovo={lista.recarregar} />}
+        {lista.carregando && (
+          <div className="pessoas-estado">
+            <Carregando texto="Carregando equipe..." />
+          </div>
+        )}
+        {lista.erro && (
+          <div className="pessoas-estado">
+            <ErroCarregamento erro={lista.erro} onTentarDeNovo={lista.recarregar} />
+          </div>
+        )}
 
-      {lista.dados && lista.dados.itens.length === 0 && (
-        <EstadoVazio titulo={temFiltro || pagina > 1 ? 'Ninguém encontrado' : 'Nenhum membro cadastrado'}>
-          {pagina > 1 ? (
-            <button type="button" className="btn-link" onClick={() => setPagina(1)}>
-              Voltar para a primeira página
-            </button>
-          ) : (
-            temFiltro && <p>Ajuste a busca ou os filtros.</p>
-          )}
-        </EstadoVazio>
-      )}
+        {lista.dados && itens.length === 0 && (
+          <div className="pessoas-estado">
+            <EstadoVazio titulo={temFiltro || pagina > 1 ? 'Ninguém encontrado' : 'Nenhum membro cadastrado'}>
+              {pagina > 1 ? (
+                <button type="button" className="btn-link" onClick={() => setPagina(1)}>
+                  Voltar para a primeira página
+                </button>
+              ) : (
+                temFiltro && <p>Ajuste a busca ou os filtros.</p>
+              )}
+            </EstadoVazio>
+          </div>
+        )}
 
-      {lista.dados && lista.dados.itens.length > 0 && (
-        <>
-          <div className="card card-tabela tabela-desktop">
-            <div className="table-wrap">
-              <table>
-                <caption className="sr-only">Equipe Scale IA</caption>
+        {itens.length > 0 && (
+          <>
+            <div className="table-wrap pessoas-tabela-wrap">
+              <table className="pessoas-tabela">
+                <caption className="sr-only">Usuários gestão</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Nome</th>
+                    <th scope="col">Membro</th>
+                    <th scope="col">Contato</th>
                     <th scope="col">Situação</th>
                     <th scope="col">Último acesso</th>
                     <th scope="col">Cadastrado em</th>
-                    <th scope="col">
+                    <th scope="col" className="coluna-acoes">
                       <span className="sr-only">Ações</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lista.dados.itens.map((membro) => (
-                    <tr key={membro.id} className={membro.ativo ? undefined : 'linha-inativa'}>
+                  {itens.map((membro) => (
+                    <tr key={membro.id} className={membro.ativo ? undefined : 'inativa'}>
                       <th scope="row">
-                        {membro.nome}
-                        {ehEu(membro) && ' (você)'}
-                        <span className="celula-sub">{contato(membro)}</span>
+                        <Pessoa nome={membro.nome} sub={subtitulo(membro)} voce={ehEu(membro)} />
                       </th>
                       <td>
-                        <PilulaAtivo ativo={membro.ativo} />
-                        {membro.deve_trocar_senha && <span className="celula-sub">Senha temporária</span>}
+                        <ContatoPessoa email={membro.email} telefone={membro.telefone} cpf={membro.cpf_mascarado} />
                       </td>
-                      <td>{membro.ultimo_login_em ? formatarDataHora(membro.ultimo_login_em) : 'Nunca'}</td>
-                      <td>{membro.criado_em ? formatarDataHora(membro.criado_em) : '—'}</td>
-                      <td className="table-actions">{acoes(membro)}</td>
+                      <td>
+                        <Situacao ativo={membro.ativo} senhaTemporaria={membro.deve_trocar_senha} />
+                      </td>
+                      <td>
+                        <UltimoAcesso iso={membro.ultimo_login_em} />
+                      </td>
+                      <td className="ultimo-acesso">{membro.criado_em ? formatarData(dataDoInstante(membro.criado_em)) : '—'}</td>
+                      <td className="coluna-acoes">
+                        <MenuAcoesPessoa nome={membro.nome} acoes={acoes(membro)} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
 
-          <ul className="cartoes-admin">
-            {lista.dados.itens.map((membro) => (
-              <li key={membro.id} className={membro.ativo ? 'cartao-admin' : 'cartao-admin inativo'}>
-                <div className="cartao-admin-topo">
-                  <span className="cartao-admin-titulo">
-                    {membro.nome}
-                    {ehEu(membro) && ' (você)'}
-                    <span className="celula-sub">{contato(membro)}</span>
-                  </span>
-                  <PilulaAtivo ativo={membro.ativo} />
-                </div>
-                <span>Último acesso: {membro.ultimo_login_em ? formatarDataHora(membro.ultimo_login_em) : 'nunca'}</span>
-                <div className="barra-acoes">{acoes(membro)}</div>
-              </li>
-            ))}
-          </ul>
+            <ul className="pessoas-cartoes">
+              {itens.map((membro) => (
+                <li key={membro.id} className={membro.ativo ? 'pessoas-cartao' : 'pessoas-cartao inativa'}>
+                  <div className="pessoas-cartao-topo">
+                    <Pessoa nome={membro.nome} sub={subtitulo(membro)} voce={ehEu(membro)} />
+                    <MenuAcoesPessoa nome={membro.nome} acoes={acoes(membro)} />
+                  </div>
+                  <div className="pessoas-cartao-info">
+                    <Situacao ativo={membro.ativo} senhaTemporaria={membro.deve_trocar_senha} />
+                    <UltimoAcesso iso={membro.ultimo_login_em} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
 
-          <nav className="paginacao" aria-label="Paginação">
-            <span>
-              {lista.dados.total} {lista.dados.total === 1 ? 'membro' : 'membros'} · página {pagina} de {totalPaginas}
-            </span>
-            <div className="barra-acoes">
-              <button type="button" className="btn-secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-                Anterior
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={pagina >= totalPaginas}
-                onClick={() => setPagina((p) => p + 1)}
-              >
-                Próxima
-              </button>
-            </div>
-          </nav>
-        </>
-      )}
+        <PaginacaoPessoas pagina={pagina} totalPaginas={totalPaginas} onPagina={setPagina} />
+      </CartaoPessoas>
 
       {(modal?.tipo === 'criar' || modal?.tipo === 'editar') && (
         <ModalMembro
@@ -294,6 +295,26 @@ export function Equipe() {
         </ModalConfirmacao>
       )}
 
+      {modal?.tipo === 'excluir' && (
+        <ModalConfirmacao
+          titulo="Excluir membro da equipe"
+          rotuloConfirmar="Excluir definitivamente"
+          perigo
+          onFechar={() => setModal(null)}
+          onConfirmar={async () => {
+            await api(`/equipe/${modal.membro.id}`, { method: 'DELETE' })
+            setMensagem({ tipo: 'ok', texto: `${modal.membro.nome} foi excluído.` })
+            setModal(null)
+            lista.recarregar()
+          }}
+        >
+          <p>
+            <strong>{modal.membro.nome}</strong> perde o acesso e o cadastro é apagado. Essa ação não pode ser desfeita.
+          </p>
+          <p>Se for só bloquear o acesso por um tempo, prefira <strong>Desativar</strong>.</p>
+        </ModalConfirmacao>
+      )}
+
       {modal?.tipo === 'senha' && <ModalSenhaTemporaria nome={modal.nome} senha={modal.senha} onFechar={() => setModal(null)} />}
     </section>
   )
@@ -310,6 +331,8 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
   const [nome, setNome] = useState(membro?.nome ?? '')
   const [email, setEmail] = useState(membro?.email ?? '')
   const [cpf, setCpf] = useState('')
+  const [cargo, setCargo] = useState(membro?.cargo ?? '')
+  const [telefone, setTelefone] = useState(membro?.telefone ? formatarTelefone(membro.telefone) : '')
   const [erros, setErros] = useState<Record<string, string>>({})
   const [erroGeral, setErroGeral] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -319,6 +342,8 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
     if (nome.trim().length < 2) saida.nome = 'Informe o nome (mín. 2 caracteres).'
     if (email.trim() && !EMAIL_VALIDO.test(email.trim())) saida.email = 'E-mail inválido.'
     if (cpf && !cpfValido(cpf)) saida.cpf = 'CPF inválido.'
+    const digitosTelefone = telefone.replace(/\D/g, '')
+    if (digitosTelefone && (digitosTelefone.length < 10 || digitosTelefone.length > 11)) saida.telefone = 'Informe DDD e número.'
     const temCpf = Boolean(cpf) || Boolean(membro?.cpf_mascarado)
     if (!email.trim() && !temCpf) saida.email = 'Informe e-mail ou CPF (usados para entrar).'
     return saida
@@ -333,12 +358,14 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
 
     const emailLimpo = email.trim() || null
     const cpfDigitos = cpf.replace(/\D/g, '') || null
+    const cargoLimpo = cargo.trim() || null
+    const telefoneDigitos = telefone.replace(/\D/g, '') || null
     setEnviando(true)
     try {
       if (!membro) {
         const criado = await api<ContaCriada<MembroEquipe>>('/equipe', {
           method: 'POST',
-          json: { nome: nome.trim(), email: emailLimpo, cpf: cpfDigitos },
+          json: { nome: nome.trim(), email: emailLimpo, cpf: cpfDigitos, cargo: cargoLimpo, telefone: telefoneDigitos },
         })
         return onSalvo({ nome: nome.trim(), senha: criado.senha_temporaria })
       }
@@ -347,6 +374,8 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
       if (nome.trim() !== membro.nome) alteracoes.nome = nome.trim()
       if (emailLimpo !== membro.email) alteracoes.email = emailLimpo
       if (cpfDigitos) alteracoes.cpf = cpfDigitos
+      if (cargoLimpo !== membro.cargo) alteracoes.cargo = cargoLimpo
+      if (telefoneDigitos !== membro.telefone) alteracoes.telefone = telefoneDigitos
       if (Object.keys(alteracoes).length) {
         await api(`/equipe/${membro.id}`, { method: 'PATCH', json: alteracoes })
       }
@@ -363,41 +392,70 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
   return (
     <Modal titulo={editando ? `Editar ${membro.nome}` : 'Novo membro da equipe'} onFechar={onFechar}>
       <form className="modal-form" onSubmit={salvar} noValidate>
-        <Campo rotulo="Nome" erro={erros.nome}>
-          {(props) => (
-            <input
-              {...props}
-              type="text"
-              value={nome}
-              maxLength={120}
-              autoComplete="off"
-              onChange={(event) => setNome(event.target.value)}
-              data-autofoco
-            />
-          )}
-        </Campo>
-        <Campo rotulo="E-mail" erro={erros.email} ajuda="Usado para entrar. Opcional se houver CPF.">
-          {(props) => (
-            <input {...props} type="email" value={email} autoComplete="off" onChange={(event) => setEmail(event.target.value)} />
-          )}
-        </Campo>
-        <Campo
-          rotulo="CPF"
-          erro={erros.cpf}
-          ajuda={membro?.cpf_mascarado ? `Atual: ${membro.cpf_mascarado}. Deixe em branco para manter.` : 'Também pode ser usado para entrar.'}
-        >
-          {(props) => (
-            <input
-              {...props}
-              type="text"
-              inputMode="numeric"
-              placeholder="000.000.000-00"
-              value={cpf}
-              autoComplete="off"
-              onChange={(event) => setCpf(mascararCpfEntrada(event.target.value))}
-            />
-          )}
-        </Campo>
+        <PreviaCadastro nome={nome} vazio="Nome do membro" sub={['Equipe Scale IA', cargo.trim()].filter(Boolean).join(' · ')} />
+
+        <SecaoCadastro titulo="Dados pessoais">
+          <Campo rotulo="Nome completo" erro={erros.nome}>
+            {(props) => (
+              <input
+                {...props}
+                type="text"
+                value={nome}
+                maxLength={120}
+                autoComplete="off"
+                onChange={(event) => setNome(event.target.value)}
+                data-autofoco
+              />
+            )}
+          </Campo>
+          <div className="campos-grade">
+            <Campo rotulo="Cargo" erro={erros.cargo} ajuda="Ex.: Suporte, Implantação, Comercial.">
+              {(props) => (
+                <input {...props} type="text" value={cargo} maxLength={80} autoComplete="off" onChange={(event) => setCargo(event.target.value)} />
+              )}
+            </Campo>
+            <Campo rotulo="Telefone" erro={erros.telefone}>
+              {(props) => (
+                <input
+                  {...props}
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="(00) 00000-0000"
+                  value={telefone}
+                  autoComplete="off"
+                  onChange={(event) => setTelefone(mascararTelefoneEntrada(event.target.value))}
+                />
+              )}
+            </Campo>
+          </div>
+        </SecaoCadastro>
+
+        <SecaoCadastro titulo="Acesso ao sistema" descricao="E-mail ou CPF servem para entrar no Copiloto.">
+          <div className="campos-grade">
+            <Campo rotulo="E-mail" erro={erros.email} ajuda="Opcional se houver CPF.">
+              {(props) => (
+                <input {...props} type="email" value={email} autoComplete="off" onChange={(event) => setEmail(event.target.value)} />
+              )}
+            </Campo>
+            <Campo
+              rotulo="CPF"
+              erro={erros.cpf}
+              ajuda={membro?.cpf_mascarado ? `Atual: ${membro.cpf_mascarado}. Deixe em branco para manter.` : undefined}
+            >
+              {(props) => (
+                <input
+                  {...props}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="000.000.000-00"
+                  value={cpf}
+                  autoComplete="off"
+                  onChange={(event) => setCpf(mascararCpfEntrada(event.target.value))}
+                />
+              )}
+            </Campo>
+          </div>
+        </SecaoCadastro>
 
         {!editando && (
           <p className="modal-texto">

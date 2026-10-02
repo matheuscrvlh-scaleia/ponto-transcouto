@@ -4,7 +4,7 @@ import type { DadosMembro, ListarEquipeQuery, MembroEquipe } from '../types/equi
 /* Equipe Scale IA = tabela usuarios (perfil sempre 'admin'). */
 
 const selecao = `
-    SELECT u.id, u.nome, u.email, u.cpf, u.ativo, u.deve_trocar_senha,
+    SELECT u.id, u.nome, u.email, u.cpf, u.cargo, u.telefone, u.ativo, u.deve_trocar_senha,
            u.ultimo_login_em, u.criado_em AT TIME ZONE 'UTC' AS criado_em
       FROM usuarios u`
 
@@ -29,22 +29,25 @@ export async function buscarPorId(id: number, executor: Executor = db) {
 
 export async function criar(dados: DadosMembro, senhaHash: string, executor: Executor = db) {
     const { rows } = await executor.query<{ id: number }>(
-        `INSERT INTO usuarios (nome, email, cpf, perfil, ativo, senha, deve_trocar_senha)
-         VALUES ($1, $2, $3, 'admin', $4, $5, true)
+        `INSERT INTO usuarios (nome, email, cpf, cargo, telefone, perfil, ativo, senha, deve_trocar_senha)
+         VALUES ($1, $2, $3, $4, $5, 'admin', $6, $7, true)
       RETURNING id`,
-        [dados.nome, dados.email, dados.cpf, dados.ativo, senhaHash],
+        [dados.nome, dados.email, dados.cpf, dados.cargo, dados.telefone, dados.ativo, senhaHash],
     )
     return rows[0].id
 }
 
 export async function atualizar(id: number, dados: DadosMembro, executor: Executor = db) {
-    await executor.query('UPDATE usuarios SET nome = $2, email = $3, cpf = $4, ativo = $5 WHERE id = $1', [
-        id,
-        dados.nome,
-        dados.email,
-        dados.cpf,
-        dados.ativo,
-    ])
+    await executor.query(
+        'UPDATE usuarios SET nome = $2, email = $3, cpf = $4, cargo = $5, telefone = $6, ativo = $7 WHERE id = $1',
+        [id, dados.nome, dados.email, dados.cpf, dados.cargo, dados.telefone, dados.ativo],
+    )
+}
+
+/** Exclusão definitiva: autorias antigas (auditoria, ajustes, pedidos de integração) ficam sem o nome. */
+export async function excluir(id: number, executor: Executor = db) {
+    const { rowCount } = await executor.query('DELETE FROM usuarios WHERE id = $1', [id])
+    return (rowCount ?? 0) > 0
 }
 
 export async function redefinirSenha(id: number, senhaHash: string, executor: Executor = db) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatarData, formatarMinutos } from '../lib/formato'
-import type { SemanaHistorico } from '../types/api'
+import type { DataISO, DiaHistorico, Minutos, SemanaHistorico } from '../types/api'
 
 const LARGURA_PADRAO = 640
 const ALTURA = 200
@@ -12,8 +12,16 @@ function passoEixo(maximo: number) {
   return (passos.find((passo) => horas / passo <= 4) ?? 1000) * 60
 }
 
-/** Saldo acumulado por semana (barras divergentes a partir do zero). `semanas` em ordem cronológica. */
-export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
+interface Ponto {
+  chave: string | number
+  data: DataISO
+  saldo: Minutos
+  /** Texto entre parênteses na legenda (ex.: "semana +02:00"). */
+  detalhe: string
+}
+
+/** Saldo acumulado por ponto (barras divergentes a partir do zero). `pontos` em ordem cronológica. */
+function GraficoSaldo({ pontos, larguraMaxBarra }: { pontos: Ponto[]; larguraMaxBarra: number }) {
   const [ativo, setAtivo] = useState<number | null>(null)
   const container = useRef<HTMLDivElement>(null)
   const [largura, setLargura] = useState(LARGURA_PADRAO)
@@ -26,7 +34,7 @@ export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
     return () => observador.disconnect()
   }, [])
 
-  const valores = semanas.map((semana) => semana.saldo_total)
+  const valores = pontos.map((ponto) => ponto.saldo)
   const passo = passoEixo(Math.max(...valores.map(Math.abs), 60))
   const max = Math.max(passo, Math.ceil(Math.max(...valores, 0) / passo) * passo)
   const min = Math.min(0, Math.floor(Math.min(...valores, 0) / passo) * passo)
@@ -34,15 +42,15 @@ export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
   const areaAltura = ALTURA - MARGEM.topo - MARGEM.base
   const areaLargura = largura - MARGEM.esquerda - MARGEM.direita
   const y = (valor: number) => MARGEM.topo + ((max - valor) / (max - min)) * areaAltura
-  const faixa = areaLargura / semanas.length
-  const larguraBarra = Math.min(28, faixa - 2)
+  const faixa = areaLargura / pontos.length
+  const larguraBarra = Math.max(1, Math.min(larguraMaxBarra, faixa - 2))
   const x = (i: number) => MARGEM.esquerda + faixa * i + (faixa - larguraBarra) / 2
 
   const ticks: number[] = []
   for (let v = min; v <= max; v += passo) ticks.push(v)
 
-  const cadaRotulo = Math.ceil(semanas.length / Math.max(2, Math.floor(areaLargura / 48)))
-  const semanaAtiva = ativo !== null ? semanas[ativo] : null
+  const cadaRotulo = Math.ceil(pontos.length / Math.max(2, Math.floor(areaLargura / 48)))
+  const pontoAtivo = ativo !== null ? pontos[ativo] : null
 
   return (
     <div className="grafico" ref={container}>
@@ -62,8 +70,8 @@ export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
           </g>
         ))}
 
-        {semanas.map((semana, i) => {
-          const valor = semana.saldo_total
+        {pontos.map((ponto, i) => {
+          const valor = ponto.saldo
           const topo = y(Math.max(valor, 0))
           const altura = Math.max(Math.abs(y(valor) - y(0)), valor === 0 ? 0 : 2)
           const raio = Math.min(4, larguraBarra / 2, altura)
@@ -75,7 +83,7 @@ export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
             : `M${x0},${topo}V${topo + altura - raio}Q${x0},${topo + altura} ${x0 + raio},${topo + altura}H${x1 - raio}Q${x1},${topo + altura} ${x1},${topo + altura - raio}V${topo}Z`
 
           return (
-            <g key={semana.fechamento_id}>
+            <g key={ponto.chave}>
               {altura > 0 && (
                 <path
                   d={caminho}
@@ -92,9 +100,9 @@ export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
                 onMouseEnter={() => setAtivo(i)}
                 onClick={() => setAtivo(i)}
               />
-              {i % cadaRotulo === (semanas.length - 1) % cadaRotulo && (
+              {i % cadaRotulo === (pontos.length - 1) % cadaRotulo && (
                 <text x={x0 + larguraBarra / 2} y={ALTURA - 8} textAnchor="middle" className="grafico-eixo">
-                  {formatarData(semana.data_referencia, { ano: false })}
+                  {formatarData(ponto.data, { ano: false })}
                 </text>
               )}
             </g>
@@ -102,10 +110,35 @@ export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
         })}
       </svg>
       <p className="grafico-legenda" aria-hidden="true">
-        {semanaAtiva
-          ? `${formatarData(semanaAtiva.data_referencia)}: saldo ${formatarMinutos(semanaAtiva.saldo_total, { sinal: true })} (semana ${formatarMinutos(semanaAtiva.banco_semana, { sinal: true })})`
+        {pontoAtivo
+          ? `${formatarData(pontoAtivo.data)}: saldo ${formatarMinutos(pontoAtivo.saldo, { sinal: true })} (${pontoAtivo.detalhe})`
           : 'Passe o mouse ou toque numa barra para ver o valor.'}
       </p>
     </div>
   )
+}
+
+/** Saldo acumulado por semana (fotografias). `semanas` em ordem cronológica. */
+export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
+  const pontos = semanas.map((semana) => ({
+    chave: semana.fechamento_id,
+    data: semana.data_referencia,
+    saldo: semana.saldo_total,
+    detalhe: `semana ${formatarMinutos(semana.banco_semana, { sinal: true })}`,
+  }))
+  return <GraficoSaldo pontos={pontos} larguraMaxBarra={28} />
+}
+
+/** Saldo acumulado por dia (tempo real). `dias` em ordem cronológica. */
+export function GraficoDias({ dias }: { dias: DiaHistorico[] }) {
+  const pontos = dias.map((dia) => ({
+    chave: dia.dia,
+    data: dia.dia,
+    saldo: dia.saldo_total,
+    detalhe:
+      dia.banco_dia === null
+        ? 'primeiro dia registrado no período'
+        : `banco do dia ${formatarMinutos(dia.banco_dia, { sinal: true })}`,
+  }))
+  return <GraficoSaldo pontos={pontos} larguraMaxBarra={18} />
 }

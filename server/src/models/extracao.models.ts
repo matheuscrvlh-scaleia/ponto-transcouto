@@ -3,7 +3,7 @@ import type { CicloPrevisto, ConfigCalendario } from '../services/calendario.ser
 import type { ItemMapeamento, RegistroBase, ValoresRegistro } from '../services/calculo-horas.service'
 import type { TotaisSecullum } from '../integrations/secullum/tipos'
 
-export type EmpresaRegua = ConfigCalendario & { empresa_id: number }
+export type EmpresaRegua = ConfigCalendario & { empresa_id: number; modo_extracao: 'semanal' | 'tempo_real' }
 
 export type FechamentoReivindicado = {
     id: number
@@ -39,7 +39,7 @@ const daPosse = `id = $1 AND status = 'processando' AND tentativas = $2`
 export async function empresasParaRegua(ex: Executor = db) {
     const result = await ex.query<EmpresaRegua>(
         `SELECT e.id AS empresa_id, cf.dia_semana_extracao, cf.hora_extracao::text AS hora_extracao,
-                cf.dia_fechamento_mes, cf.dias_apos_fechamento_mes, cf.fuso_horario
+                cf.dia_fechamento_mes, cf.dias_apos_fechamento_mes, cf.fuso_horario, cf.modo_extracao
            FROM empresas e
            JOIN configuracoes cf ON cf.empresa_id = e.id
           WHERE e.ativo AND e.secullum_usuario IS NOT NULL AND e.secullum_banco_id IS NOT NULL
@@ -109,6 +109,17 @@ export async function reivindicarFechamento(ex: Executor = db) {
                AND (   (f.status = 'pendente'
                         AND (f.proxima_tentativa_em IS NULL OR f.proxima_tentativa_em <= now()))
                     OR (f.status = 'processando' AND f.heartbeat_em < now() - interval '15 minutes'))
+               -- cada semana é calculada sobre a anterior: espera as semanas anteriores
+               -- da mesma unidade que ainda estão na fila (ex.: período refeito pela Integração)
+               AND NOT EXISTS (
+                    SELECT 1
+                      FROM fechamentos fa
+                      JOIN ciclos ca ON ca.id = fa.ciclo_id
+                     WHERE fa.unidade_id = f.unidade_id
+                       AND fa.id <> f.id
+                       AND ca.data_referencia < c.data_referencia
+                       AND ca.gatilho_em <= now()
+                       AND fa.status IN ('pendente', 'processando'))
              ORDER BY c.gatilho_em, f.id
              LIMIT 1
              FOR UPDATE OF f SKIP LOCKED
@@ -151,10 +162,18 @@ export async function interromperExecucoesAbertas(fechamentoId: number, ex: Exec
     )
 }
 
+/** Quem pediu o fechamento (Integração/reprocessar) vira o autor da execução; sem pedido é automática. */
 export async function criarExecucao(fechamentoId: number, total: number, processados: number, ex: Executor = db) {
     const result = await ex.query<{ id: number }>(
-        `INSERT INTO execucoes_extracao (fechamento_id, total_colaboradores, processados)
-         VALUES ($1, $2, $3) RETURNING id`,
+        `INSERT INTO execucoes_extracao
+                (fechamento_id, total_colaboradores, processados, disparo, disparado_por, disparado_por_cliente)
+         SELECT f.id, $2, $3,
+                CASE WHEN f.solicitado_por_usuario IS NOT NULL OR f.solicitado_por_cliente IS NOT NULL
+                     THEN 'manual' ELSE 'automatico' END,
+                f.solicitado_por_usuario, f.solicitado_por_cliente
+           FROM fechamentos f
+          WHERE f.id = $1
+         RETURNING id`,
         [fechamentoId, total, processados],
     )
     return result.rows[0].id

@@ -5,6 +5,7 @@ import { ApiError, api } from '../../lib/api'
 import { mensagemDeErro } from '../../lib/erros'
 import { useRecurso } from '../../lib/useRecurso'
 import type { CampoMapeado, MapeamentoColuna, MapeamentoResposta } from '../../types/api'
+import { TituloPagina } from '../../components/TituloPagina'
 
 const CAMPOS: { valor: CampoMapeado; rotulo: string }[] = [
   { valor: 'extra', rotulo: 'Horas extras' },
@@ -120,7 +121,7 @@ function EditorMapeamento({ inicial, query }: { inicial: MapeamentoResposta; que
   return (
     <section className="pagina">
       <header className="pagina-header">
-        <h1>Mapeamento de colunas</h1>
+        <TituloPagina>Mapeamento de colunas</TituloPagina>
         <p className="pagina-sub">
           O que cada coluna do cálculo de totais da Secullum representa. Colunas não mapeadas fazem a extração falhar.
         </p>

@@ -1,4 +1,5 @@
 import type { ErroApi } from '../types/api'
+import { alertarErro, tituloDoErroApi } from './alertas'
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000/api/v1'
 const CHAVE_TOKEN = 'copiloto.token'
@@ -50,9 +51,26 @@ export const sessao = {
   },
 }
 
-type Opcoes = Omit<RequestInit, 'body'> & { json?: unknown; query?: Record<string, string | number | undefined> }
+type Opcoes = Omit<RequestInit, 'body'> & {
+  json?: unknown
+  query?: Record<string, string | number | undefined>
+  /** Não mostra alerta de erro (ex.: consultas de fundo feitas de tempos em tempos). */
+  silencioso?: boolean
+}
 
-export async function api<T>(caminho: string, { json, query, headers, ...init }: Opcoes = {}): Promise<T> {
+/**
+ * Erros que viram alerta no canto da tela sozinhos: sem conexão (qualquer chamada) e
+ * erro do servidor em ações (POST, PATCH...). Erro ao carregar uma tela já aparece na
+ * própria tela, e erros de validação aparecem no formulário.
+ */
+function alertarSeFor(erro: ApiError, metodo: string) {
+  if (erro.status === 0 || (erro.status >= 500 && metodo !== 'GET')) {
+    alertarErro({ titulo: tituloDoErroApi(erro.status), mensagem: erro.message })
+  }
+}
+
+export async function api<T>(caminho: string, { json, query, headers, silencioso, ...init }: Opcoes = {}): Promise<T> {
+  const metodo = (init.method ?? 'GET').toUpperCase()
   const cabecalhos = new Headers(headers)
   if (token) cabecalhos.set('Authorization', `Bearer ${token}`)
   if (json !== undefined) cabecalhos.set('Content-Type', 'application/json')
@@ -75,7 +93,9 @@ export async function api<T>(caminho: string, { json, query, headers, ...init }:
     })
   } catch (erro) {
     if (erro instanceof DOMException && erro.name === 'AbortError') throw erro
-    throw new ApiError(0, null)
+    const semConexao = new ApiError(0, null)
+    if (!silencioso) alertarSeFor(semConexao, metodo)
+    throw semConexao
   }
 
   const corpo = resposta.status === 204 ? null : await resposta.json().catch(() => null)
@@ -84,7 +104,11 @@ export async function api<T>(caminho: string, { json, query, headers, ...init }:
     sessao.definir(null)
     aoExpirar()
   }
-  if (!resposta.ok) throw new ApiError(resposta.status, corpo)
+  if (!resposta.ok) {
+    const erro = new ApiError(resposta.status, corpo)
+    if (!silencioso) alertarSeFor(erro, metodo)
+    throw erro
+  }
 
   return corpo as T
 }

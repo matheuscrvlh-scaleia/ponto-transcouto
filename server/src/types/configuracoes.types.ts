@@ -9,7 +9,23 @@ export const camposRh = [
     'alerta_saldo_positivo_minutos',
     'alerta_saldo_negativo_minutos',
     'origem_horas_pagas',
+    // atualização dos dados: o cliente escolhe semanal ou tempo real, e o dia/hora da fotografia semanal
+    'modo_extracao',
+    'dia_semana_extracao',
+    'hora_extracao',
 ] as const
+
+/** Tela que libera cada campo que o cliente pode alterar (Alertas e horas pagas x Atualização dos dados). */
+export const telaDoCampo: Record<(typeof camposRh)[number], 'alertas' | 'atualizacao'> = {
+    teto_horas_pagas_minutos: 'alertas',
+    teto_periodicidade: 'alertas',
+    alerta_saldo_positivo_minutos: 'alertas',
+    alerta_saldo_negativo_minutos: 'alertas',
+    origem_horas_pagas: 'alertas',
+    modo_extracao: 'atualizacao',
+    dia_semana_extracao: 'atualizacao',
+    hora_extracao: 'atualizacao',
+}
 
 export const camposRegua = [
     'dia_semana_extracao',
@@ -32,6 +48,7 @@ export const atualizarConfiguracoesSchema = z
         dias_apos_fechamento_mes: z.number().int().min(0).max(10),
         fuso_horario: z.string().min(1).refine(fusoValido, 'Fuso horário inválido.'),
         cota_calcular_por_hora: z.number().int().min(1).max(100),
+        modo_extracao: z.enum(['semanal', 'tempo_real']),
     })
     .partial()
     .strict()
@@ -55,6 +72,7 @@ export type Configuracoes = {
     alerta_saldo_negativo_minutos: number
     fuso_horario: string
     cota_calcular_por_hora: number
+    modo_extracao: 'semanal' | 'tempo_real'
     atualizado_em: Date
     atualizado_por: { id: number; nome: string } | null
 }

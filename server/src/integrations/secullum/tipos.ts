@@ -78,3 +78,16 @@ export type OpcoesCliente = {
     backoffMs?: number
     ganchos?: GanchosChamada
 }
+
+/** Uma marcação da FonteDados (sem PIS: só o necessário para achar o colaborador). */
+export type MarcacaoSecullum = {
+    id: number
+    funcionarioId: number | null
+    cpf: string | null
+    data: string
+    hora: string
+    tipo: number
+    origem: number
+    equipamentoId: number | null
+    incluidaEm: string | null
+}

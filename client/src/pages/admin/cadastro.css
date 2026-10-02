@@ -1,0 +1,192 @@
+/* ---------- Formulários de cadastro (empresa, usuário, membro da equipe) ---------- */
+
+.cadastro-previa {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--accent-suave), transparent 85%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.cadastro-previa-avatar {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--destaque-de), var(--destaque-ate));
+}
+
+.cadastro-previa-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cadastro-previa-texto strong {
+  font-size: 16px;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.cadastro-previa-texto strong.vazio {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.cadastro-previa-texto span {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.cadastro-secao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px 0 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.cadastro-secao-titulo {
+  float: left;
+  width: 100%;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.cadastro-secao-descricao {
+  clear: both;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.cadastro-secao-corpo {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+/* ----- Logo da empresa ----- */
+
+.logo-empresa {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-suave);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  user-select: none;
+}
+
+.logo-empresa img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.campo-logo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.campo-logo-previa {
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.campo-logo-previa:hover .logo-empresa {
+  border-color: var(--accent);
+}
+
+.campo-logo-previa:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.campo-logo-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.campo-logo-texto strong {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.campo-logo-texto > span {
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.campo-logo-acoes {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+/* campo estreito (UF) ao lado de um largo (cidade) */
+.campos-cidade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 16px;
+}
+
+/* ----- Detalhes na lista de empresas ----- */
+
+.empresa-secullum {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--text-h);
+}
+
+.empresa-secullum small {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.empresa-contagens {
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.empresa-contagens strong {
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .campo-logo {
+    align-items: flex-start;
+  }
+}

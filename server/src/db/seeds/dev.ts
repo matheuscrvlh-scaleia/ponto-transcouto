@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { env } from '../../config/env'
 import { db, withTransaction } from '../database'
 import { proximosCiclos } from '../../services/calendario.service'
 import { hashPassword } from '../../utils/hash'
@@ -345,6 +346,12 @@ async function semear(client: PoolClient) {
         ciclos: [...publicados.map(c => `${c.data_referencia} ${c.tipo}`), `${futuro.data_referencia} ${futuro.tipo} (pendente)`],
         gestorCpf: gerarCpf(812399002),
     }
+}
+
+// cria contas com senha fixa conhecida: nunca em produção
+if (env.NODE_ENV === 'production') {
+    console.error('seed:dev não roda com NODE_ENV=production (cria usuários com senha fixa).')
+    process.exit(1)
 }
 
 withTransaction(semear)

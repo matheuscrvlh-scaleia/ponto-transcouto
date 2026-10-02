@@ -4,7 +4,7 @@ import { Carregando, ErroCarregamento, EstadoVazio } from '../../components/Esta
 import './admin.css'
 
 /* Casca das áreas Configuração e Administração. A navegação fica na sidebar
-   e a empresa em foco no topo (ambos no AppLayout); aqui só o conteúdo. */
+   e a empresa em foco na barra lateral (ambos no AppLayout); aqui só o conteúdo. */
 export function AdminLayout() {
   return (
     <div className="admin-layout">
@@ -15,7 +15,7 @@ export function AdminLayout() {
   )
 }
 
-/** Telas que dependem de uma empresa: a equipe usa a escolhida no topo; o RH, a própria. */
+/** Telas que dependem de uma empresa: a equipe usa a escolhida na barra lateral; o RH, a própria. */
 export function ComEmpresa() {
   const { ehAdmin, empresaId, empresas, carregando, erro, selecionar, recarregarEmpresas } = useEmpresaAdmin()
 
@@ -36,7 +36,7 @@ export function ComEmpresa() {
   if (ehAdmin && empresaId == null) {
     return (
       <EstadoVazio titulo="Escolha uma empresa">
-        <p>Esta tela mostra os dados de uma empresa. Escolha qual no seletor do topo ou aqui:</p>
+        <p>Esta tela mostra os dados de uma empresa. Escolha qual no seletor da barra lateral ou aqui:</p>
         <div className="escolha-empresa">
           {empresas.map((empresa) => (
             <button key={empresa.id} type="button" className="escolha-empresa-botao" onClick={() => selecionar(empresa.id)}>

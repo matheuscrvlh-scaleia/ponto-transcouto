@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { Tela } from './permissoes.types'
 
 export const perfis = ['admin', 'rh', 'gestor'] as const
 export type Perfil = (typeof perfis)[number]
@@ -19,6 +20,10 @@ export type Ator = {
 export type UsuarioAutenticado = Ator & {
     nome: string
     perfil: Perfil
+    /** Telas liberadas pelo grupo de permissão (a equipe Scale IA tem todas). */
+    telas: Tela[]
+    /** Grupo de permissão do cliente (null para a equipe). */
+    grupoId: number | null
     empresaId: number | null
     deveTrocarSenha: boolean
 }
@@ -34,13 +39,11 @@ export const loginSchema = z.object({
     login: z.string().trim().min(1, 'Informe e-mail ou CPF.'),
     senha: z.string().min(1, 'Informe a senha.'),
 })
-export type LoginBody = z.infer<typeof loginSchema>
 
 export const trocarSenhaSchema = z.object({
     senha_atual: z.string().min(1),
     nova_senha: z.string().min(8, 'A nova senha deve ter ao menos 8 caracteres.').max(72),
 })
-export type TrocarSenhaBody = z.infer<typeof trocarSenhaSchema>
 
 export type UnidadeResumo = {
     id: number
@@ -56,4 +59,8 @@ export type UsuarioSessao = {
     perfil: Perfil
     empresa_id: number | null
     deve_trocar_senha: boolean
+    /** Telas liberadas (a equipe Scale IA tem todas). */
+    telas: Tela[]
+    /** Grupo de permissão do cliente; null para a equipe. */
+    grupo: { id: number; nome: string } | null
 }

@@ -5,11 +5,13 @@ import { descartarToken } from '../../src/integrations/secullum/auth'
 import { processarProximoFechamento } from '../../src/jobs/extracao.job'
 import { logSilencioso } from '../../src/jobs/log'
 import { executarRegua } from '../../src/jobs/regua.job'
+import { executarTempoReal } from '../../src/jobs/tempo-real.job'
 import { sincronizarEmpresa } from '../../src/jobs/sincronizacao.job'
 import { criarFechamentosDoCiclo } from '../../src/models/extracao.models'
 import { empresasParaSincronizar } from '../../src/models/sincronizacao.models'
 import { proximosCiclos } from '../../src/services/calendario.service'
 import { encrypt } from '../../src/utils/crypt'
+import { aplicarMigrationsPendentes } from '../migracoes'
 
 const CNPJ_A = '12345678000190'
 const CNPJ_B = '98765432000110'
@@ -87,6 +89,12 @@ async function criarCiclo(tipo: string, periodoInicio: string, dataReferencia: s
 const processar = () => processarProximoFechamento({ log: logSilencioso, ex: client, opcoesCliente: { backoffMs: 1 } })
 const chamadasCalcular = () => chamadas.filter(c => c.url.endsWith('Calcular/SomenteTotais'))
 
+/** Sincroniza e deixa a unidade B fora do painel (desativada): os cenários usam só a unidade A. */
+async function sincronizarSoUnidadeA() {
+    await sincronizarEmpresa(empresaId, logSilencioso, client)
+    await client.query('UPDATE unidades SET ativo = false WHERE empresa_id = $1 AND documento = $2', [empresaId, CNPJ_B])
+}
+
 beforeAll(async () => {
     client = await db.connect()
 })
@@ -103,6 +111,7 @@ beforeEach(async () => {
     vi.stubGlobal('fetch', vi.fn(fetchFalso))
 
     await client.query('BEGIN')
+    await aplicarMigrationsPendentes(client)
     bancoId = `teste-${Date.now()}`
     ;({ id: empresaId } = await um<{ id: number }>(
         `INSERT INTO empresas (nome, secullum_usuario, secullum_senha_cripto, secullum_banco_id, sincronizacao_solicitada_em)
@@ -142,7 +151,8 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
         )).rows
         expect(unidades).toEqual([
             { documento: CNPJ_A, razao_social: 'TC TESTE TRANSPORTES LTDA', nome_exibicao: 'Teste A', ativo: true },
-            { documento: CNPJ_B, razao_social: 'OUTRA UNIDADE LTDA', nome_exibicao: null, ativo: true },
+            // unidade nova vinda da FriPonto ganha a razão social como nome
+            { documento: CNPJ_B, razao_social: 'OUTRA UNIDADE LTDA', nome_exibicao: 'OUTRA UNIDADE LTDA', ativo: true },
         ])
 
         const colaboradores = (await client.query(
@@ -167,7 +177,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
     })
 
     it('executa ciclos completos: publica, calcula *_semana, respeita retry e cota, bloqueia mapeamento desconhecido', async () => {
-        await sincronizarEmpresa(empresaId, logSilencioso, client)
+        await sincronizarSoUnidadeA()
 
         totaisPorCpf.set(CPF_ANA, [resposta('12:30', '02:00', '08:00', '00:45')])
         totaisPorCpf.set(CPF_BRUNO, [{ status: 503 }, resposta('01:00', '', '', '')])
@@ -269,7 +279,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
     })
 
     it('falha transitória deixa o fechamento pendente com backoff e não publica parcial', async () => {
-        await sincronizarEmpresa(empresaId, logSilencioso, client)
+        await sincronizarSoUnidadeA()
         totaisPorCpf.set(CPF_ANA, [resposta('01:00', '', '', '')])
         totaisPorCpf.set(CPF_BRUNO, [{ status: 500 }])
 
@@ -326,9 +336,9 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
     })
 
     it('sincronização não reativa unidade desativada manualmente', async () => {
-        await sincronizarEmpresa(empresaId, logSilencioso, client)
+        await sincronizarSoUnidadeA()
         await client.query('UPDATE unidades SET ativo = false WHERE empresa_id = $1 AND documento = $2', [empresaId, CNPJ_A])
-        await sincronizarEmpresa(empresaId, logSilencioso, client)
+        await sincronizarSoUnidadeA()
         const unidade = await um<{ ativo: boolean }>(
             'SELECT ativo FROM unidades WHERE empresa_id = $1 AND documento = $2', [empresaId, CNPJ_A],
         )
@@ -349,7 +359,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
     })
 
     it('descarta o resultado se o fechamento for reaberto durante a extração', async () => {
-        await sincronizarEmpresa(empresaId, logSilencioso, client)
+        await sincronizarSoUnidadeA()
         totaisPorCpf.set(CPF_ANA, [resposta('01:00', '', '', '')])
         totaisPorCpf.set(CPF_BRUNO, [resposta('02:00', '', '', '')])
         const f = await criarCiclo('semanal', '2026-08-26', '2026-09-15', '2001-01-01T09:00:00Z')
@@ -372,7 +382,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
     })
 
     it('colaborador transferido usa como base da semana o registro da unidade antiga', async () => {
-        await sincronizarEmpresa(empresaId, logSilencioso, client)
+        await sincronizarSoUnidadeA()
         totaisPorCpf.set(CPF_ANA, [resposta('10:00', '', '', '')])
         totaisPorCpf.set(CPF_BRUNO, [resposta('01:00', '', '', '')])
         await criarCiclo('semanal', '2026-08-26', '2026-09-15', '2001-01-01T09:00:00Z')
@@ -383,7 +393,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
         )
 
         const unidadeB = await um<{ id: number }>(
-            `UPDATE unidades SET nome_exibicao = 'Teste B' WHERE empresa_id = $1 AND documento = $2 RETURNING id`,
+            `UPDATE unidades SET nome_exibicao = 'Teste B', ativo = true WHERE empresa_id = $1 AND documento = $2 RETURNING id`,
             [empresaId, CNPJ_B],
         )
         await client.query('UPDATE colaboradores SET unidade_id = $1 WHERE empresa_id = $2 AND cpf = $3', [unidadeB.id, empresaId, CPF_ANA])
@@ -401,5 +411,134 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
               WHERE c.empresa_id = $1 AND c.cpf = $2 AND r.id <> $3`, [empresaId, CPF_ANA, base.id],
         )
         expect(ana).toEqual({ extra_semana: 120, base_semana_registro_id: base.id, unidade_id: unidadeB.id })
+    })
+})
+
+describe('tempo real (transação desfeita)', () => {
+    const agora = new Date('2026-09-20T15:00:00Z')
+    const tempoReal = () => executarTempoReal({ log: logSilencioso, ex: client, agora, opcoesCliente: { backoffMs: 1 } })
+
+    async function ativarTempoReal(cota = 90) {
+        // só a empresa do teste: as do banco de dev (ex.: Transcouto) ficam fora, dentro da transação desfeita
+        await client.query("UPDATE configuracoes SET modo_extracao = 'semanal' WHERE empresa_id <> $1", [empresaId])
+        await client.query(
+            `UPDATE configuracoes SET modo_extracao = 'tempo_real', cota_calcular_por_hora = $2 WHERE empresa_id = $1`,
+            [empresaId, cota],
+        )
+    }
+
+    it('atualiza o período atual até hoje em rodízio, sobre a última fotografia semanal', async () => {
+        await sincronizarSoUnidadeA()
+
+        // fotografia semanal publicada em 15/09
+        totaisPorCpf.set(CPF_ANA, [resposta('12:30', '02:00', '08:00', '00:45')])
+        totaisPorCpf.set(CPF_BRUNO, [resposta('01:00', '', '', '')])
+        await criarCiclo('semanal', '2026-08-26', '2026-09-15', '2001-01-01T09:00:00Z')
+        expect(await processar()).toBe(true)
+        const base = await um<{ id: string }>(
+            `SELECT r.id FROM registros_horas r JOIN colaboradores c ON c.id = r.colaborador_id WHERE c.cpf = $1`,
+            [CPF_ANA],
+        )
+
+        await ativarTempoReal()
+        totaisPorCpf.set(CPF_ANA, [resposta('20:00', '02:00', '08:00', '00:45')])
+        chamadas = []
+        expect(await tempoReal()).toBe(2)
+
+        // período atual até hoje; Carla (unidade fora do painel) e o demitido ficam de fora
+        expect(chamadasCalcular().map(c => c.corpo)).toEqual([
+            { FuncionarioCpf: CPF_ANA, DataInicial: '2026-08-26', DataFinal: '2026-09-20' },
+            { FuncionarioCpf: CPF_BRUNO, DataInicial: '2026-08-26', DataFinal: '2026-09-20' },
+        ])
+
+        const ana = await um<Record<string, unknown>>(
+            `SELECT rt.* FROM registros_tempo_real rt JOIN colaboradores c ON c.id = rt.colaborador_id WHERE c.cpf = $1`,
+            [CPF_ANA],
+        )
+        expect(ana).toMatchObject({
+            extra_periodo: 1320, negativa_periodo: 525, pagas_periodo: 600, banco_periodo: 720,
+            saldo_banco_total: 195, base_registro_id: base.id, ultimo_erro: null,
+        })
+        expect(ana.extraido_em).not.toBeNull()
+
+        // a chamada conta na cota da empresa, sem execução vinculada
+        const cota = await um<{ total: number }>(
+            `SELECT count(*)::int AS total FROM chamadas_api
+              WHERE empresa_id = $1 AND rota = 'Calcular/SomenteTotais' AND execucao_id IS NULL`,
+            [empresaId],
+        )
+        expect(cota.total).toBe(2)
+
+        // e vira o ponto do dia no histórico diário
+        const dia = await um<{ dia: string, saldo_banco_total: number }>(
+            `SELECT hd.dia::text AS dia, hd.saldo_banco_total FROM historico_diario hd
+               JOIN colaboradores c ON c.id = hd.colaborador_id WHERE c.cpf = $1`,
+            [CPF_ANA],
+        )
+        expect(dia).toEqual({ dia: '2026-09-20', saldo_banco_total: 195 })
+
+        // logo em seguida ninguém é consultado de novo (intervalo mínimo por colaborador)
+        chamadas = []
+        expect(await tempoReal()).toBe(0)
+        expect(chamadasCalcular()).toHaveLength(0)
+    })
+
+    it('espera fechamento na fila e deixa a reserva da cota livre', async () => {
+        await sincronizarSoUnidadeA()
+        totaisPorCpf.set(CPF_ANA, [resposta('01:00', '', '', '')])
+        totaisPorCpf.set(CPF_BRUNO, [resposta('01:00', '', '', '')])
+
+        // fechamento atrasado na fila: ele tem prioridade
+        await ativarTempoReal()
+        const ciclo = await criarCiclo('semanal', '2026-08-26', '2026-09-15', '2001-01-01T09:00:00Z')
+        expect(await tempoReal()).toBe(0)
+        expect(chamadasCalcular()).toHaveLength(0)
+
+        // sem fila, com cota 11 e reserva de 10: só 1 colaborador por hora
+        await client.query(`UPDATE fechamentos SET status = 'cancelado' WHERE id = $1`, [ciclo.id])
+        await ativarTempoReal(11)
+        expect(await tempoReal()).toBe(1)
+        expect(chamadasCalcular()).toHaveLength(1)
+    })
+
+    it('falha de um colaborador não apaga o valor anterior e o rodízio segue', async () => {
+        await sincronizarSoUnidadeA()
+        await ativarTempoReal()
+        // Ana: Secullum não encontra o CPF (400); Bruno: ok
+        totaisPorCpf.set(CPF_BRUNO, [resposta('01:00', '', '', '')])
+        expect(await tempoReal()).toBe(1)
+
+        const ana = await um<{ extraido_em: Date | null, ultimo_erro: string | null }>(
+            `SELECT rt.extraido_em, rt.ultimo_erro FROM registros_tempo_real rt
+               JOIN colaboradores c ON c.id = rt.colaborador_id WHERE c.cpf = $1`,
+            [CPF_ANA],
+        )
+        expect(ana.extraido_em).toBeNull()
+        expect(ana.ultimo_erro).toEqual(expect.any(String))
+    })
+})
+
+describe('régua em tempo real (transação desfeita)', () => {
+    it('só cria o fechamento do mês e descarta as semanas futuras que não começaram', async () => {
+        // em 20/10 o fechamento de 25/10 (gatilho 27/10) já está dentro do horizonte de 14 dias da régua
+        const agora = new Date('2026-10-20T12:00:00Z')
+        // semana futura criada antes da troca para tempo real
+        const { id: semanalFutura } = await um<{ id: number }>(
+            `INSERT INTO ciclos (empresa_id, tipo, periodo_inicio, data_referencia, gatilho_previsto_em, gatilho_em)
+             VALUES ($1, 'semanal', '2026-09-26', '2026-10-20', '2026-10-21T09:00:00Z', '2026-10-21T09:00:00Z') RETURNING id`,
+            [empresaId],
+        )
+        await client.query(`UPDATE configuracoes SET modo_extracao = 'tempo_real' WHERE empresa_id = $1`, [empresaId])
+
+        await executarRegua(logSilencioso, client, agora)
+
+        const ciclos = (await client.query(
+            'SELECT tipo, data_referencia::text FROM ciclos WHERE empresa_id = $1 ORDER BY data_referencia',
+            [empresaId],
+        )).rows
+        expect(ciclos.length).toBeGreaterThan(0)
+        expect(ciclos.every(c => c.tipo === 'fechamento_mes')).toBe(true)
+        expect(ciclos.map(c => c.data_referencia)).toContain('2026-10-25')
+        expect((await client.query('SELECT 1 FROM ciclos WHERE id = $1', [semanalFutura])).rowCount).toBe(0)
     })
 })

@@ -8,13 +8,14 @@ import { NOME_PERFIL } from '../../lib/preferencias'
 import { useRecurso } from '../../lib/useRecurso'
 import type { Paginado, Perfil } from '../../types/api'
 import './permissoes.css'
+import { TituloPagina } from '../../components/TituloPagina'
 
 const PERFIS: Perfil[] = ['admin', 'rh', 'gestor']
 
 const RESUMO_PERFIL: Record<Perfil, string> = {
   admin: 'Time da Scale IA: acesso a todas as empresas, à Configuração e à Administração do sistema.',
-  rh: 'Cuida da própria empresa: usuários, unidades, alertas e acompanhamento dos fechamentos.',
-  gestor: 'Acompanha o banco de horas apenas das unidades vinculadas a ele.',
+  rh: 'Cuida da própria empresa: usuários, unidades, alertas, atualização dos dados e acompanhamento dos fechamentos.',
+  gestor: 'Acompanha o banco de horas das unidades vinculadas a ele e pode pedir nova extração dos dados delas.',
 }
 
 type Nivel = 'total' | 'parcial' | 'nenhum'
@@ -50,6 +51,25 @@ const MATRIZ: { grupo: string; linhas: Linha[] }[] = [
         perfis: {
           admin: { nivel: 'total', texto: 'Qualquer empresa' },
           rh: { nivel: 'parcial', texto: 'Somente a própria empresa' },
+          gestor: SEM_ACESSO,
+        },
+      },
+      {
+        area: 'Integração FriPonto',
+        descricao:
+          'Situação da conexão, pedidos de nova extração (ou de refazer o fechamento do mês, no tempo real), atualizar o tempo real agora e histórico de solicitações',
+        perfis: {
+          admin: { nivel: 'total', texto: 'Qualquer empresa' },
+          rh: { nivel: 'parcial', texto: 'Ver, puxar cadastros e dados e atualizar o tempo real agora, na empresa toda' },
+          gestor: { nivel: 'parcial', texto: 'Ver, puxar dados e atualizar o tempo real agora, só nas suas unidades' },
+        },
+      },
+      {
+        area: 'Atualização dos dados',
+        descricao: 'Modo semanal ou tempo real e o dia e a hora da extração (no tempo real, só a hora do fechamento do mês)',
+        perfis: {
+          admin: { nivel: 'total', texto: 'Qualquer empresa' },
+          rh: { nivel: 'parcial', texto: 'Escolher semanal ou tempo real, dia e hora' },
           gestor: SEM_ACESSO,
         },
       },
@@ -180,7 +200,7 @@ export function Permissoes() {
     <section className="pagina perm">
       <header className="pagina-header-linha">
         <div className="pagina-header">
-          <h1>Permissões</h1>
+          <TituloPagina>Permissões</TituloPagina>
           <p className="pagina-sub">O que cada perfil pode fazer no Copiloto de Ponto.</p>
         </div>
         <Link to="/configuracao/usuarios" className="btn-primary btn-compact">
@@ -253,7 +273,7 @@ export function Permissoes() {
           {ehEquipe && (
             <>
               {' '}
-              A equipe Scale IA é gerenciada em <Link to="/admin/equipe">Administração › Equipe</Link>.
+              A equipe Scale IA é gerenciada em <Link to="/admin/equipe">Administração › Usuários gestão</Link>.
             </>
           )}
         </p>

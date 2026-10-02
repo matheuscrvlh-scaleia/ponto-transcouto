@@ -71,6 +71,12 @@ export function inicioDoPeriodo(n: number, diaFechamento: number) {
     return ultimoFechamentoAte(n - 1, diaFechamento) + 1
 }
 
+/** Período de apuração que contém hoje (fuso da empresa): usado pelo tempo real, que puxa do início até hoje. */
+export function periodoDeHoje(config: { fuso_horario: string; dia_fechamento_mes: number }, agora = new Date()) {
+    const hoje = dataLocal(agora, config.fuso_horario)
+    return { periodo_inicio: diaParaIso(inicioDoPeriodo(hoje, config.dia_fechamento_mes)), hoje: diaParaIso(hoje) }
+}
+
 function lerHora(hora: string) {
     const [h = '0', m = '0'] = hora.split(':')
     return { hora: Number(h), minuto: Number(m) }

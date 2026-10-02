@@ -29,6 +29,21 @@ npm run dev                   # :5173
 
 Usuários da Demo: `gestor@demo.local` e `rh@demo.local`, senha `demo12345`.
 
+## Produção (Docker)
+
+`docker-compose.yml` sobe quatro serviços: `caddy` (HTTPS automático, portas 80/443) → `web` (Nginx com o build do client, repassa `/api` para a API) → `api`; e o `worker` (mesma imagem do server, rodar só um). O banco continua no Supabase.
+
+```bash
+cp .env.example .env                 # DOMINIO (DNS apontando para a VPS)
+cp server/.env.example server/.env   # NODE_ENV=production, CORS_ORIGIN=https://<DOMINIO>, TRUST_PROXY=2
+docker compose build
+docker compose run --rm api node --import tsx src/db/migrate.ts --dry-run
+docker compose run --rm api node --import tsx src/db/migrate.ts
+docker compose up -d
+```
+
+`TRUST_PROXY=2` porque há dois proxies na frente da API (Caddy e Nginx). Na VPS (IPv4), use a connection string do *Session pooler* do Supabase.
+
 ## Scripts do server
 
 | Script | O que faz |
@@ -48,4 +63,8 @@ Usuários da Demo: `gestor@demo.local` e `rh@demo.local`, senha `demo12345`.
   - `clientes` = usuários das empresas atendidas: `rh` (Gestão + Configuração da própria empresa) e `gestor` (Gestão das unidades vinculadas em `cliente_unidades`).
   - Escopo aplicado no SQL por `unidades_permitidas(tipo, id)`; o token leva o tipo (`equipe`/`cliente`).
 - Extração: `/Calcular/SomenteTotais` da Secullum, um colaborador por chamada, limitado por `configuracoes.cota_calcular_por_hora` (padrão 90/h).
+- Modo de atualização por empresa (`configuracoes.modo_extracao`, o cliente escolhe em Configuração → Atualização dos dados):
+  - `semanal`: só as fotografias semanais (ciclos/fechamentos) no dia e hora escolhidos.
+  - `tempo_real`: as fotografias semanais continuam (histórico oficial, teto semanal) e o worker (`jobs/tempo-real.job.ts`) mantém em `registros_tempo_real` o período atual até hoje de cada colaborador, em rodízio. Fechamentos na fila têm prioridade e 10 chamadas/h ficam de reserva; com N colaboradores, cada um é atualizado a cada ~N/(cota−10) horas. O painel mostra, por colaborador, o dado mais recente entre o ao vivo e a última fotografia.
+- Batidas (Gestão → Batidas): log das marcações da FriPonto, da mais recente para a mais antiga, com filtros por colaborador, unidade, período, origem e situação. O worker (`jobs/batidas.job.ts`) copia a `FonteDados` da Secullum para `batidas` a cada ~5 min por empresa: carga inicial dos últimos 31 dias por data, depois incremental por `FonteDados/APartirDoId` (cursor em `batidas_importacao`) e, uma vez por dia, relê os últimos 7 dias para pegar marcações alteradas. Não usa a cota de `/Calcular`.
 - Para ligar a Transcouto: em Administração → Empresas, cadastre o usuário de integração da Secullum, teste a conexão, escolha o banco, sincronize, faça o de-para das unidades e o mapeamento de colunas.

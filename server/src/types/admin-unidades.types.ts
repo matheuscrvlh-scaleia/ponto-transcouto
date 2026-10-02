@@ -20,7 +20,6 @@ export const atualizarUnidadeSchema = z
     })
     .partial()
     .strict()
-export type AtualizarUnidadeBody = z.infer<typeof atualizarUnidadeSchema>
 
 export const solicitarSincronizacaoSchema = z.object({ empresa_id: idOpcional }).strict()
 

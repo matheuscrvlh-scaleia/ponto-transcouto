@@ -48,7 +48,7 @@ export async function reprocessar(req: FastifyRequest, res: FastifyReply) {
     }
 
     const atualizado = await withTransaction(async client => {
-        if (!(await fechamentosModel.reabrir(fechamento.id, client))) {
+        if (!(await fechamentosModel.reabrir(fechamento.id, req.usuario, client))) {
             throw conflito('O fechamento entrou em processamento.')
         }
         await auditoria.registrar(

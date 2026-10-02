@@ -1,0 +1,266 @@
+/* ---------- Batidas (log de marcações) ---------- */
+
+.batidas-card {
+  gap: 10px;
+  padding: 22px 18px 12px;
+}
+
+.batidas-filtros {
+  align-items: flex-end;
+  gap: 10px 12px;
+}
+
+.batidas-filtros .busca {
+  flex: 1 1 220px;
+}
+
+.batidas-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.batidas-campo select,
+.batidas-campo input {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--muted);
+  color: var(--text-h);
+  color-scheme: light dark;
+}
+
+.batidas-campo select:focus,
+.batidas-campo input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.batidas-ativos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 13px;
+}
+
+.batidas-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--accent-suave);
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.batidas-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.batidas-chip button:hover {
+  background: var(--surface);
+  color: var(--text-h);
+}
+
+/* ----- Tabela ----- */
+
+.batidas-tabela tbody tr:not(.batidas-dia):hover {
+  background: var(--muted);
+}
+
+.batidas-dia th {
+  padding: 18px 12px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-h);
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.batidas-dia th::first-letter {
+  text-transform: uppercase;
+}
+
+.batidas-dia span,
+.batidas-dia-mobile span {
+  margin-left: 8px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.batidas-tabela tbody tr:first-child.batidas-dia th {
+  padding-top: 8px;
+}
+
+.batida-hora {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-h);
+  white-space: nowrap;
+  width: 150px;
+}
+
+/* data ao lado do horário, mais discreta */
+.batida-data {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.batida-situacao {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.situacao-original {
+  background: var(--muted);
+  color: var(--text);
+}
+
+.situacao-manual {
+  background: var(--aviso-bg);
+  color: var(--aviso);
+}
+
+.situacao-pre {
+  background: var(--accent-suave);
+  color: var(--accent);
+}
+
+.situacao-desconsiderada {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.batida-inclusao {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.batida-desconsiderada .batida-hora {
+  text-decoration: line-through;
+  color: var(--text);
+}
+
+.batida-desconsiderada .celula-pessoa a,
+.batida-desconsiderada .cartao-colab-nome {
+  color: var(--text);
+}
+
+/* ----- Cartões (celular) ----- */
+
+.batidas-dia-mobile {
+  padding: 10px 4px 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.batidas-dia-mobile:first-child {
+  padding-top: 0;
+}
+
+.batidas-cartoes .cartao-colab-topo {
+  align-items: center;
+}
+
+.batidas-cartoes .cartao-colab-nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batidas-cartoes .batida-hora {
+  width: auto;
+}
+
+/* ----- Paginação ----- */
+
+.batidas-paginacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 4px 4px;
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.batidas-paginacao-botoes {
+  display: flex;
+  gap: 8px;
+}
+
+.batidas-paginacao-botoes .btn-secondary {
+  width: auto;
+  min-height: 40px;
+  border-radius: 999px;
+}
+
+.batidas-paginacao-botoes .btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
+  border-color: var(--border);
+  background: transparent;
+}
+
+@media (max-width: 640px) {
+  .batidas-card {
+    padding: 18px 14px 10px;
+  }
+
+  .batidas-filtros .busca {
+    flex-basis: 100%;
+  }
+
+  .batidas-campo {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  .batidas-campo select,
+  .batidas-campo input {
+    width: 100%;
+  }
+
+  .batidas-paginacao-botoes {
+    width: 100%;
+  }
+
+  .batidas-paginacao-botoes .btn-secondary {
+    flex: 1;
+  }
+}

@@ -15,9 +15,11 @@ export const paginacao = {
 
 export const dataIso = z.iso.date()
 
-export type Paginado<T> = {
-    itens: T[]
-    total: number
-    pagina: number
-    por_pagina: number
-}
+/** Telefone com DDD: chega com ou sem máscara, guarda só os dígitos (10 ou 11). */
+export const telefone = z
+    .string()
+    .transform(v => v.replace(/\D/g, ''))
+    .pipe(z.string().regex(/^\d{10,11}$/, 'Telefone inválido: informe DDD e número.'))
+
+/** Cargo / função de quem usa o sistema. */
+export const cargo = z.string().trim().min(1).max(80)

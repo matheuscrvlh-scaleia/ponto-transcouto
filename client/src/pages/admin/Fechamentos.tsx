@@ -11,6 +11,7 @@ import type { CotaSecullum, FechamentoAdmin, StatusFechamento, UnidadeAdmin } fr
 import { DetalheFechamento, TextoReprocessar } from './DetalheFechamento'
 import { estaAtrasado } from './fechamentos-util'
 import { PreviaCalendario } from './PreviaCalendario'
+import { TituloPagina } from '../../components/TituloPagina'
 
 const INTERVALO_ATUALIZACAO_MS = 10_000
 const LIMITE = 300
@@ -103,7 +104,7 @@ function PainelFechamentos() {
   return (
     <section className="pagina">
       <header className="pagina-header">
-        <h1>Painel de fechamentos</h1>
+        <TituloPagina>Painel de fechamentos</TituloPagina>
         <p className="pagina-sub">Extração semanal por unidade. A lista se atualiza sozinha enquanto houver processamento.</p>
       </header>
 

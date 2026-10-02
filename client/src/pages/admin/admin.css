@@ -391,10 +391,6 @@
   min-height: 36px;
 }
 
-tr.linha-destaque {
-  background: var(--aviso-bg);
-}
-
 tr.linha-inativa > * {
   opacity: 0.6;
 }
@@ -615,14 +611,6 @@ tr.linha-inativa > * {
   }
 }
 
-.titulo-com-pilula {
-  font-size: 24px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
 .tabela-fechamentos td {
   white-space: nowrap;
 }
@@ -648,4 +636,247 @@ tr.linha-inativa > * {
 
 .form-secao legend + * {
   clear: both;
+}
+
+/* ---------- Configuração → Atualização dos dados ---------- */
+
+.form-nota {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.form-nota a {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.modo-opcoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.modo-opcao {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.modo-opcao:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.modo-opcao.ativo {
+  border-color: var(--accent);
+  background: var(--accent-suave);
+}
+
+/* o radio fica acessível (teclado e leitor de tela), mas o cartão inteiro é o alvo visual */
+.modo-opcao input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.modo-opcao:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.modo-opcao-icone {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.modo-opcao.ativo .modo-opcao-icone {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.modo-opcao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.modo-opcao-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.modo-opcao-atual {
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-h);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.modo-opcao-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* aviso dentro do cartão do modo (ex.: teto semanal impede o tempo real) */
+.modo-opcao-alerta {
+  margin-top: 4px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--aviso);
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-border);
+  border-radius: 10px;
+}
+
+.modo-opcao-alerta a {
+  font-weight: 600;
+  color: inherit;
+}
+
+.modo-estimativa {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.modo-estimativa svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modo-opcao {
+    transition: none;
+  }
+}
+
+/* ----- Abas das telas agrupadas da Configuração ----- */
+
+.abas-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 20px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--app-borda);
+  border-radius: 999px;
+  box-shadow: var(--sombra-suave);
+}
+
+.abas-config-item {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 999px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.abas-config-item:hover {
+  color: var(--text-h);
+  background: var(--muted);
+}
+
+.abas-config-item.ativa {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.abas-config-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .abas-config {
+    width: 100%;
+    border-radius: 16px;
+  }
+
+  .abas-config-item {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+/* Atualização dos dados → Forçar sincronização */
+.forcar-sincronizacao-lista {
+  margin: 4px 0 14px;
+  padding-left: 20px;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* Atualização dos dados: título do primeiro bloco com o botão "Forçar sincronização" ao lado */
+.form-secao-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.form-secao-titulo {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.forcar-sincronizacao-lista a {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.btn-sincronizar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  min-height: 38px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--accent-suave);
+}
+
+.btn-sincronizar:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }

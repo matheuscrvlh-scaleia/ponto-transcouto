@@ -22,7 +22,7 @@ describe('login', () => {
         expect(res.statusCode).toBe(200)
         const corpo = res.json()
         expect(corpo.usuario).toMatchObject({ email: 'rh@demo.local', perfil: 'rh', empresa_id: ctx.empresaId })
-        expect(corpo.unidades.map((u: { nome_exibicao: string }) => u.nome_exibicao)).toEqual(['GDR', 'TRS', 'VRD'])
+        expect(corpo.unidades.map((u: { nome_exibicao: string }) => u.nome_exibicao)).toEqual(['GDR', 'TC NOVA UNIDADE SERVICOS LTDA', 'TRS', 'VRD'])
     })
 
     it('entra por CPF com máscara', async () => {

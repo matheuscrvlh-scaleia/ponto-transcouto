@@ -5,14 +5,28 @@ import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
 import { Carregando, ErroCarregamento, EstadoVazio } from '../../components/Estados'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { ModalSenhaTemporaria } from '../../components/ModalSenhaTemporaria'
-import { PilulaAtivo } from '../../components/PilulaStatus'
+import { IconeBloqueio, IconeChave, IconeCheck, IconeLapis, IconeLixeira, IconeMais } from '../../components/Icones'
 import { api } from '../../lib/api'
 import { mensagemDeErro } from '../../lib/erros'
-import { formatarDataHora } from '../../lib/formato'
 import { NOME_PERFIL } from '../../lib/preferencias'
 import { useRecurso } from '../../lib/useRecurso'
 import type { ClienteAdmin, Paginado, PerfilCliente, UnidadeAdmin } from '../../types/api'
+import {
+  BarraPessoas,
+  CartaoPessoas,
+  ContatoPessoa,
+  EtiquetaPerfil,
+  EtiquetasUnidades,
+  FiltroPessoas,
+  MenuAcoesPessoa,
+  PaginacaoPessoas,
+  Pessoa,
+  Situacao,
+  UltimoAcesso,
+  type AcaoPessoa,
+} from './ListaPessoas'
 import { ModalUsuario } from './ModalUsuario'
+import { TituloPagina } from '../../components/TituloPagina'
 
 const POR_PAGINA = 20
 
@@ -21,10 +35,11 @@ type Modal =
   | { tipo: 'editar'; usuario: ClienteAdmin }
   | { tipo: 'redefinir'; usuario: ClienteAdmin }
   | { tipo: 'desativar'; usuario: ClienteAdmin }
+  | { tipo: 'excluir'; usuario: ClienteAdmin }
   | { tipo: 'senha'; nome: string; senha: string }
   | null
 
-/* Usuários das empresas clientes (RH e gestores). A equipe Scale IA fica em Administração > Equipe. */
+/* Usuários das empresas clientes (RH e gestores). A equipe Scale IA fica em Administração › Usuários gestão. */
 export function Usuarios() {
   const { usuario: eu } = useAuth()
   const { empresaId, ehAdmin, query } = useEmpresaSelecionada()
@@ -98,50 +113,43 @@ export function Usuarios() {
   const totalPaginas = lista.dados ? Math.max(1, Math.ceil(lista.dados.total / POR_PAGINA)) : 1
   const temFiltro = Boolean(buscaAplicada || perfil || ativo || unidadeId)
 
-  const acoes = (usuario: ClienteAdmin) => (
-    <>
-      <button type="button" className="btn-link" onClick={() => setModal({ tipo: 'editar', usuario })} aria-label={`Editar ${usuario.nome}`}>
-        Editar
-      </button>
-      <button
-        type="button"
-        className="btn-link"
-        onClick={() => setModal({ tipo: 'redefinir', usuario })}
-        aria-label={`Redefinir senha de ${usuario.nome}`}
-      >
-        Redefinir senha
-      </button>
-      {!ehEu(usuario) &&
-        (usuario.ativo ? (
-          <button
-            type="button"
-            className="btn-link btn-link-danger"
-            onClick={() => setModal({ tipo: 'desativar', usuario })}
-            aria-label={`Desativar ${usuario.nome}`}
-          >
-            Desativar
-          </button>
-        ) : (
-          <button type="button" className="btn-link" onClick={() => reativar(usuario)} aria-label={`Reativar ${usuario.nome}`}>
-            Reativar
-          </button>
-        ))}
-    </>
-  )
+  // o RH gerencia os gestores e a própria conta; contas de outros RH ficam com a equipe (o server confere)
+  const podeGerenciar = (usuario: ClienteAdmin) => ehAdmin || usuario.perfil === 'gestor' || ehEu(usuario)
 
-  const nomesUnidades = (usuario: ClienteAdmin) =>
-    usuario.perfil !== 'gestor'
-      ? 'Todas da empresa'
-      : usuario.unidades.map((unidade) => unidade.nome_exibicao ?? `#${unidade.id}`).join(', ') || 'Nenhuma'
+  const acoes = (usuario: ClienteAdmin): AcaoPessoa[] => (podeGerenciar(usuario) ? acoesDe(usuario) : [])
+
+  const acoesDe = (usuario: ClienteAdmin): AcaoPessoa[] => [
+    { rotulo: 'Editar', icone: <IconeLapis tamanho={17} />, onClick: () => setModal({ tipo: 'editar', usuario }) },
+    { rotulo: 'Redefinir senha', icone: <IconeChave tamanho={17} />, onClick: () => setModal({ tipo: 'redefinir', usuario }) },
+    usuario.ativo
+      ? {
+          rotulo: 'Desativar',
+          icone: <IconeBloqueio tamanho={17} />,
+          onClick: () => setModal({ tipo: 'desativar', usuario }),
+          oculta: ehEu(usuario),
+        }
+      : { rotulo: 'Reativar', icone: <IconeCheck tamanho={17} />, onClick: () => reativar(usuario) },
+    {
+      rotulo: 'Excluir',
+      icone: <IconeLixeira tamanho={17} />,
+      onClick: () => setModal({ tipo: 'excluir', usuario }),
+      perigo: true,
+      oculta: ehEu(usuario),
+    },
+  ]
+
+  // embaixo do nome: cargo; sem cargo, o e-mail (nos cartões do celular não há coluna de contato)
+  const subtitulo = (usuario: ClienteAdmin) => usuario.cargo ?? usuario.email ?? undefined
+  const nomesUnidades = (usuario: ClienteAdmin) => usuario.unidades.map((unidade) => unidade.nome_exibicao ?? `#${unidade.id}`)
+  const itens = lista.dados?.itens ?? []
 
   return (
     <section className="pagina">
-      <header className="pagina-header-linha">
-        <div className="pagina-header">
-          <h1>Usuários</h1>
-          <p className="pagina-sub">Cadastre, edite e desative o RH e os gestores da empresa, e defina as unidades de cada gestor.</p>
-        </div>
-        <button type="button" className="btn-primary btn-compact" onClick={() => setModal({ tipo: 'criar' })}>
+      <TituloPagina>Usuários</TituloPagina>
+      <header className="pessoas-topo">
+        <p>Cadastre o RH e os gestores da empresa e defina quais unidades cada gestor acompanha.</p>
+        <button type="button" className="pessoas-novo" onClick={() => setModal({ tipo: 'criar' })}>
+          <IconeMais tamanho={18} />
           Novo usuário
         </button>
       </header>
@@ -152,143 +160,134 @@ export function Usuarios() {
         </p>
       )}
 
-      <div className="filtros-admin" role="group" aria-label="Filtros">
-        <div className="field" style={{ flexBasis: 240 }}>
-          <label htmlFor="busca-usuario">Buscar</label>
-          <input
-            id="busca-usuario"
-            type="search"
-            placeholder="Nome, e-mail ou CPF"
-            value={busca}
-            onChange={(event) => setBusca(event.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="filtro-perfil">Perfil</label>
-          <select
-            id="filtro-perfil"
-            value={perfil}
-            onChange={(event) => mudarFiltro(() => setPerfil(event.target.value as PerfilCliente | ''))}
-          >
+      <CartaoPessoas>
+        <BarraPessoas
+          idBusca="busca-usuario"
+          busca={busca}
+          onBusca={setBusca}
+          placeholder="Buscar por nome, e-mail ou CPF"
+          contagem={lista.dados ? `${lista.dados.total} ${lista.dados.total === 1 ? 'usuário' : 'usuários'}` : undefined}
+        >
+          <FiltroPessoas rotulo="Perfil" valor={perfil} onMudar={(valor) => mudarFiltro(() => setPerfil(valor as PerfilCliente | ''))}>
             <option value="">Todos</option>
             <option value="gestor">{NOME_PERFIL.gestor}</option>
             <option value="rh">{NOME_PERFIL.rh}</option>
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="filtro-ativo">Situação</label>
-          <select id="filtro-ativo" value={ativo} onChange={(event) => mudarFiltro(() => setAtivo(event.target.value as typeof ativo))}>
+          </FiltroPessoas>
+          <FiltroPessoas rotulo="Situação" valor={ativo} onMudar={(valor) => mudarFiltro(() => setAtivo(valor as typeof ativo))}>
             <option value="">Todas</option>
             <option value="true">Ativos</option>
             <option value="false">Inativos</option>
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="filtro-unidade-usuario">Unidade</label>
-          <select id="filtro-unidade-usuario" value={unidadeId} onChange={(event) => mudarFiltro(() => setUnidadeId(event.target.value))}>
+          </FiltroPessoas>
+          <FiltroPessoas rotulo="Unidade" valor={unidadeId} onMudar={(valor) => mudarFiltro(() => setUnidadeId(valor))}>
             <option value="">Todas</option>
             {unidadesVinculaveis.map((unidade) => (
               <option key={unidade.id} value={unidade.id}>
                 {unidade.nome_exibicao}
               </option>
             ))}
-          </select>
-        </div>
-      </div>
+          </FiltroPessoas>
+        </BarraPessoas>
 
-      {lista.carregando && <Carregando texto="Carregando usuários..." />}
-      {lista.erro && <ErroCarregamento erro={lista.erro} onTentarDeNovo={lista.recarregar} />}
+        {lista.carregando && (
+          <div className="pessoas-estado">
+            <Carregando texto="Carregando usuários..." />
+          </div>
+        )}
+        {lista.erro && (
+          <div className="pessoas-estado">
+            <ErroCarregamento erro={lista.erro} onTentarDeNovo={lista.recarregar} />
+          </div>
+        )}
 
-      {lista.dados && lista.dados.itens.length === 0 && (
-        <EstadoVazio titulo={temFiltro || pagina > 1 ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}>
-          {pagina > 1 ? (
-            <button type="button" className="btn-link" onClick={() => setPagina(1)}>
-              Voltar para a primeira página
-            </button>
-          ) : (
-            temFiltro && <p>Ajuste a busca ou os filtros.</p>
-          )}
-        </EstadoVazio>
-      )}
+        {lista.dados && itens.length === 0 && (
+          <div className="pessoas-estado">
+            <EstadoVazio titulo={temFiltro || pagina > 1 ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}>
+              {pagina > 1 ? (
+                <button type="button" className="btn-link" onClick={() => setPagina(1)}>
+                  Voltar para a primeira página
+                </button>
+              ) : temFiltro ? (
+                <p>Ajuste a busca ou os filtros.</p>
+              ) : (
+                <p>Use “Novo usuário” para cadastrar o RH e os gestores.</p>
+              )}
+            </EstadoVazio>
+          </div>
+        )}
 
-      {lista.dados && lista.dados.itens.length > 0 && (
-        <>
-          <div className="card card-tabela tabela-desktop">
-            <div className="table-wrap">
-              <table>
+        {itens.length > 0 && (
+          <>
+            <div className="table-wrap pessoas-tabela-wrap">
+              <table className="pessoas-tabela">
                 <caption className="sr-only">Usuários</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Nome</th>
+                    <th scope="col">Usuário</th>
+                    <th scope="col">Contato</th>
                     <th scope="col">Perfil</th>
                     <th scope="col">Unidades</th>
                     <th scope="col">Situação</th>
                     <th scope="col">Último acesso</th>
-                    <th scope="col">
+                    <th scope="col" className="coluna-acoes">
                       <span className="sr-only">Ações</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lista.dados.itens.map((usuario) => (
-                    <tr key={usuario.id} className={usuario.ativo ? undefined : 'linha-inativa'}>
+                  {itens.map((usuario) => (
+                    <tr key={usuario.id} className={usuario.ativo ? undefined : 'inativa'}>
                       <th scope="row">
-                        {usuario.nome}
-                        <span className="celula-sub">{[usuario.email, usuario.cpf_mascarado].filter(Boolean).join(' · ')}</span>
+                        <Pessoa nome={usuario.nome} sub={subtitulo(usuario)} voce={ehEu(usuario)} />
                       </th>
-                      <td>{NOME_PERFIL[usuario.perfil]}</td>
-                      <td style={{ whiteSpace: 'normal', maxWidth: 260 }}>{nomesUnidades(usuario)}</td>
                       <td>
-                        <PilulaAtivo ativo={usuario.ativo} />
-                        {usuario.deve_trocar_senha && <span className="celula-sub">Senha temporária</span>}
+                        <ContatoPessoa email={usuario.email} telefone={usuario.telefone} cpf={usuario.cpf_mascarado} />
                       </td>
-                      <td>{usuario.ultimo_login_em ? formatarDataHora(usuario.ultimo_login_em) : 'Nunca'}</td>
-                      <td className="table-actions">{acoes(usuario)}</td>
+                      <td>
+                        <EtiquetaPerfil perfil={usuario.perfil} />
+                      </td>
+                      <td>
+                        <EtiquetasUnidades nomes={nomesUnidades(usuario)} todas={usuario.perfil !== 'gestor'} />
+                      </td>
+                      <td>
+                        <Situacao ativo={usuario.ativo} senhaTemporaria={usuario.deve_trocar_senha} />
+                      </td>
+                      <td>
+                        <UltimoAcesso iso={usuario.ultimo_login_em} />
+                      </td>
+                      <td className="coluna-acoes">
+                        <MenuAcoesPessoa nome={usuario.nome} acoes={acoes(usuario)} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
 
-          <ul className="cartoes-admin">
-            {lista.dados.itens.map((usuario) => (
-              <li key={usuario.id} className={usuario.ativo ? 'cartao-admin' : 'cartao-admin inativo'}>
-                <div className="cartao-admin-topo">
-                  <span className="cartao-admin-titulo">
-                    {usuario.nome}
-                    <span className="celula-sub">{[usuario.email, usuario.cpf_mascarado].filter(Boolean).join(' · ')}</span>
-                  </span>
-                  <PilulaAtivo ativo={usuario.ativo} />
-                </div>
-                <span>
-                  {NOME_PERFIL[usuario.perfil]} · {nomesUnidades(usuario)}
-                </span>
-                <div className="barra-acoes">{acoes(usuario)}</div>
-              </li>
-            ))}
-          </ul>
+            <ul className="pessoas-cartoes">
+              {itens.map((usuario) => (
+                <li key={usuario.id} className={usuario.ativo ? 'pessoas-cartao' : 'pessoas-cartao inativa'}>
+                  <div className="pessoas-cartao-topo">
+                    <Pessoa nome={usuario.nome} sub={subtitulo(usuario)} voce={ehEu(usuario)} />
+                    <MenuAcoesPessoa nome={usuario.nome} acoes={acoes(usuario)} />
+                  </div>
+                  <div className="pessoas-cartao-info">
+                    <EtiquetaPerfil perfil={usuario.perfil} />
+                    <Situacao ativo={usuario.ativo} senhaTemporaria={usuario.deve_trocar_senha} />
+                    <UltimoAcesso iso={usuario.ultimo_login_em} />
+                  </div>
+                  {usuario.perfil === 'gestor' && (
+                    <div className="pessoas-cartao-info">
+                      <EtiquetasUnidades nomes={nomesUnidades(usuario)} max={3} />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
 
-          <nav className="paginacao" aria-label="Paginação">
-            <span>
-              {lista.dados.total} usuário{lista.dados.total === 1 ? '' : 's'} · página {pagina} de {totalPaginas}
-            </span>
-            <div className="barra-acoes">
-              <button type="button" className="btn-secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-                Anterior
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={pagina >= totalPaginas}
-                onClick={() => setPagina((p) => p + 1)}
-              >
-                Próxima
-              </button>
-            </div>
-          </nav>
-        </>
-      )}
+        <PaginacaoPessoas pagina={pagina} totalPaginas={totalPaginas} onPagina={setPagina} />
+      </CartaoPessoas>
 
       {(modal?.tipo === 'criar' || modal?.tipo === 'editar') && (
         <ModalUsuario
@@ -345,6 +344,26 @@ export function Usuarios() {
           <p>
             <strong>{modal.usuario.nome}</strong> perde o acesso imediatamente. Você pode reativar depois.
           </p>
+        </ModalConfirmacao>
+      )}
+
+      {modal?.tipo === 'excluir' && (
+        <ModalConfirmacao
+          titulo="Excluir usuário"
+          rotuloConfirmar="Excluir definitivamente"
+          perigo
+          onFechar={() => setModal(null)}
+          onConfirmar={async () => {
+            await api(`/clientes/${modal.usuario.id}`, { method: 'DELETE' })
+            setMensagem({ tipo: 'ok', texto: `${modal.usuario.nome} foi excluído.` })
+            setModal(null)
+            lista.recarregar()
+          }}
+        >
+          <p>
+            <strong>{modal.usuario.nome}</strong> perde o acesso e o cadastro é apagado. Essa ação não pode ser desfeita.
+          </p>
+          <p>Se for só bloquear o acesso por um tempo, prefira <strong>Desativar</strong>.</p>
         </ModalConfirmacao>
       )}
 

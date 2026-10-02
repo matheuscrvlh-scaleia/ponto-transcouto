@@ -54,7 +54,7 @@ export function Login() {
   return (
     <LayoutAcesso
       tituloPainel="Bem-vindo de volta!"
-      textoPainel="Entre para acompanhar o banco de horas da sua unidade, atualizado toda semana."
+      textoPainel="Entre para acompanhar o banco de horas da sua unidade, atualizado automaticamente."
       titulo="Entrar"
       subtitulo="Use seu e-mail ou CPF cadastrado."
     >

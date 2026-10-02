@@ -12,7 +12,7 @@ beforeAll(async () => {
 
 afterAll(() => encerrar(ctx))
 
-type Metodo = 'GET' | 'POST' | 'PATCH' | 'PUT'
+type Metodo = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
 
 function como(token: string, method: Metodo, url: string, payload?: object) {
     return ctx.app.inject({ method, url: `/api/v1${url}`, payload, headers: autorizado(token) })
@@ -65,7 +65,7 @@ describe('usuários dos clientes', () => {
         })
         expect(bloqueado.statusCode).toBe(403)
 
-        const duplicado = await comoRh('POST', '/clientes', { nome: 'Dup', email: 'NOVO.gestor@demo.local', perfil: 'rh' })
+        const duplicado = await comoRh('POST', '/clientes', { nome: 'Dup', email: 'NOVO.gestor@demo.local', perfil: 'gestor' })
         expect(duplicado.statusCode).toBe(409)
 
         const vinculo = await comoRh('PUT', `/clientes/${id}/unidades`, {
@@ -134,6 +134,68 @@ describe('usuários dos clientes', () => {
     })
 })
 
+describe('exclusão de usuário do cliente', () => {
+    it('RH exclui um gestor da empresa (fica na auditoria) e não exclui a si mesmo', async () => {
+        const criado = await comoRh('POST', '/clientes', {
+            nome: 'Gestor Temporário',
+            email: 'gestor.temporario@demo.local',
+            perfil: 'gestor',
+            unidade_ids: [ctx.unidades.GDR],
+        })
+        expect(criado.statusCode, criado.body).toBe(201)
+        const { id } = criado.json()
+
+        const excluido = await ctx.app.inject({
+            method: 'DELETE',
+            url: `/api/v1/clientes/${id}`,
+            headers: autorizado(ctx.tokens.rh),
+        })
+        expect(excluido.statusCode, excluido.body).toBe(204)
+        expect((await db.query('SELECT 1 FROM clientes WHERE id = $1', [id])).rowCount).toBe(0)
+
+        const auditoria = await db.query(
+            `SELECT dados FROM log_auditoria WHERE acao = 'cliente.excluido' AND entidade_id = $1`,
+            [String(id)],
+        )
+        expect(auditoria.rows[0].dados).toMatchObject({ nome: 'Gestor Temporário', perfil: 'gestor', unidade_ids: [ctx.unidades.GDR] })
+
+        const { rows } = await db.query(`SELECT id FROM clientes WHERE email = 'rh@demo.local'`)
+        const proprio = await ctx.app.inject({
+            method: 'DELETE',
+            url: `/api/v1/clientes/${rows[0].id}`,
+            headers: autorizado(ctx.tokens.rh),
+        })
+        expect(proprio.statusCode).toBe(400)
+    })
+})
+
+describe('RH gerencia só gestores', () => {
+    it('não cria nem promove RH e não mexe na conta de outro RH; edita os próprios dados', async () => {
+        expect((await comoRh('POST', '/clientes', { nome: 'Outro RH', email: 'outro.rh@demo.local', perfil: 'rh' })).statusCode).toBe(403)
+
+        const outroRh = await comoEquipe('POST', '/clientes', {
+            nome: 'Segundo RH',
+            email: 'segundo.rh@demo.local',
+            perfil: 'rh',
+            empresa_id: ctx.empresaId,
+        })
+        expect(outroRh.statusCode, outroRh.body).toBe(201)
+        const idOutro = outroRh.json().id
+        expect((await comoRh('POST', `/clientes/${idOutro}/redefinir-senha`)).statusCode).toBe(404)
+        expect((await comoRh('PATCH', `/clientes/${idOutro}`, { nome: 'Tomado' })).statusCode).toBe(404)
+        expect((await comoRh('DELETE', `/clientes/${idOutro}`)).statusCode).toBe(404)
+
+        const gestor = await comoRh('POST', '/clientes', { nome: 'Gestor Promovível', email: 'promovivel@demo.local', perfil: 'gestor' })
+        expect(gestor.statusCode, gestor.body).toBe(201)
+        expect((await comoRh('PATCH', `/clientes/${gestor.json().id}`, { perfil: 'rh' })).statusCode).toBe(403)
+        expect((await comoRh('POST', `/clientes/${gestor.json().id}/redefinir-senha`)).statusCode).toBe(200)
+
+        const eu = await db.query(`SELECT id FROM clientes WHERE email = 'rh@demo.local'`)
+        const proprio = await comoRh('PATCH', `/clientes/${eu.rows[0].id}`, { cargo: 'Coordenadora de RH' })
+        expect(proprio.statusCode, proprio.body).toBe(200)
+    })
+})
+
 describe('equipe Scale IA', () => {
     it('só a equipe acessa', async () => {
         expect((await comoRh('GET', '/equipe')).statusCode).toBe(403)
@@ -159,6 +221,50 @@ describe('equipe Scale IA', () => {
         const eu = await db.query(`SELECT id FROM usuarios WHERE email = 'admin-teste@demo.local'`)
         const autoDesativar = await comoEquipe('PATCH', `/equipe/${eu.rows[0].id}`, { ativo: false })
         expect(autoDesativar.statusCode).toBe(400)
+    })
+
+    it('guarda cargo e telefone de membros e de clientes', async () => {
+        const membro = await comoEquipe('POST', '/equipe', {
+            nome: 'Membro Com Cargo',
+            email: 'cargo@scaleia.ai',
+            cargo: 'Analista de suporte',
+            telefone: '(21) 3333-4444',
+        })
+        expect(membro.statusCode, membro.body).toBe(201)
+        expect(membro.json().usuario).toMatchObject({ cargo: 'Analista de suporte', telefone: '2133334444' })
+
+        const telefoneRuim = await comoEquipe('PATCH', `/equipe/${membro.json().id}`, { telefone: '123' })
+        expect(telefoneRuim.statusCode).toBe(400)
+
+        const cliente = await comoRh('POST', '/clientes', {
+            nome: 'Gestor Com Cargo',
+            email: 'gestor.cargo@demo.local',
+            perfil: 'gestor',
+            cargo: 'Supervisor de turno',
+            telefone: '11 91234-5678',
+        })
+        expect(cliente.statusCode, cliente.body).toBe(201)
+        const limpo = await comoRh('PATCH', `/clientes/${cliente.json().id}`, { cargo: null })
+        expect(limpo.json()).toMatchObject({ cargo: null, telefone: '11912345678' })
+    })
+
+    it('exclui outro membro (com auditoria), mas não a si mesmo', async () => {
+        const criado = await comoEquipe('POST', '/equipe', { nome: 'Membro Temporário', email: 'temporario@scaleia.ai' })
+        const { id } = criado.json()
+
+        expect((await comoRh('DELETE', `/equipe/${id}`)).statusCode).toBe(403)
+        const excluido = await comoEquipe('DELETE', `/equipe/${id}`)
+        expect(excluido.statusCode, excluido.body).toBe(204)
+        expect((await db.query('SELECT 1 FROM usuarios WHERE id = $1', [id])).rowCount).toBe(0)
+
+        const auditoria = await db.query(
+            `SELECT dados FROM log_auditoria WHERE acao = 'equipe.excluido' AND entidade_id = $1`,
+            [String(id)],
+        )
+        expect(auditoria.rows[0].dados).toMatchObject({ nome: 'Membro Temporário', email: 'temporario@scaleia.ai' })
+
+        const eu = await db.query(`SELECT id FROM usuarios WHERE email = 'admin-teste@demo.local'`)
+        expect((await comoEquipe('DELETE', `/equipe/${eu.rows[0].id}`)).statusCode).toBe(400)
     })
 
     it('e-mail não se repete entre equipe e clientes', async () => {

@@ -8,7 +8,7 @@ const selecao = `
            c.dia_fechamento_mes, c.dias_apos_fechamento_mes, c.origem_horas_pagas,
            c.teto_horas_pagas_minutos, c.teto_periodicidade,
            c.alerta_saldo_positivo_minutos, c.alerta_saldo_negativo_minutos,
-           c.fuso_horario, c.cota_calcular_por_hora, c.atualizado_em,
+           c.fuso_horario, c.cota_calcular_por_hora, c.modo_extracao, c.atualizado_em,
            CASE WHEN u.id IS NOT NULL THEN json_build_object('id', u.id, 'nome', u.nome)
                 WHEN cl.id IS NOT NULL THEN json_build_object('id', cl.id, 'nome', cl.nome) END AS atualizado_por
       FROM configuracoes c
@@ -76,13 +76,19 @@ export async function limitesDaEmpresa(empresaId: number) {
 }
 
 // Ciclos futuros ainda não iniciados são recriados pela régua do worker com a configuração nova.
-export async function descartarCiclosNaoIniciados(empresaId: number, executor: Executor) {
+/** Ciclos futuros que ainda não começaram (só pendentes/cancelados sem tentativa); `tipo` restringe a um tipo. */
+export async function descartarCiclosNaoIniciados(
+    empresaId: number,
+    executor: Executor,
+    tipo: 'semanal' | 'fechamento_mes' | null = null,
+) {
     const { rows } = await executor.query<{ id: number }>(
         `SELECT c.id FROM ciclos c
           WHERE c.empresa_id = $1 AND c.gatilho_em > now()
+            AND ($2::text IS NULL OR c.tipo = $2)
             AND NOT EXISTS (SELECT 1 FROM fechamentos f
                              WHERE f.ciclo_id = c.id AND (f.status NOT IN ('pendente', 'cancelado') OR f.tentativas > 0))`,
-        [empresaId],
+        [empresaId, tipo],
     )
     const ids = rows.map(r => r.id)
     if (ids.length === 0) return 0

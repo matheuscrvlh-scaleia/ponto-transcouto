@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { IconeChave, IconeEmail, IconeEscudo, IconeSair, IconeUnidade } from '../components/Icones'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { IconeEmail, IconeUnidade } from '../components/Icones'
+import { MenuPerfil } from '../components/MenuPerfil'
 import { iniciais } from '../lib/formato'
 import { NOME_PERFIL } from '../lib/preferencias'
 import './perfil.css'
+import { TituloPagina } from '../components/TituloPagina'
 
 const DESCRICAO_PERFIL = {
   admin: 'Acesso a todas as empresas, à Configuração e à Administração do sistema.',
@@ -14,7 +15,7 @@ const DESCRICAO_PERFIL = {
 } as const
 
 export function Perfil() {
-  const { usuario, unidades, perfil, sair } = useAuth()
+  const { usuario, unidades, perfil } = useAuth()
 
   useEffect(() => {
     document.title = 'Meu perfil — Copiloto de Ponto'
@@ -26,14 +27,16 @@ export function Perfil() {
 
   return (
     <section className="pagina perfil">
+      <TituloPagina>Meu perfil</TituloPagina>
       <header className="perfil-hero">
         <div className="perfil-hero-faixa" aria-hidden="true" />
+        <MenuPerfil className="perfil-hero-menu" />
         <div className="perfil-hero-corpo">
           <span className="perfil-avatar" aria-hidden="true">
             {iniciais(usuario.nome)}
           </span>
           <div className="perfil-identidade">
-            <h1>{usuario.nome}</h1>
+            <h2>{usuario.nome}</h2>
             <div className="perfil-meta">
               {perfil && <span className="perfil-pilula">{NOME_PERFIL[perfil]}</span>}
               {usuario.email && (
@@ -100,35 +103,6 @@ export function Perfil() {
               ))}
             </ul>
           )}
-        </article>
-
-        <article className="perfil-card">
-          <div className="perfil-card-topo">
-            <h2>Segurança</h2>
-            <IconeEscudo tamanho={20} className="perfil-card-icone" />
-          </div>
-          <p className="perfil-texto">Use uma senha forte e só sua. Se suspeitar que alguém sabe sua senha, troque agora.</p>
-          <div className="perfil-acoes">
-            <Link to="/trocar-senha" className="perfil-botao perfil-botao-primario">
-              <IconeChave tamanho={16} />
-              Trocar senha
-            </Link>
-            <button type="button" className="perfil-botao perfil-botao-sair" onClick={sair}>
-              <IconeSair tamanho={16} />
-              Sair da conta
-            </button>
-          </div>
-        </article>
-
-        <article className="perfil-card">
-          <h2>Preferências</h2>
-          <div className="perfil-preferencia">
-            <div>
-              <strong>Aparência</strong>
-              <span>Tema claro ou escuro, salvo neste navegador.</span>
-            </div>
-            <ThemeToggle />
-          </div>
         </article>
       </div>
     </section>

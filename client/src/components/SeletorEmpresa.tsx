@@ -6,11 +6,11 @@ import { SeletorLista, type OpcaoLista } from './SeletorLista'
 
 const TODAS = 'todas'
 
-/* Só para a equipe Scale IA, no topo: empresa que está sendo visualizada.
+/* Só para a equipe Scale IA, na barra lateral: empresa que está sendo visualizada.
    "Todas as empresas" junta tudo no dashboard; Configuração pede uma empresa. */
 export function SeletorEmpresa({ className = '' }: { className?: string }) {
   const { unidades } = useAuth()
-  const { ehAdmin, empresaId, empresas, selecionar } = useEmpresaAdmin()
+  const { ehAdmin, empresaId, empresa, empresas, selecionar } = useEmpresaAdmin()
   const navigate = useNavigate()
   const matchUnidade = useMatch('/unidades/:unidadeId/*')
 
@@ -37,9 +37,18 @@ export function SeletorEmpresa({ className = '' }: { className?: string }) {
       opcoes={opcoes}
       selecionadoId={empresaId ?? TODAS}
       onEscolher={escolher}
-      icone={empresaId == null ? <IconePainel tamanho={18} /> : <IconeEmpresa tamanho={18} />}
+      icone={
+        empresaId == null ? (
+          <IconePainel tamanho={18} />
+        ) : empresa?.logo ? (
+          // logo cadastrado em Administração › Empresas
+          <img className="seletor-logo" src={empresa.logo} alt="" />
+        ) : (
+          <IconeEmpresa tamanho={18} />
+        )
+      }
       iconeGeral={<IconePainel tamanho={16} />}
-      className={`seletor-empresa-topo ${className}`}
+      className={className}
     />
   )
 }

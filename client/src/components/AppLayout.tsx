@@ -1,12 +1,16 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
+import { IndicadorSincronizacao } from './IndicadorSincronizacao'
 import { LimiteErro } from './TelaAviso'
 import { useAuth } from '../context/AuthContext'
 import { iniciais } from '../lib/formato'
 import { lerMenuRecolhido, NOME_PERFIL, salvarMenuRecolhido } from '../lib/preferencias'
-import { secoesPermitidas } from '../pages/admin/navegacao'
+import { caminhoColaboradores } from '../lib/painel'
+import { entradasDaSecao, secoesPermitidas } from '../pages/admin/navegacao'
 import {
   IconeAjustes,
+  IconeAtividade,
+  IconeBatidas,
   IconeCalendario,
   IconeColunas,
   IconeEmpresa,
@@ -17,6 +21,7 @@ import {
   IconeRelogio,
   IconeSair,
   IconeSetaBaixo,
+  IconeSincronizar,
   IconeUnidade,
   IconeUsuarios,
 } from './Icones'
@@ -25,14 +30,19 @@ import { Notificacoes } from './Notificacoes'
 import { SeletorEmpresa } from './SeletorEmpresa'
 import { SeletorUnidade } from './SeletorUnidade'
 import { ThemeToggle } from './ThemeToggle'
-import logo from '../assets/logos/logo.avif'
+import { DestinoTitulo } from './TituloPagina'
 import './app-layout.css'
 
 const classeLink = ({ isActive }: { isActive: boolean }) => (isActive ? 'app-nav-item active' : 'app-nav-item')
 
 // ícone de cada item de Configuração / Administração, pelo caminho
 const ICONES_ITENS: Record<string, typeof IconeAjustes> = {
+  // grupos da Configuração
+  integracoes: IconeSincronizar,
+  configuracoes: IconeAjustes,
   usuarios: IconeUsuarios,
+  integracao: IconeSincronizar,
+  atualizacao: IconeAtividade,
   unidades: IconeUnidade,
   alertas: IconeAjustes,
   fechamentos: IconeCalendario,
@@ -43,7 +53,7 @@ const ICONES_ITENS: Record<string, typeof IconeAjustes> = {
   equipe: IconeUsuarios,
 }
 
-/* A empresa escolhida no topo (equipe) vale para o app inteiro: Gestão, Configuração e Administração. */
+/* A empresa escolhida na barra lateral (equipe) vale para o app inteiro: Gestão, Configuração e Administração. */
 export function AppLayout() {
   return (
     <EmpresaAdminProvider>
@@ -55,10 +65,16 @@ export function AppLayout() {
 function CascaApp() {
   const { usuario, unidades, perfil, sair } = useAuth()
   const [menuAberto, setMenuAberto] = useState(false)
+  const [destinoTitulo, setDestinoTitulo] = useState<HTMLDivElement | null>(null)
+  const { navRef, rolagem } = useRolagemDoMenu()
   // seções recolhidas da sidebar, guardadas por usuário neste navegador
   const [recolhidas, setRecolhidas] = useState(() => (usuario ? lerMenuRecolhido(usuario) : []))
   const { pathname } = useLocation()
-  const naGestao = Boolean(useMatch('/unidades/*'))
+  const matchUnidade = useMatch('/unidades/:unidadeId/*')
+  const naUnidades = Boolean(useMatch('/unidades/*'))
+  const naBatidas = Boolean(useMatch('/batidas'))
+  const naColaboradores = Boolean(useMatch('/colaboradores'))
+  const naGestao = naUnidades || naBatidas || naColaboradores
   const naConfiguracao = Boolean(useMatch('/configuracao/*'))
   const naAdministracao = Boolean(useMatch('/admin/*'))
   const noPerfil = Boolean(useMatch('/perfil'))
@@ -67,6 +83,8 @@ function CascaApp() {
 
   const secoes = secoesPermitidas(perfil)
   const unicaUnidade = unidades.length === 1 ? unidades[0] : null
+  // Dashboard e Colaboradores seguem a unidade em foco (a escolhida no seletor)
+  const unidadeEmFoco = unicaUnidade?.id ?? matchUnidade?.params.unidadeId
   const nome = usuario?.nome ?? 'Usuário'
   const nomePerfil = perfil ? NOME_PERFIL[perfil] : ''
 
@@ -87,8 +105,9 @@ function CascaApp() {
       <aside className={menuAberto ? 'app-sidebar open' : 'app-sidebar'} aria-label="Menu principal">
         <div className="app-sidebar-top">
           <Link to="/" className="brand" onClick={fecharMenu}>
-            <span className="brand-logo-wrap">
-              <img src={logo} alt="Transcouto" className="brand-logo" />
+            {/* mesmo símbolo da tela de login */}
+            <span className="brand-selo" aria-hidden="true">
+              <IconeRelogio tamanho={18} />
             </span>
             <span className="brand-nome">Copiloto de Ponto</span>
           </Link>
@@ -97,9 +116,14 @@ function CascaApp() {
           </button>
         </div>
 
-        <SeletorUnidade className="seletor-sidebar" />
+        {/* empresa em foco: só a equipe Scale IA escolhe (para os clientes o seletor não aparece) */}
+        <SeletorEmpresa className="seletor-sidebar" />
 
-        <nav className="app-sidebar-nav" aria-label="Navegação">
+        <nav
+          ref={navRef}
+          className={['app-sidebar-nav', rolagem.acima ? 'mais-acima' : '', rolagem.abaixo ? 'mais-abaixo' : ''].join(' ')}
+          aria-label="Navegação"
+        >
           <SecaoMenu
             id="gestao"
             titulo="Gestão"
@@ -107,17 +131,24 @@ function CascaApp() {
             contemPaginaAtual={naGestao}
             onAlternar={alternarSecao}
           >
-            {unicaUnidade ? (
-              <NavLink to={`/unidades/${unicaUnidade.id}`} className={classeLink} onClick={fecharMenu}>
-                <IconePainel className="app-nav-icone" />
-                <span>{unicaUnidade.nome_exibicao}</span>
-              </NavLink>
-            ) : (
-              <NavLink to="/unidades" className={classeLink} onClick={fecharMenu}>
-                <IconePainel className="app-nav-icone" />
-                <span>Dashboard</span>
-              </NavLink>
-            )}
+            {/* `end`: na lista ou no detalhe de colaboradores quem fica ativo é "Colaboradores" */}
+            <NavLink
+              to={unidadeEmFoco ? `/unidades/${unidadeEmFoco}` : '/unidades'}
+              end
+              className={classeLink}
+              onClick={fecharMenu}
+            >
+              <IconePainel className="app-nav-icone" />
+              <span>{unicaUnidade ? unicaUnidade.nome_exibicao : 'Dashboard'}</span>
+            </NavLink>
+            <NavLink to="/batidas" className={classeLink} onClick={fecharMenu}>
+              <IconeBatidas className="app-nav-icone" />
+              <span>Batidas</span>
+            </NavLink>
+            <NavLink to={caminhoColaboradores(unidadeEmFoco)} className={classeLink} onClick={fecharMenu}>
+              <IconeUsuarios className="app-nav-icone" />
+              <span>Colaboradores</span>
+            </NavLink>
           </SecaoMenu>
 
           {secoes.map((secao) => (
@@ -129,12 +160,19 @@ function CascaApp() {
               contemPaginaAtual={secaoAtual[secao.id]}
               onAlternar={alternarSecao}
             >
-              {secao.itens.map(({ caminho, rotulo }) => {
-                const Icone = ICONES_ITENS[caminho] ?? IconeAjustes
+              {entradasDaSecao(secao).map((entrada) => {
+                const Icone = ICONES_ITENS[entrada.chave] ?? IconeAjustes
+                // grupo com abas: fica ativo em qualquer uma delas
+                const naEntrada = entrada.abas.some((aba) => pathname.startsWith(`${secao.base}/${aba.caminho}`))
                 return (
-                  <NavLink key={caminho} to={`${secao.base}/${caminho}`} className={classeLink} onClick={fecharMenu}>
+                  <NavLink
+                    key={entrada.chave}
+                    to={`${secao.base}/${entrada.caminho}`}
+                    className={({ isActive }) => classeLink({ isActive: isActive || naEntrada })}
+                    onClick={fecharMenu}
+                  >
                     <Icone className="app-nav-icone" />
-                    <span>{rotulo}</span>
+                    <span>{entrada.rotulo}</span>
                   </NavLink>
                 )
               })}
@@ -175,8 +213,7 @@ function CascaApp() {
       </aside>
 
       <main className="app-main">
-        {/* no desktop o topo some quando não tem nada: sem o aviso e sem o seletor de empresa da equipe */}
-        <header className={semNota && perfil !== 'admin' ? 'app-topbar sem-nota' : 'app-topbar'}>
+        <header className="app-topbar">
           <button
             type="button"
             className="app-menu-toggle"
@@ -186,26 +223,67 @@ function CascaApp() {
           >
             <IconeMenu />
           </button>
-          <SeletorUnidade className="seletor-topbar" />
           {!semNota && (
             <p className="app-topbar-nota">
               <IconeOlho tamanho={16} />
-              Painel semanal · somente leitura
+              Painel somente leitura
             </p>
           )}
+          {/* título da página atual (cada página manda o seu via <TituloPagina>) */}
+          <div className="app-topbar-titulo" ref={setDestinoTitulo} />
           <div className="app-topbar-acoes">
-            <SeletorEmpresa />
+            <SeletorUnidade className="seletor-topo" />
           </div>
         </header>
         <div className="app-conteudo">
           {/* erro numa página não derruba a sidebar; trocar de página limpa o erro */}
           <LimiteErro key={pathname}>
-            <Outlet />
+            <DestinoTitulo elemento={destinoTitulo}>
+              <Outlet />
+            </DestinoTitulo>
           </LimiteErro>
         </div>
       </main>
+
+      <IndicadorSincronizacao />
     </div>
   )
+}
+
+/**
+ * O menu rola sem barra visível; aqui ele avisa se há itens escondidos acima/abaixo
+ * (para o esmaecido nas bordas) e, ao trocar de página, traz o item ativo para a vista.
+ */
+function useRolagemDoMenu() {
+  const navRef = useRef<HTMLElement>(null)
+  const { pathname } = useLocation()
+  const [rolagem, setRolagem] = useState({ acima: false, abaixo: false })
+
+  useEffect(() => {
+    const nav = navRef.current
+    if (!nav) return
+    const medir = () => {
+      const acima = nav.scrollTop > 2
+      const abaixo = nav.scrollTop + nav.clientHeight < nav.scrollHeight - 2
+      setRolagem((atual) => (atual.acima === acima && atual.abaixo === abaixo ? atual : { acima, abaixo }))
+    }
+    medir()
+    nav.addEventListener('scroll', medir, { passive: true })
+    // muda de tamanho com a janela e quando uma seção abre/recolhe
+    const observador = new ResizeObserver(medir)
+    observador.observe(nav)
+    for (const filho of nav.children) observador.observe(filho)
+    return () => {
+      nav.removeEventListener('scroll', medir)
+      observador.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    navRef.current?.querySelector('.app-nav-item.active')?.scrollIntoView({ block: 'nearest' })
+  }, [pathname])
+
+  return { navRef, rolagem }
 }
 
 function SecaoMenu({

@@ -1,8 +1,9 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env'
-import { buscarPorId } from '../models/auth.models'
+import { buscarPorId, telasDe } from '../models/auth.models'
 import type { Ator, Perfil, TokenPayload } from '../types/auth.types'
+import type { Tela } from '../types/permissoes.types'
 import { naoAutorizado, proibido } from '../utils/errors'
 
 const rotasLiberadasSemTrocaDeSenha = ['/api/v1/auth/me', '/api/v1/auth/trocar-senha']
@@ -31,6 +32,8 @@ export async function authenticate(req: FastifyRequest) {
         id: usuario.id,
         nome: usuario.nome,
         perfil: usuario.perfil,
+        telas: telasDe(usuario),
+        grupoId: usuario.grupo?.id ?? null,
         empresaId: usuario.empresa_id,
         deveTrocarSenha: usuario.deve_trocar_senha,
     }
@@ -44,6 +47,13 @@ export async function authenticate(req: FastifyRequest) {
 export function exigirPerfil(...permitidos: Perfil[]) {
     return async (req: FastifyRequest, _res: FastifyReply) => {
         if (!permitidos.includes(req.usuario.perfil)) throw proibido()
+    }
+}
+
+/** Libera a rota para quem tem ao menos uma das telas no grupo de permissão (a equipe tem todas). */
+export function exigirTela(...telas: Tela[]) {
+    return async (req: FastifyRequest, _res: FastifyReply) => {
+        if (!telas.some(tela => req.usuario.telas.includes(tela))) throw proibido()
     }
 }
 

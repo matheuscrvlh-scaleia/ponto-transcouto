@@ -27,7 +27,6 @@ export const salvarMapeamentoSchema = z
             ctx.addIssue({ code: 'custom', message: 'Mapeie ao menos uma coluna como extra.', path: ['mapeamento'] })
         }
     })
-export type SalvarMapeamentoBody = z.infer<typeof salvarMapeamentoSchema>
 
 export type ItemMapeamento = {
     coluna_secullum: string

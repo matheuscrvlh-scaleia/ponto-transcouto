@@ -30,7 +30,7 @@ export const ajustarGatilhoSchema = z
 export type ExecucaoResumo = {
     id: number
     disparo: 'automatico' | 'manual'
-    disparado_por: { id: number; nome: string } | null
+    disparado_por: { id: number; nome: string; tipo: 'equipe' | 'cliente' } | null
     status: 'processando' | 'sucesso' | 'falhou' | 'interrompida'
     total_colaboradores: number
     processados: number

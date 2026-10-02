@@ -53,11 +53,23 @@ function montarFaixas({ alerta_neg: neg, alerta_pos: pos }: Limites): Faixa[] {
   ]
 }
 
+/** Faixa clicada: descrição e os colaboradores dela. */
+export type FaixaSelecionada<T extends LinhaDashboard> = { descricao: string; linhas: T[] }
+
 /**
  * Distribuição dos colaboradores por faixa de saldo do banco (faixas derivadas dos limites
  * de alerta da unidade). A faixa ativa — a mais numerosa, ou a apontada — fica sólida.
+ * Com onSelecionar, clicar numa barra entrega os colaboradores daquela faixa.
  */
-export function GraficoFaixas({ linhas, limites }: { linhas: LinhaDashboard[]; limites: Limites }) {
+export function GraficoFaixas<T extends LinhaDashboard>({
+  linhas,
+  limites,
+  onSelecionar,
+}: {
+  linhas: T[]
+  limites: Limites
+  onSelecionar?: (faixa: FaixaSelecionada<T>) => void
+}) {
   const [apontada, setApontada] = useState<number | null>(null)
 
   const faixas = montarFaixas(limites)
@@ -78,12 +90,15 @@ export function GraficoFaixas({ linhas, limites }: { linhas: LinhaDashboard[]; l
             <li key={faixa.rotulo}>
               <button
                 type="button"
-                className={i === ativa ? 'faixa ativa' : 'faixa'}
-                aria-label={`${faixa.descricao}: ${n} ${n === 1 ? 'colaborador' : 'colaboradores'}`}
+                className={[i === ativa ? 'faixa ativa' : 'faixa', onSelecionar ? 'clicavel' : ''].join(' ')}
+                aria-label={`${faixa.descricao}: ${n} ${n === 1 ? 'colaborador' : 'colaboradores'}${onSelecionar ? '. Ver lista' : ''}`}
                 onMouseEnter={() => setApontada(i)}
                 onFocus={() => setApontada(i)}
                 onBlur={() => setApontada(null)}
-                onClick={() => setApontada(i)}
+                onClick={() => {
+                  setApontada(i)
+                  onSelecionar?.({ descricao: faixa.descricao, linhas: linhas.filter((linha) => faixa.teste(linha.saldo_min)) })
+                }}
               >
                 <span className="faixa-trilho">
                   <span className={n === 0 ? 'faixa-barra vazia' : 'faixa-barra'} style={{ height: `${altura}%` }}>
@@ -106,6 +121,7 @@ export function GraficoFaixas({ linhas, limites }: { linhas: LinhaDashboard[]; l
         {faixas[ativa].descricao}: <strong>{contagens[ativa]}</strong>{' '}
         {contagens[ativa] === 1 ? 'colaborador' : 'colaboradores'} ({percentual(contagens[ativa])}%)
       </p>
+      {onSelecionar && <p className="grafico-dica">Clique numa barra para ver os colaboradores.</p>}
     </div>
   )
 }

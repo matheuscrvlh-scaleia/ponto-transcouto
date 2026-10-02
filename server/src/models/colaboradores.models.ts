@@ -1,7 +1,7 @@
 import { db } from '../db/database'
 import { unidadesPermitidasSql } from '../db/escopo'
 import type { Ator } from '../types/auth.types'
-import type { ColaboradorAcessivel, RegistroAtual, SemanaHistorico } from '../types/colaboradores.types'
+import type { ColaboradorAcessivel, DiaHistorico, RegistroAtual, SemanaHistorico } from '../types/colaboradores.types'
 
 // Quem trocou de unidade continua visível para a unidade antiga (pelos fechamentos publicados dela).
 export async function buscarPermitido(ator: Ator, colaboradorId: number) {
@@ -45,6 +45,50 @@ export async function registroAtual(ator: Ator, colaboradorId: number) {
         [ator.id, colaboradorId],
     )
     return rows[0] ?? null
+}
+
+/** Valor ao vivo do colaborador (empresa em tempo real), se já foi atualizado alguma vez. */
+export async function registroTempoReal(ator: Ator, colaboradorId: number) {
+    const { rows } = await db.query<RegistroAtual & { atualizado_em: Date }>(
+        `SELECT NULL::int AS fechamento_id, rt.dados_ate::text AS data_referencia,
+                rt.extra_periodo AS extra_min, rt.negativa_periodo AS negativa_min,
+                rt.pagas_periodo AS pagas_min, rt.banco_periodo AS banco_min,
+                rt.saldo_banco_total AS saldo_min, rt.extraido_em AS atualizado_em
+           FROM registros_tempo_real rt
+           JOIN configuracoes cf ON cf.empresa_id = rt.empresa_id AND cf.modo_extracao = 'tempo_real'
+          WHERE rt.colaborador_id = $2 AND rt.extraido_em IS NOT NULL
+            AND rt.unidade_id IN (SELECT ${unidadesPermitidasSql(ator)})`,
+        [ator.id, colaboradorId],
+    )
+    return rows[0] ?? null
+}
+
+/**
+ * Histórico por dia (empresas em tempo real). Os valores *_dia são a diferença para o dia
+ * anterior registrado no mesmo período; no primeiro dia registrado do período ficam null.
+ */
+export async function historicoDiario(ator: Ator, colaboradorId: number, dias: number) {
+    const { rows } = await db.query<DiaHistorico>(
+        `SELECT x.* FROM (
+            SELECT hd.dia::text AS dia, hd.periodo_inicio::text AS periodo_inicio,
+                   json_build_object('id', un.id, 'nome', coalesce(un.nome_exibicao, un.razao_social)) AS unidade,
+                   hd.extra_periodo - lag(hd.extra_periodo) OVER w AS extra_dia,
+                   hd.negativa_periodo - lag(hd.negativa_periodo) OVER w AS negativa_dia,
+                   hd.pagas_periodo - lag(hd.pagas_periodo) OVER w AS pagas_dia,
+                   hd.banco_periodo - lag(hd.banco_periodo) OVER w AS banco_dia,
+                   hd.extra_periodo, hd.negativa_periodo, hd.pagas_periodo, hd.banco_periodo,
+                   hd.saldo_banco_total AS saldo_total, hd.atualizado_em
+              FROM historico_diario hd
+              JOIN unidades un ON un.id = hd.unidade_id
+             WHERE hd.colaborador_id = $2
+               AND hd.unidade_id IN (SELECT ${unidadesPermitidasSql(ator)})
+            WINDOW w AS (PARTITION BY hd.periodo_inicio ORDER BY hd.dia)
+         ) x
+         WHERE x.dia::date > current_date - $3::int
+         ORDER BY x.dia DESC`,
+        [ator.id, colaboradorId, dias],
+    )
+    return rows
 }
 
 export async function historico(ator: Ator, colaboradorId: number, limite: number) {

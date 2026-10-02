@@ -4,6 +4,26 @@ export const historicoQuerySchema = z.object({
     limite: z.coerce.number().int().min(1).max(104).default(26),
 })
 
+export const historicoDiarioQuerySchema = z.object({
+    dias: z.coerce.number().int().min(1).max(180).default(60),
+})
+
+export type DiaHistorico = {
+    dia: string
+    periodo_inicio: string
+    unidade: { id: number; nome: string }
+    extra_dia: number | null
+    negativa_dia: number | null
+    pagas_dia: number | null
+    banco_dia: number | null
+    extra_periodo: number
+    negativa_periodo: number
+    pagas_periodo: number
+    banco_periodo: number
+    saldo_total: number
+    atualizado_em: Date
+}
+
 export type ColaboradorAcessivel = {
     id: number
     nome: string

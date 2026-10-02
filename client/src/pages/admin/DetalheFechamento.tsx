@@ -10,6 +10,7 @@ import type { ErroExecucao, FechamentoAdmin, FechamentoDetalhe } from '../../typ
 import { estaAtrasado } from './fechamentos-util'
 import { ModalGatilho } from './ModalGatilho'
 import { useEmpresaAdmin } from '../../context/EmpresaAdminContext'
+import { TituloPagina } from '../../components/TituloPagina'
 
 const INTERVALO_ATUALIZACAO_MS = 10_000
 
@@ -73,9 +74,9 @@ export function DetalheFechamento() {
 
       <header className="pagina-header-linha">
         <div>
-          <h1 className="titulo-com-pilula">
+          <TituloPagina>
             {dados.unidade.nome} <PilulaStatus status={dados.status} atrasado={estaAtrasado(dados)} />
-          </h1>
+          </TituloPagina>
           <p className="pagina-sub">
             {dados.empresa.nome} · período de {formatarData(dados.periodo_inicio)} a {formatarData(dados.data_referencia)}
             {dados.tipo === 'fechamento_mes' && ' (fechamento do mês)'}

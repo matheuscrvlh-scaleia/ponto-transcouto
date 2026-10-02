@@ -59,6 +59,25 @@ export interface UnidadeResumo extends UnidadeRef {
 export type ForaDaCurva = 'positivo' | 'negativo' | null
 export type FiltroDashboard = 'todos' | 'extra' | 'negativa' | 'fora'
 
+/**
+ * Como os dados de uma empresa são atualizados: fotografia semanal ou tempo real (sem fotografia semanal:
+ * dados ao vivo, histórico por dia e só o fechamento do mês como registro oficial).
+ */
+export type ModoExtracao = 'semanal' | 'tempo_real'
+/** De onde vem o número exibido: atualização ao vivo ou fotografia publicada (semanal ou fechamento do mês). */
+export type FonteDados = 'tempo_real' | 'fechamento'
+
+/** Situação do tempo real no painel (no consolidado, `ativo` = alguma empresa em tempo real). */
+export interface TempoRealDashboard {
+  ativo: boolean
+  colaboradores_ao_vivo: number
+  /** Horário mais antigo e mais recente das atualizações ao vivo exibidas. */
+  atualizado_de: DataHoraISO | null
+  atualizado_ate: DataHoraISO | null
+  /** Data até onde vão os dados ao vivo (normalmente hoje). */
+  dados_ate: DataISO | null
+}
+
 export interface Limites {
   alerta_pos: Minutos
   alerta_neg: Minutos
@@ -74,6 +93,9 @@ export interface LinhaDashboard {
   banco_min: Minutos
   saldo_min: Minutos
   fora_da_curva: ForaDaCurva
+  fonte: FonteDados
+  /** Hora da atualização ao vivo (com fonte 'tempo_real'). */
+  atualizado_em: DataHoraISO | null
 }
 
 export interface FechamentoPublicado {
@@ -98,6 +120,8 @@ export interface UnidadePainel {
   fechamento: FechamentoPublicado | null
   alerta_pos: Minutos
   alerta_neg: Minutos
+  /** empresa da unidade em tempo real */
+  tempo_real?: boolean
 }
 
 /** Linha do painel consolidado: traz a unidade e os limites da empresa dela. */
@@ -115,7 +139,9 @@ export interface LinhaDashboardGeral extends LinhaDashboard {
 export interface DashboardUnidade {
   unidade: { id: number; nome: string } | null
   unidades?: UnidadePainel[]
+  /** Última fotografia publicada (no tempo real, o último fechamento do mês); pode vir null com `colaboradores` já preenchido. */
   fechamento: FechamentoPublicado | null
+  tempo_real: TempoRealDashboard
   aviso_fechamento_mes: boolean
   proximo_fechamento_previsto: DataHoraISO | null
   limites: Limites
@@ -134,9 +160,15 @@ export interface ColaboradorDetalhe {
   departamento: string | null
   ativo: boolean
   unidade: { id: number; nome: string }
+  /** Modo da empresa do colaborador: no tempo real o histórico é por dia. */
+  modo_extracao: ModoExtracao
   resumo: {
-    fechamento_id: number
+    /** null quando a fonte é o tempo real. */
+    fechamento_id: number | null
+    /** No tempo real, a data até onde vão os dados (hoje). */
     data_referencia: DataISO
+    fonte: FonteDados
+    atualizado_em: DataHoraISO | null
     extra_min: Minutos
     negativa_min: Minutos
     pagas_min: Minutos
@@ -165,6 +197,24 @@ export interface SemanaHistorico {
   saldo_total: Minutos
 }
 
+/** Item de GET /colaboradores/:id/historico-diario (empresa em tempo real), do dia mais recente para o mais antigo. */
+export interface DiaHistorico {
+  dia: DataISO
+  periodo_inicio: DataISO
+  unidade: { id: number; nome: string }
+  /** Diferença para o dia anterior registrado no mesmo período; null no primeiro dia registrado do período. */
+  extra_dia: Minutos | null
+  negativa_dia: Minutos | null
+  pagas_dia: Minutos | null
+  banco_dia: Minutos | null
+  extra_periodo: Minutos
+  negativa_periodo: Minutos
+  pagas_periodo: Minutos
+  banco_periodo: Minutos
+  saldo_total: Minutos
+  atualizado_em: DataHoraISO
+}
+
 /* ---------- Admin ---------- */
 
 export interface Pessoa {
@@ -191,6 +241,20 @@ export interface Empresa {
   criado_em: DataHoraISO
   atualizado_em: DataHoraISO
   qtd_unidades: number
+  /** RH e gestores ativos */
+  qtd_usuarios: number
+  razao_social: string | null
+  /** só dígitos */
+  cnpj: string | null
+  /** data URL (PNG, JPG ou WebP, até 256px) */
+  logo: string | null
+  responsavel: string | null
+  email_contato: string | null
+  /** só dígitos, com DDD */
+  telefone: string | null
+  cidade: string | null
+  uf: string | null
+  observacoes: string | null
 }
 
 export type TesteConexao =
@@ -283,6 +347,9 @@ export interface UnidadeAdmin {
 
 export interface Configuracoes {
   empresa_id: number
+  /** Modo, dia e hora: RH e equipe alteram; o resto do calendário é só da equipe. */
+  modo_extracao: ModoExtracao
+  /** 0 = domingo … 6 = sábado */
   dia_semana_extracao: number
   hora_extracao: string
   dia_fechamento_mes: number
@@ -296,6 +363,8 @@ export interface Configuracoes {
   cota_calcular_por_hora: number
   atualizado_em: DataHoraISO
   atualizado_por: Pessoa | null
+  /** Só leitura: quanto leva para atualizar todo mundo uma vez no tempo real (null sem colaboradores). */
+  tempo_real_estimativa: { colaboradores: number; minutos_por_rodada: number | null }
 }
 
 export type CampoMapeado = 'extra' | 'negativa' | 'pagas' | 'saldo_banco' | 'ignorar'
@@ -316,6 +385,8 @@ export interface ClienteAdmin {
   nome: string
   email: string | null
   perfil: PerfilCliente
+  cargo: string | null
+  telefone: string | null
   empresa_id: number
   ativo: boolean
   deve_trocar_senha: boolean
@@ -331,6 +402,8 @@ export interface MembroEquipe {
   nome: string
   email: string | null
   cpf_mascarado: string | null
+  cargo: string | null
+  telefone: string | null
   ativo: boolean
   deve_trocar_senha: boolean
   ultimo_login_em: DataHoraISO | null
@@ -342,4 +415,150 @@ export interface ContaCriada<T> {
   id: number
   senha_temporaria: string
   usuario: T | null
+}
+
+/* ---------- Integração FriPonto (Configuração → Integração FriPonto) ---------- */
+
+/** Quem disparou uma ação: equipe Scale IA ou usuário da empresa cliente. */
+export interface AtorIntegracao {
+  tipo: TipoUsuario
+  nome: string
+}
+
+/** GET /integracao/status */
+export interface StatusIntegracao {
+  empresa: {
+    id: number
+    nome: string
+    credenciais_configuradas: boolean
+    sincronizado_em: DataHoraISO | null
+    sincronizacao_solicitada_em: DataHoraISO | null
+    sincronizacao_pendente: boolean
+  }
+  worker: { online: boolean; visto_em: DataHoraISO | null; status: string | null }
+  cota: { usadas_ultima_hora: number; limite_por_hora: number }
+  fila: { pendentes: number; processando: number; falhas: number }
+  tempo_real: {
+    ativo: boolean
+    colaboradores: number
+    atualizados_ultima_hora: number
+    mais_antigo_em: DataHoraISO | null
+    mais_recente_em: DataHoraISO | null
+    minutos_por_rodada: number | null
+  }
+  /** Unidades que este usuário pode puxar (gestor: só as dele). */
+  unidades: { id: number; nome: string }[]
+}
+
+/** POST /integracao/cadastros (202) */
+export interface PedidoCadastrosResposta {
+  solicitado_em: DataHoraISO
+  /** já havia uma sincronização na fila: nada novo foi pedido */
+  ja_pendente?: boolean
+}
+
+/** POST /integracao/tempo-real/atualizar (202): colaboradores do escopo postos no início da fila do tempo real. */
+/** GET /integracao/atividade: o que está sendo puxado da FriPonto agora e falhas recentes. */
+export interface AtividadeIntegracao {
+  sincronizando: boolean
+  tarefas: { cadastros: number; fechamentos: number; tempo_real: number; batidas: number }
+  worker_online: boolean
+  /** Só para RH e equipe; vazio para o gestor. */
+  erros: { chave: string; origem: string; empresa: string; mensagem: string; em: DataHoraISO }[]
+}
+
+/** POST /integracao/sincronizar (Atualização dos dados → Forçar sincronização). */
+export interface ForcarSincronizacaoResposta {
+  cadastros: { solicitado_em: DataHoraISO; ja_pendente: boolean }
+  batidas: boolean
+  /** Só para empresa em tempo real. */
+  tempo_real: PedidoTempoRealResposta | null
+}
+
+export interface PedidoTempoRealResposta {
+  colaboradores: number
+  /** Quanto leva para atualizar todos (cota da FriPonto); null sem estimativa. */
+  minutos_estimados: number | null
+}
+
+/** Item da prévia de "Puxar dados"; no tempo real só vêm fechamentos do mês (`tipo` sempre 'fechamento_mes'). */
+export interface SemanaPrevia {
+  data_referencia: DataISO
+  periodo_inicio: DataISO
+  tipo: TipoCiclo
+  /** Semana que ainda não tinha sido puxada (será criada). */
+  nova: boolean
+  /** Semana depois do fim, já publicada, refeita junto para manter os saldos. */
+  dependente: boolean
+}
+
+/** GET /integracao/dados/previa */
+export interface PreviaDadosIntegracao {
+  semanas: SemanaPrevia[]
+  fechamentos: number
+  dependentes: number
+  ignorados_em_processamento: number
+  colaboradores_estimados: number
+  chamadas_estimadas: number
+  horas_estimadas: number
+}
+
+/** POST /integracao/dados (202) */
+export interface PedidoDadosResposta {
+  fechamentos: number
+  ciclos_criados: number
+  dependentes: number
+}
+
+/** Item de GET /integracao/execucoes */
+export interface ExecucaoIntegracao {
+  id: number
+  fechamento_id: number
+  unidade: { id: number; nome: string }
+  data_referencia: DataISO
+  status: ExecucaoResumo['status']
+  disparo: ExecucaoResumo['disparo']
+  disparado_por: AtorIntegracao | null
+  processados: number
+  total_colaboradores: number | null
+  com_erro: number
+  iniciado_em: DataHoraISO
+  finalizado_em: DataHoraISO | null
+  mensagem_erro: string | null
+}
+
+/** Item de GET /integracao/historico */
+export interface RegistroHistoricoIntegracao {
+  id: number
+  criado_em: DataHoraISO
+  acao: string
+  /** Texto pronto em português. */
+  descricao: string
+  ator: AtorIntegracao | null
+  dados: Record<string, unknown> | null
+}
+
+/* ---------- Batidas (log de marcações da FriPonto) ---------- */
+
+/** 0 Original, 1 Manual, 2 Pré-assinalada, 3 Desconsiderada (FonteDados da Secullum). */
+export type TipoBatida = 0 | 1 | 2 | 3
+export type FiltroTipoBatida = 'todas' | 'validas' | 'manuais' | 'desconsideradas'
+
+export interface Batida {
+  id: number
+  data: DataISO
+  /** 'HH:MM' no horário local da empresa */
+  hora: string
+  tipo: TipoBatida
+  /** 0 Desconhecida, 1 Relógio, 2 Incluída manualmente, 3 Pré-assinalada, 4 Check-in, 5 Web, 6 App, 7 App offline, 8 Integração */
+  origem: number
+  equipamento_id: number | null
+  /** quando a marcação entrou na FriPonto (horário local, sem fuso) */
+  incluida_em: string | null
+  colaborador: { id: number; nome: string; funcao: string | null }
+  unidade: { id: number; nome: string }
+}
+
+export interface BatidasResposta extends Paginado<Batida> {
+  importado_em: DataHoraISO | null
 }

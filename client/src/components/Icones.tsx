@@ -249,3 +249,78 @@ export function IconeSetaBaixo(props: Props) {
     </Base>
   )
 }
+
+export function IconeSincronizar(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1" />
+      <path d="M17.5 3.5v3.4h-3.4M6.5 20.5v-3.4h3.4" />
+    </Base>
+  )
+}
+
+/** Linha de pulso: atualização contínua (tempo real). */
+export function IconeAtividade(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M3 12h4l2.5-6 5 12 2.5-6h4" />
+    </Base>
+  )
+}
+
+export function IconeBatidas(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M4 6h10M4 12h6M4 18h6" />
+      <circle cx="17" cy="15.5" r="4.5" />
+      <path d="M17 13.5v2.2l1.4 1" />
+    </Base>
+  )
+}
+
+export function IconePontos(props: Props) {
+  return (
+    <Base {...props}>
+      <circle cx="5.5" cy="12" r="1.4" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+      <circle cx="18.5" cy="12" r="1.4" fill="currentColor" />
+    </Base>
+  )
+}
+
+export function IconeBusca(props: Props) {
+  return (
+    <Base {...props}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </Base>
+  )
+}
+
+export function IconeLapis(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z" />
+      <path d="m13.5 6.5 4 4" />
+    </Base>
+  )
+}
+
+export function IconeLixeira(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M4 7h16M10 11v6M14 11v6" />
+      <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+      <path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7" />
+    </Base>
+  )
+}
+
+export function IconeBloqueio(props: Props) {
+  return (
+    <Base {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m6 6 12 12" />
+    </Base>
+  )
+}

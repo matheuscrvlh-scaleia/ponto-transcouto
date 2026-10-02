@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { db } from '../../src/db/database'
 import { autorizado, encerrar, prepararContexto, type Contexto } from './helpers'
 
 vi.mock('../../src/db/database', () => import('./banco-transacional'))
@@ -202,5 +203,67 @@ describe('painel consolidado por empresa', () => {
 
         const sessao = await ctx.app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: autorizado(ctx.tokens.rh) })
         expect(sessao.json().unidades.every((u: { empresa_id: number }) => u.empresa_id === ctx.empresaId)).toBe(true)
+    })
+})
+
+describe('tempo real no painel', () => {
+    it('com a empresa em tempo real, o valor ao vivo substitui a fotografia de cada colaborador', async () => {
+        const antes = await dashboard(ctx.unidades.GDR)
+        const alvo: Linha = antes.colaboradores[0]
+        expect(antes.tempo_real).toMatchObject({ ativo: false, colaboradores_ao_vivo: 0 })
+
+        // RH muda o modo (campo liberado para o cliente)
+        const patch = await ctx.app.inject({
+            method: 'PATCH',
+            url: '/api/v1/configuracoes',
+            payload: { modo_extracao: 'tempo_real' },
+            headers: autorizado(ctx.tokens.rh),
+        })
+        expect(patch.statusCode, patch.body).toBe(200)
+        expect(patch.json()).toMatchObject({ modo_extracao: 'tempo_real', tempo_real_estimativa: { colaboradores: 25 } })
+        expect(patch.json().tempo_real_estimativa.minutos_por_rodada).toBeGreaterThan(0)
+
+        await db.query(
+            `INSERT INTO registros_tempo_real
+                    (colaborador_id, empresa_id, unidade_id, periodo_inicio, dados_ate, extra_periodo,
+                     negativa_periodo, pagas_periodo, banco_periodo, saldo_banco_total, extraido_em)
+             VALUES ($1, $2, $3, current_date - 10, current_date, 60, 0, 0, 60, 54321, now())`,
+            [alvo.id, ctx.empresaId, ctx.unidades.GDR],
+        )
+
+        const depois = await dashboard(ctx.unidades.GDR)
+        expect(depois.tempo_real).toMatchObject({ ativo: true, colaboradores_ao_vivo: 1 })
+        expect(depois.total).toBe(antes.total)
+        expect(depois.resumo.total).toBe(antes.resumo.total)
+
+        const linhas: (Linha & { fonte: string })[] = depois.colaboradores
+        const aoVivo = linhas.find(l => l.id === alvo.id)!
+        expect(aoVivo).toMatchObject({ fonte: 'tempo_real', saldo_min: 54321, fora_da_curva: 'positivo' })
+        expect(linhas[0].id).toBe(alvo.id) // maior saldo primeiro
+        expect(linhas.filter(l => l.fonte === 'fechamento')).toHaveLength(antes.total - 1)
+
+        // o detalhe do colaborador também usa o valor ao vivo
+        const detalhe = await ctx.app.inject({
+            method: 'GET',
+            url: `/api/v1/colaboradores/${alvo.id}`,
+            headers: autorizado(ctx.tokens.gestor),
+        })
+        expect(detalhe.json().resumo).toMatchObject({ fonte: 'tempo_real', saldo_min: 54321, fechamento_id: null })
+
+        // e o consolidado
+        const geral = await ctx.app.inject({ method: 'GET', url: '/api/v1/dashboard', headers: autorizado(ctx.tokens.rh) })
+        expect(geral.json().tempo_real).toMatchObject({ ativo: true, colaboradores_ao_vivo: 1 })
+        expect(geral.json().colaboradores.find((l: { id: number }) => l.id === alvo.id)).toMatchObject({ fonte: 'tempo_real' })
+        expect(new Set(geral.json().colaboradores.map((l: { id: number }) => l.id)).size).toBe(geral.json().colaboradores.length)
+    })
+
+    it('RH não altera campos do calendário que são da equipe', async () => {
+        const res = await ctx.app.inject({
+            method: 'PATCH',
+            url: '/api/v1/configuracoes',
+            payload: { dia_fechamento_mes: 20 },
+            headers: autorizado(ctx.tokens.rh),
+        })
+        expect(res.statusCode).toBe(403)
     })
 })

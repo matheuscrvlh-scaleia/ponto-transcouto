@@ -5,7 +5,6 @@ import type { Limites } from '../services/dashboard.service'
 import type {
     DashboardQuery,
     FechamentoPublicado,
-    LinhaDashboard,
     LinhaDashboardGeral,
     ResumoDashboard,
     UnidadeAcessivel,
@@ -75,11 +74,46 @@ export async function ultimoFechamentoPublicado(unidadeId: number) {
     return rows[0] ?? null
 }
 
+/* Fonte dos números do painel (uma unidade ou várias):
+   - tempo real: o valor ao vivo de cada colaborador (registros_tempo_real), para empresas nesse modo;
+   - fotografia: o último fechamento publicado da unidade (registros_horas).
+   Cada colaborador aparece uma vez, com o dado mais recente (ao vivo ganha no empate).
+   As unidades viram uma tabela (unnest) com os limites da empresa de cada uma,
+   para que filtro e "fora da curva" usem o limite certo. */
+const fontePainel = `
+    WITH lim AS (
+        SELECT *
+          FROM unnest($1::int[], $2::int[], $3::int[], $4::int[], $5::text[], $6::bool[])
+            AS l(fechamento_id, pos, neg, unidade_id, unidade_nome, tempo_real)
+    ),
+    r AS (
+        SELECT DISTINCT ON (t.colaborador_id) t.*
+          FROM (
+                SELECT rt.colaborador_id, rt.extra_periodo, rt.negativa_periodo, rt.pagas_periodo,
+                       rt.banco_periodo, rt.saldo_banco_total,
+                       'tempo_real'::text AS fonte, rt.extraido_em AS atualizado_em, rt.dados_ate,
+                       lim.pos, lim.neg, lim.unidade_id, lim.unidade_nome
+                  FROM lim
+                  JOIN registros_tempo_real rt ON rt.unidade_id = lim.unidade_id AND lim.tempo_real
+                                              AND rt.extraido_em IS NOT NULL
+                UNION ALL
+                SELECT rh.colaborador_id, rh.extra_periodo, rh.negativa_periodo, rh.pagas_periodo,
+                       rh.banco_periodo, rh.saldo_banco_total,
+                       'fechamento'::text, NULL::timestamptz, c.data_referencia,
+                       lim.pos, lim.neg, lim.unidade_id, lim.unidade_nome
+                  FROM lim
+                  JOIN registros_horas rh ON rh.fechamento_id = lim.fechamento_id
+                  JOIN fechamentos f ON f.id = rh.fechamento_id
+                  JOIN ciclos c ON c.id = f.ciclo_id
+               ) t
+         ORDER BY t.colaborador_id, t.dados_ate DESC, (t.fonte = 'tempo_real') DESC
+    )`
+
 const filtrosDashboard: Record<DashboardQuery['filtro'], string> = {
     todos: 'true',
     extra: 'r.extra_periodo > 0',
     negativa: 'r.negativa_periodo > 0',
-    fora: '(r.saldo_banco_total >= lim.pos OR r.saldo_banco_total <= -lim.neg)',
+    fora: '(r.saldo_banco_total >= r.pos OR r.saldo_banco_total <= -r.neg)',
 }
 
 const ordensDashboard: Record<DashboardQuery['ordem'], string> = {
@@ -88,63 +122,13 @@ const ordensDashboard: Record<DashboardQuery['ordem'], string> = {
     nome: 'col.nome, col.id',
 }
 
-export async function linhasDashboard(fechamentoId: number, limites: Limites, q: DashboardQuery) {
-    const { rows } = await db.query<LinhaDashboard & { total: number }>(
-        `SELECT col.id, col.nome, col.funcao,
-                r.extra_periodo AS extra_min, r.negativa_periodo AS negativa_min,
-                r.pagas_periodo AS pagas_min, r.banco_periodo AS banco_min,
-                r.saldo_banco_total AS saldo_min,
-                ${foraDaCurvaSql('r.saldo_banco_total', 'lim.pos', 'lim.neg')} AS fora_da_curva,
-                count(*) OVER ()::int AS total
-           FROM registros_horas r
-           JOIN colaboradores col ON col.id = r.colaborador_id
-          CROSS JOIN (SELECT $3::int AS pos, $4::int AS neg) lim
-          WHERE r.fechamento_id = $1
-            AND ($2::text IS NULL OR col.nome ILIKE '%' || $2 || '%')
-            AND ${filtrosDashboard[q.filtro]}
-          ORDER BY ${ordensDashboard[q.ordem]}
-          LIMIT $5 OFFSET $6`,
-        [fechamentoId, q.busca || null, limites.alerta_pos, limites.alerta_neg, q.por_pagina, (q.pagina - 1) * q.por_pagina],
-    )
-    const total = rows[0]?.total ?? (await contarLinhas(fechamentoId, limites, q))
-    return { linhas: rows.map(({ total: _total, ...linha }) => linha), total }
-}
-
-async function contarLinhas(fechamentoId: number, limites: Limites, q: DashboardQuery) {
-    const { rows } = await db.query<{ total: number }>(
-        `SELECT count(*)::int AS total
-           FROM registros_horas r
-           JOIN colaboradores col ON col.id = r.colaborador_id
-          CROSS JOIN (SELECT $3::int AS pos, $4::int AS neg) lim
-          WHERE r.fechamento_id = $1
-            AND ($2::text IS NULL OR col.nome ILIKE '%' || $2 || '%')
-            AND ${filtrosDashboard[q.filtro]}`,
-        [fechamentoId, q.busca || null, limites.alerta_pos, limites.alerta_neg],
-    )
-    return rows[0].total
-}
-
-export async function resumoDashboard(fechamentoId: number, limites: Limites) {
-    const { rows } = await db.query<ResumoDashboard>(
-        `SELECT count(*)::int AS total,
-                count(*) FILTER (WHERE saldo_banco_total >= $2::int)::int AS fora_positivo,
-                count(*) FILTER (WHERE saldo_banco_total <= -$3::int)::int AS fora_negativo,
-                coalesce(sum(pagas_periodo), 0)::int AS pagas_total_min
-           FROM registros_horas
-          WHERE fechamento_id = $1`,
-        [fechamentoId, limites.alerta_pos, limites.alerta_neg],
-    )
-    return rows[0]
-}
-
-// ---------- Painel consolidado (todas as unidades do usuário) ----------
-
-/** Unidades visíveis no painel, cada uma com o último fechamento publicado e os limites da empresa dela. */
+/** Unidades visíveis no painel, cada uma com o último fechamento publicado, os limites e o modo da empresa dela. */
 export async function unidadesDoPainel(ator: Ator, empresaId: number | null, padrao: Limites) {
     const { rows } = await db.query<UnidadePainel>(
         `SELECT un.id, un.nome_exibicao AS nome, un.empresa_id,
                 coalesce(cf.alerta_saldo_positivo_minutos, $3)::int AS alerta_pos,
                 coalesce(cf.alerta_saldo_negativo_minutos, $4)::int AS alerta_neg,
+                coalesce(cf.modo_extracao = 'tempo_real', false) AS tempo_real,
                 CASE WHEN uf.id IS NULL THEN NULL
                      ELSE json_build_object('id', uf.id, 'periodo_inicio', uf.periodo_inicio,
                                             'data_referencia', uf.data_referencia, 'publicado_em', uf.publicado_em,
@@ -170,46 +154,47 @@ export async function unidadesDoPainel(ator: Ator, empresaId: number | null, pad
     return rows
 }
 
-/* Os fechamentos do painel viram uma tabela (unnest) com os limites de cada um,
-   para que filtro e "fora da curva" usem o limite da empresa de cada unidade. */
-const fechamentosDoPainel = `unnest($1::int[], $2::int[], $3::int[], $4::int[], $5::text[])
-        AS lim(fechamento_id, pos, neg, unidade_id, unidade_nome)
-   JOIN registros_horas r ON r.fechamento_id = lim.fechamento_id`
+/** Unidade com algo a mostrar: fotografia publicada ou empresa em tempo real. */
+export const temDadosNoPainel = (u: UnidadePainel) => Boolean(u.fechamento) || u.tempo_real
 
 function parametrosDoPainel(unidades: UnidadePainel[]) {
-    const comDados = unidades.filter(u => u.fechamento)
+    const comDados = unidades.filter(temDadosNoPainel)
     return [
-        comDados.map(u => u.fechamento!.id),
+        comDados.map(u => u.fechamento?.id ?? null),
         comDados.map(u => u.alerta_pos),
         comDados.map(u => u.alerta_neg),
         comDados.map(u => u.id),
         comDados.map(u => u.nome),
+        comDados.map(u => u.tempo_real),
     ]
 }
 
-export async function linhasDashboardGeral(unidades: UnidadePainel[], q: DashboardQuery) {
-    const filtroSql = `($6::text IS NULL OR col.nome ILIKE '%' || $6 || '%') AND ${filtrosDashboard[q.filtro]}`
+export async function linhasPainel(unidades: UnidadePainel[], q: DashboardQuery) {
+    const filtroSql = `($7::text IS NULL OR col.nome ILIKE '%' || $7 || '%') AND ${filtrosDashboard[q.filtro]}`
     const { rows } = await db.query<LinhaDashboardGeral & { total: number }>(
-        `SELECT col.id, col.nome, col.funcao,
+        `${fontePainel}
+         SELECT col.id, col.nome, col.funcao,
                 r.extra_periodo AS extra_min, r.negativa_periodo AS negativa_min,
                 r.pagas_periodo AS pagas_min, r.banco_periodo AS banco_min,
                 r.saldo_banco_total AS saldo_min,
-                ${foraDaCurvaSql('r.saldo_banco_total', 'lim.pos', 'lim.neg')} AS fora_da_curva,
-                lim.unidade_id, lim.unidade_nome, lim.pos AS alerta_pos, lim.neg AS alerta_neg,
+                ${foraDaCurvaSql('r.saldo_banco_total', 'r.pos', 'r.neg')} AS fora_da_curva,
+                r.unidade_id, r.unidade_nome, r.pos AS alerta_pos, r.neg AS alerta_neg,
+                r.fonte, r.atualizado_em,
                 count(*) OVER ()::int AS total
-           FROM ${fechamentosDoPainel}
+           FROM r
            JOIN colaboradores col ON col.id = r.colaborador_id
           WHERE ${filtroSql}
-          ORDER BY ${ordensDashboard[q.ordem]}, lim.unidade_nome
-          LIMIT $7 OFFSET $8`,
+          ORDER BY ${ordensDashboard[q.ordem]}, r.unidade_nome
+          LIMIT $8 OFFSET $9`,
         [...parametrosDoPainel(unidades), q.busca || null, q.por_pagina, (q.pagina - 1) * q.por_pagina],
     )
     if (rows[0]) return { linhas: rows.map(({ total: _total, ...linha }) => linha), total: rows[0].total }
 
     // página além do fim: o total vem de uma contagem à parte
     const contagem = await db.query<{ total: number }>(
-        `SELECT count(*)::int AS total
-           FROM ${fechamentosDoPainel}
+        `${fontePainel}
+         SELECT count(*)::int AS total
+           FROM r
            JOIN colaboradores col ON col.id = r.colaborador_id
           WHERE ${filtroSql}`,
         [...parametrosDoPainel(unidades), q.busca || null],
@@ -217,16 +202,35 @@ export async function linhasDashboardGeral(unidades: UnidadePainel[], q: Dashboa
     return { linhas: [], total: contagem.rows[0].total }
 }
 
-export async function resumoDashboardGeral(unidades: UnidadePainel[]) {
+export async function resumoPainel(unidades: UnidadePainel[]) {
     const { rows } = await db.query<ResumoDashboard>(
-        `SELECT count(*)::int AS total,
-                count(*) FILTER (WHERE r.saldo_banco_total >= lim.pos)::int AS fora_positivo,
-                count(*) FILTER (WHERE r.saldo_banco_total <= -lim.neg)::int AS fora_negativo,
+        `${fontePainel}
+         SELECT count(*)::int AS total,
+                count(*) FILTER (WHERE r.saldo_banco_total >= r.pos)::int AS fora_positivo,
+                count(*) FILTER (WHERE r.saldo_banco_total <= -r.neg)::int AS fora_negativo,
                 coalesce(sum(r.pagas_periodo), 0)::int AS pagas_total_min
-           FROM ${fechamentosDoPainel}`,
+           FROM r`,
         parametrosDoPainel(unidades),
     )
     return rows[0]
+}
+
+/** Situação do tempo real nas unidades (para o selo "Tempo real · atualizado entre ..."). */
+export async function resumoTempoReal(unidades: UnidadePainel[]) {
+    const ids = unidades.filter(u => u.tempo_real).map(u => u.id)
+    const { rows } = await db.query<{
+        colaboradores_ao_vivo: number
+        atualizado_de: Date | null
+        atualizado_ate: Date | null
+        dados_ate: string | null
+    }>(
+        `SELECT count(*)::int AS colaboradores_ao_vivo, min(extraido_em) AS atualizado_de,
+                max(extraido_em) AS atualizado_ate, max(dados_ate)::text AS dados_ate
+           FROM registros_tempo_real
+          WHERE unidade_id = ANY($1::int[]) AND extraido_em IS NOT NULL`,
+        [ids],
+    )
+    return { ativo: ids.length > 0, ...rows[0] }
 }
 
 // Semana de fechamento mensal: ciclo 'fechamento_mes' nos próximos 7 dias (ou recém-passado) ainda não publicado na unidade.

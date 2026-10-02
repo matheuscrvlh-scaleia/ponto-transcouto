@@ -38,9 +38,17 @@ describe('configurações', () => {
         expect(rows[0].dados.depois).toEqual({ teto_horas_pagas_minutos: 720, alerta_saldo_positivo_minutos: 480 })
     })
 
-    it('rh não altera a régua', async () => {
-        const res = await requisitar('rh', 'PATCH', '/configuracoes', { dia_semana_extracao: 4 })
-        expect(res.statusCode).toBe(403)
+    it('rh escolhe modo, dia e hora da atualização, mas não o resto da régua', async () => {
+        const proibido = await requisitar('rh', 'PATCH', '/configuracoes', { dia_fechamento_mes: 20 })
+        expect(proibido.statusCode).toBe(403)
+
+        const res = await requisitar('rh', 'PATCH', '/configuracoes', {
+            modo_extracao: 'semanal',
+            dia_semana_extracao: 4,
+            hora_extracao: '07:30',
+        })
+        expect(res.statusCode, res.body).toBe(200)
+        expect(res.json()).toMatchObject({ modo_extracao: 'semanal', dia_semana_extracao: 4, hora_extracao: '07:30' })
     })
 
     it('rh ignora empresa_id de outra empresa', async () => {

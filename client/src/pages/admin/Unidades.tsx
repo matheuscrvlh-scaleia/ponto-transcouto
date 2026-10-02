@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
 import { Campo } from '../../components/Campo'
-import { Aviso, Carregando, ErroCarregamento, EstadoVazio } from '../../components/Estados'
+import { Carregando, ErroCarregamento, EstadoVazio } from '../../components/Estados'
 import { Modal } from '../../components/Modal'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { PilulaAtivo } from '../../components/PilulaStatus'
@@ -10,14 +10,18 @@ import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
 import { formatarCnpj, formatarDataHora, normalizarBusca } from '../../lib/formato'
 import { useRecurso } from '../../lib/useRecurso'
 import type { UnidadeAdmin } from '../../types/api'
+import { TituloPagina } from '../../components/TituloPagina'
 
-type Filtro = 'todas' | 'sem_nome' | 'inativas'
+type Filtro = 'todas' | 'razao_social' | 'inativas'
 
 const FILTROS: { valor: Filtro; rotulo: string }[] = [
   { valor: 'todas', rotulo: 'Todas' },
-  { valor: 'sem_nome', rotulo: 'Sem nome' },
+  { valor: 'razao_social', rotulo: 'Usando razão social' },
   { valor: 'inativas', rotulo: 'Inativas' },
 ]
+
+/** Unidade sem nome próprio: o servidor usa a razão social como nome. */
+const usaRazaoSocial = (unidade: UnidadeAdmin) => !unidade.nome_exibicao || unidade.nome_exibicao === unidade.razao_social
 
 export function Unidades() {
   const { empresaId, empresas, query, recarregarEmpresas } = useEmpresaSelecionada()
@@ -39,12 +43,12 @@ export function Unidades() {
   const empresa = empresas.find((item) => item.id === empresaId)
   const termo = normalizarBusca(busca)
   const lista = (dados ?? []).filter((unidade) => {
-    if (filtro === 'sem_nome' && unidade.nome_exibicao) return false
+    if (filtro === 'razao_social' && !usaRazaoSocial(unidade)) return false
     if (filtro === 'inativas' && unidade.ativo) return false
     const texto = normalizarBusca(`${unidade.nome_exibicao ?? ''} ${unidade.razao_social} ${unidade.cnpj}`)
     return texto.includes(termo)
   })
-  const semNome = (dados ?? []).filter((unidade) => !unidade.nome_exibicao).length
+  const comRazaoSocial = (dados ?? []).filter(usaRazaoSocial).length
 
   async function sincronizar() {
     setSincronizando(true)
@@ -78,9 +82,9 @@ export function Unidades() {
     <section className="pagina">
       <header className="pagina-header-linha">
         <div className="pagina-header">
-          <h1>Unidades</h1>
+          <TituloPagina>Unidades</TituloPagina>
           <p className="pagina-sub">
-            De-para entre a razão social da FriPonto e o nome que aparece para os gestores.
+            Nome que aparece nos painéis para cada unidade da FriPonto. Sem um nome definido, vale a razão social.
             {empresa?.sincronizado_em && ` Última sincronização: ${formatarDataHora(empresa.sincronizado_em)}.`}
           </p>
         </div>
@@ -106,11 +110,11 @@ export function Unidades() {
 
       {dados && dados.length > 0 && (
         <>
-          {semNome > 0 && (
-            <Aviso>
-              {semNome} unidade{semNome === 1 ? '' : 's'} sem nome de exibição — não aparece{semNome === 1 ? '' : 'm'} para
-              os gestores até receber um nome.
-            </Aviso>
+          {comRazaoSocial > 0 && (
+            <p className="pagina-sub">
+              {comRazaoSocial} unidade{comRazaoSocial === 1 ? '' : 's'} usando a razão social como nome. Se preferir,
+              edite para um nome mais curto (ex.: GDR).
+            </p>
           )}
 
           <div className="filtros">
@@ -167,10 +171,10 @@ export function Unidades() {
                       {lista.map((unidade) => (
                         <tr
                           key={unidade.id}
-                          className={!unidade.nome_exibicao ? 'linha-destaque' : !unidade.ativo ? 'linha-inativa' : undefined}
+                          className={!unidade.ativo ? 'linha-inativa' : undefined}
                         >
                           <th scope="row">
-                            {unidade.nome_exibicao ?? <span className="badge badge-alerta">Sem nome</span>}
+                            {unidade.nome_exibicao ?? unidade.razao_social}
                           </th>
                           <td>
                             {unidade.razao_social}
@@ -200,11 +204,11 @@ export function Unidades() {
                 {lista.map((unidade) => (
                   <li
                     key={unidade.id}
-                    className={`cartao-admin${!unidade.nome_exibicao ? ' destaque' : ''}${!unidade.ativo ? ' inativo' : ''}`}
+                    className={`cartao-admin${!unidade.ativo ? ' inativo' : ''}`}
                   >
                     <div className="cartao-admin-topo">
                       <span className="cartao-admin-titulo">
-                        {unidade.nome_exibicao ?? <span className="badge badge-alerta">Sem nome</span>}
+                        {unidade.nome_exibicao ?? unidade.razao_social}
                       </span>
                       <PilulaAtivo ativo={unidade.ativo} rotulos={['Ativa', 'Inativa']} />
                     </div>
@@ -231,7 +235,7 @@ export function Unidades() {
           onFechar={() => setEditando(null)}
           onSalvo={(atualizada) => {
             setEditando(null)
-            setMensagem({ tipo: 'ok', texto: `Nome salvo: ${atualizada.nome_exibicao ?? 'sem nome'}.` })
+            setMensagem({ tipo: 'ok', texto: `Nome salvo: ${atualizada.nome_exibicao ?? atualizada.razao_social}.` })
             recarregar()
           }}
         />
@@ -270,7 +274,7 @@ function AcoesUnidade({ unidade, onEditar, onDesativar, onAtivar }: AcoesProps) 
   return (
     <>
       <button type="button" className="btn-link" onClick={() => onEditar(unidade)} aria-label={`Editar nome de ${nome}`}>
-        {unidade.nome_exibicao ? 'Editar nome' : 'Dar nome'}
+        Editar nome
       </button>
       {unidade.ativo ? (
         <button type="button" className="btn-link btn-link-danger" onClick={() => onDesativar(unidade)} aria-label={`Desativar ${nome}`}>
@@ -324,7 +328,7 @@ function ModalNomeUnidade({ unidade, onFechar, onSalvo }: ModalNomeProps) {
         <Campo
           rotulo="Nome que os gestores verão"
           erro={erro}
-          ajuda="Ex.: GDR, VRD. Deixe em branco para remover o nome (a unidade some dos painéis)."
+          ajuda="Ex.: GDR, VRD. Deixe em branco para usar a razão social. Para tirar a unidade dos painéis, desative-a."
         >
           {(props) => (
             <input

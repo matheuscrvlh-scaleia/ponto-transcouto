@@ -1,0 +1,28 @@
+services:
+  api:
+    build: ./server
+    image: ponto-transcouto-server
+    env_file: ./server/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # API e worker no mesmo processo: manter uma única réplica deste serviço
+      WORKER_EMBUTIDO: "true"
+    ports:
+      - "3001:3000"
+    init: true
+    # espera a operação em andamento do worker terminar antes de matar o container
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./client
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+    ports:
+      - "8081:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

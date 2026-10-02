@@ -1,4 +1,5 @@
 import { db, type Executor } from '../db/database'
+import { descartarCiclosNaoIniciados } from '../models/configuracoes.models'
 import {
     cancelarFechamentosSemUnidade,
     completarFechamentosFuturos,
@@ -19,8 +20,13 @@ export async function executarRegua(log: Log, ex: Executor = db, agora = new Dat
     for (const empresa of await empresasParaRegua(ex)) {
         try {
             const limite = agora.getTime() + HORIZONTE_MS
+            // tempo real: sem fotografia semanal, só o fechamento do mês (registro oficial que carrega o saldo)
+            const tempoReal = empresa.modo_extracao === 'tempo_real'
+            if (tempoReal) await descartarCiclosNaoIniciados(empresa.empresa_id, ex, 'semanal')
+
             const ciclos = proximosCiclos(empresa, new Date(agora.getTime() - TOLERANCIA_ATRASO_MS), 6)
                 .filter(c => c.gatilho_em.getTime() <= limite)
+                .filter(c => !tempoReal || c.tipo === 'fechamento_mes')
 
             for (const ciclo of ciclos) {
                 const cicloId = await criarCiclo(empresa.empresa_id, ciclo, ex)

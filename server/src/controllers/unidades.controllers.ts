@@ -49,16 +49,27 @@ export async function dashboard(req: FastifyRequest, res: FastifyReply) {
         calendarioDa(unidade.empresa_id, config),
     ])
 
-    const [linhas, resumo] = fechamento
-        ? await Promise.all([
-              unidadesModel.linhasDashboard(fechamento.id, limites, q),
-              unidadesModel.resumoDashboard(fechamento.id, limites),
-          ])
-        : [{ linhas: [], total: 0 }, null]
+    // a unidade passa pelo mesmo caminho do painel consolidado (fotografia + tempo real)
+    const painel: UnidadePainel = {
+        id: unidade.id,
+        nome: unidade.nome,
+        empresa_id: unidade.empresa_id,
+        alerta_pos: limites.alerta_pos,
+        alerta_neg: limites.alerta_neg,
+        tempo_real: config?.modo_extracao === 'tempo_real',
+        fechamento,
+    }
+
+    const [linhas, resumo, tempoReal] = await Promise.all([
+        unidadesModel.temDadosNoPainel(painel) ? unidadesModel.linhasPainel([painel], q) : { linhas: [], total: 0 },
+        unidadesModel.temDadosNoPainel(painel) ? unidadesModel.resumoPainel([painel]) : null,
+        unidadesModel.resumoTempoReal([painel]),
+    ])
 
     res.send({
         unidade: { id: unidade.id, nome: unidade.nome },
         fechamento,
+        tempo_real: tempoReal,
         aviso_fechamento_mes: avisoPorCiclo || calendario.avisoPelaRegua,
         proximo_fechamento_previsto: calendario.proximoGatilho,
         limites,
@@ -112,20 +123,25 @@ export async function dashboardGeral(req: FastifyRequest, res: FastifyReply) {
 
     const { limites, variam } = limitesPredominantes(comDados.length ? comDados : unidades)
 
-    const [linhas, resumo] = comDados.length
-        ? await Promise.all([unidadesModel.linhasDashboardGeral(unidades, q), unidadesModel.resumoDashboardGeral(unidades)])
-        : [{ linhas: [], total: 0 }, null]
+    const algumDado = unidades.some(unidadesModel.temDadosNoPainel)
+    const [linhas, resumo, tempoReal] = await Promise.all([
+        algumDado ? unidadesModel.linhasPainel(unidades, q) : { linhas: [], total: 0 },
+        algumDado ? unidadesModel.resumoPainel(unidades) : null,
+        unidadesModel.resumoTempoReal(unidades),
+    ])
 
     res.send({
         unidade: null,
-        unidades: unidades.map(({ id, nome, fechamento, alerta_pos, alerta_neg }) => ({
+        unidades: unidades.map(({ id, nome, fechamento, alerta_pos, alerta_neg, tempo_real }) => ({
             id,
             nome,
             fechamento,
             alerta_pos,
             alerta_neg,
+            tempo_real,
         })),
         fechamento: maisRecente,
+        tempo_real: tempoReal,
         aviso_fechamento_mes: avisosPorCiclo.some(Boolean) || calendarios.some(c => c.avisoPelaRegua),
         proximo_fechamento_previsto: proximoGatilho,
         limites,

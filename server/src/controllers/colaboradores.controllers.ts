@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import * as colaboradoresModel from '../models/colaboradores.models'
 import * as configuracoesModel from '../models/configuracoes.models'
 import { foraDaCurva, LIMITES_PADRAO } from '../services/dashboard.service'
-import { historicoQuerySchema } from '../types/colaboradores.types'
+import { historicoDiarioQuerySchema, historicoQuerySchema } from '../types/colaboradores.types'
 import { idParamSchema } from '../types/comum.types'
 import { naoEncontrado } from '../utils/errors'
 
@@ -16,15 +16,24 @@ async function buscarColaborador(req: FastifyRequest) {
 export async function detalhe(req: FastifyRequest, res: FastifyReply) {
     const { empresa_id, ...colaborador } = await buscarColaborador(req)
 
-    const [atual, limitesEmpresa] = await Promise.all([
+    const [fotografia, aoVivo, limitesEmpresa, config] = await Promise.all([
         colaboradoresModel.registroAtual(req.usuario, colaborador.id),
+        colaboradoresModel.registroTempoReal(req.usuario, colaborador.id),
         configuracoesModel.limitesDaEmpresa(empresa_id),
+        configuracoesModel.buscar(empresa_id),
     ])
     const limites = limitesEmpresa ?? LIMITES_PADRAO
+
+    // o mais recente entre o valor ao vivo e o último fechamento publicado (ao vivo ganha no empate)
+    const usarAoVivo = aoVivo && (!fotografia || aoVivo.data_referencia >= fotografia.data_referencia)
+    const atual = usarAoVivo
+        ? { ...aoVivo, fonte: 'tempo_real' as const }
+        : fotografia && { ...fotografia, fonte: 'fechamento' as const, atualizado_em: null }
 
     const curva = atual ? foraDaCurva(atual.saldo_min, limites) : null
     res.send({
         ...colaborador,
+        modo_extracao: config?.modo_extracao ?? 'semanal',
         resumo: atual ? { ...atual, fora_da_curva: curva } : null,
         fora_da_curva: curva,
         limites,
@@ -35,4 +44,10 @@ export async function historico(req: FastifyRequest, res: FastifyReply) {
     const { limite } = historicoQuerySchema.parse(req.query)
     const colaborador = await buscarColaborador(req)
     res.send(await colaboradoresModel.historico(req.usuario, colaborador.id, limite))
+}
+
+export async function historicoDiario(req: FastifyRequest, res: FastifyReply) {
+    const { dias } = historicoDiarioQuerySchema.parse(req.query)
+    const colaborador = await buscarColaborador(req)
+    res.send(await colaboradoresModel.historicoDiario(req.usuario, colaborador.id, dias))
 }

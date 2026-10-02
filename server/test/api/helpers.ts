@@ -1,10 +1,9 @@
-import { readdir, readFile } from 'node:fs/promises'
-import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { expect } from 'vitest'
 import { buildApp } from '../../src/app'
 import { db } from '../../src/db/database'
 import { hashPassword } from '../../src/utils/hash'
+import { aplicarMigrationsPendentes } from '../migracoes'
 
 export const SENHA_DEMO = 'demo12345'
 export const CPF_GESTOR_DEMO = '812.399.002-28'
@@ -22,19 +21,8 @@ export async function login(app: FastifyInstance, loginInformado: string, senha 
     return res.json().token as string
 }
 
-/**
- * Aplica, dentro da transação dos testes (desfeita no final), as migrations que
- * ainda não rodaram no banco: os testes valem para o código atual mesmo antes do deploy.
- */
-async function aplicarMigrationsPendentes() {
-    const pasta = path.join(__dirname, '../../src/db/migrations')
-    const aplicadas = new Set((await db.query('SELECT nome FROM schema_migrations')).rows.map(r => r.nome))
-    const pendentes = (await readdir(pasta)).filter(a => a.endsWith('.sql') && !aplicadas.has(a)).sort()
-    for (const arquivo of pendentes) await db.query(await readFile(path.join(pasta, arquivo), 'utf8'))
-}
-
 export async function prepararContexto(): Promise<Contexto> {
-    await aplicarMigrationsPendentes()
+    await aplicarMigrationsPendentes(db)
     const app = await buildApp()
 
     const empresa = await db.query(`SELECT id FROM empresas WHERE nome = 'Demo'`)
