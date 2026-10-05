@@ -2,8 +2,6 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties
 import { createPortal } from 'react-dom'
 import { IconeBusca, IconePontos } from '../../components/Icones'
 import { formatarDataHora, formatarTelefone, formatarUltimoAcesso, iniciais } from '../../lib/formato'
-import { NOME_PERFIL } from '../../lib/preferencias'
-import type { Perfil } from '../../types/api'
 import './pessoas.css'
 
 /* Peças das listas de contas (Configuração › Usuários e Administração › Usuários gestão). */
@@ -93,10 +91,6 @@ export function Pessoa({ nome, sub, voce = false }: { nome: string; sub?: string
       </span>
     </div>
   )
-}
-
-export function EtiquetaPerfil({ perfil }: { perfil: Perfil }) {
-  return <span className={`perfil-tag perfil-tag-${perfil}`}>{NOME_PERFIL[perfil]}</span>
 }
 
 export function Situacao({

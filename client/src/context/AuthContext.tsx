@@ -15,7 +15,6 @@ interface AuthState {
   entrar: (login: string, senha: string) => Promise<UsuarioSessao>
   sair: () => void
   trocarSenha: (senhaAtual: string, novaSenha: string) => Promise<void>
-  recarregar: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -96,9 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       entrar,
       sair,
       trocarSenha,
-      recarregar,
     }),
-    [usuario, unidades, telas, podeVer, carregando, entrar, sair, trocarSenha, recarregar],
+    [usuario, unidades, telas, podeVer, carregando, entrar, sair, trocarSenha],
   )
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>

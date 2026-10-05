@@ -19,7 +19,7 @@ export function Inicio() {
 
   if (unidades.length === 1) return <Navigate to={`/unidades/${unidades[0].id}`} replace />
 
-  // com várias unidades, entra direto no painel com todas juntas; a unidade se escolhe na sidebar
+  // com várias unidades, entra direto no painel com todas juntas; a unidade se escolhe no seletor do topo
   if (unidades.length > 1) return <Navigate to="/unidades" replace />
 
   return (

@@ -314,7 +314,7 @@
   flex-shrink: 0;
 }
 
-/* Seção recolhível (Gestão, Administração) */
+/* Seção recolhível do menu */
 .app-nav-grupo {
   display: flex;
   flex-direction: column;

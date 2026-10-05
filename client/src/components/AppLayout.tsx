@@ -37,7 +37,7 @@ const classeLink = ({ isActive }: { isActive: boolean }) => (isActive ? 'app-nav
 
 // ícone de cada item de Configuração / Administração, pelo caminho
 const ICONES_ITENS: Record<string, typeof IconeAjustes> = {
-  // grupos da Configuração
+  // ids de grupos do menu (as demais chaves são itens)
   integracoes: IconeSincronizar,
   configuracoes: IconeAjustes,
   usuarios: IconeUsuarios,
@@ -53,7 +53,6 @@ const ICONES_ITENS: Record<string, typeof IconeAjustes> = {
   equipe: IconeUsuarios,
 }
 
-/* A empresa escolhida na barra lateral (equipe) vale para o app inteiro: Gestão, Configuração e Administração. */
 export function AppLayout() {
   return (
     <EmpresaAdminProvider>

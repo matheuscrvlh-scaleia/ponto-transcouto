@@ -140,7 +140,7 @@ async function montarPlano(
         ...reabrirPosteriores.map(f => f.unidade_id),
     ]
     const chamadas = unidadesTrabalho.reduce((soma, u) => soma + (colaboradores.get(u) ?? 0), 0)
-    const cota = config.cota_calcular_por_hora || LIMITE_SECULLUM_POR_HORA
+    const cota = config.cota_calcular_por_hora
 
     return {
         comColaboradores,

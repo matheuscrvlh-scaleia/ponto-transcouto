@@ -5,8 +5,6 @@ export interface ItemMenu {
   rotulo: string
   /** Tela que o grupo de permissão precisa liberar (Configuração). */
   tela?: Tela
-  /** Perfis que veem este item (sem tela); sem isso, valem os perfis padrão da seção. */
-  perfis?: Perfil[]
 }
 
 /** Tela do menu que junta várias abas (cada aba continua sendo uma rota com seus perfis). */
@@ -75,10 +73,9 @@ export const SECAO_ADMINISTRACAO: SecaoAdmin = {
 export function itemPermitido(secao: SecaoAdmin, item: ItemMenu, perfil: Perfil | null, telas: Tela[]) {
   if (!perfil) return false
   if (item.tela && !telas.includes(item.tela)) return false
-  return (item.perfis ?? secao.perfis).includes(perfil)
+  return secao.perfis.includes(perfil)
 }
 
-/** Itens da seção que o usuário vê. */
 export function itensPermitidos(secao: SecaoAdmin, perfil: Perfil | null, telas: Tela[]): ItemMenu[] {
   return secao.itens.filter((item) => itemPermitido(secao, item, perfil, telas))
 }

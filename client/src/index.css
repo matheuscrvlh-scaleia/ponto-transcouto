@@ -18,6 +18,9 @@
   --aviso: #92400e;
   --aviso-bg: #fffbeb;
   --aviso-border: #fcd34d;
+  --sucesso: #15803d;
+  --sucesso-bg: rgba(22, 163, 74, 0.1);
+  --sucesso-border: rgba(22, 163, 74, 0.3);
   --shadow:
     rgba(0, 0, 0, 0.06) 0 1px 2px, rgba(0, 0, 0, 0.08) 0 8px 24px -8px;
 
@@ -65,6 +68,9 @@
   --aviso: #fcd34d;
   --aviso-bg: rgba(252, 211, 77, 0.08);
   --aviso-border: rgba(252, 211, 77, 0.35);
+  --sucesso: #86efac;
+  --sucesso-bg: rgba(134, 239, 172, 0.1);
+  --sucesso-border: rgba(134, 239, 172, 0.3);
   --shadow:
     rgba(0, 0, 0, 0.5) 0 1px 2px, rgba(0, 0, 0, 0.4) 0 8px 24px -8px;
   --app-bg: #0c0d10;
@@ -196,7 +202,9 @@ button {
   color: var(--text);
 }
 
-/* ---------- App shell, seletor de unidade e tema: components/app-layout.css ---------- */
+/* App shell, seletor de unidade e tema: ver components/app-layout.css */
+
+/* ---------- Botão secundário ---------- */
 
 .btn-secondary {
   font: inherit;
@@ -510,15 +518,6 @@ tbody tr:last-child td {
 a.btn-link {
   text-decoration: none;
   display: inline-block;
-}
-
-.form-info {
-  font-size: 13px;
-  color: #1e3a8a;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  padding: 8px 12px;
 }
 
 .campo-senha {
@@ -972,10 +971,6 @@ tr.linha-negativo {
 .detalhe-exportar .btn-secondary:disabled {
   opacity: 0.6;
   cursor: default;
-}
-
-.detalhe-exportar .form-erro {
-  flex-basis: 100%;
 }
 
 .impressao-cabecalho {

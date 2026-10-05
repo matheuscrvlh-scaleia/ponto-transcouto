@@ -36,7 +36,6 @@ function RequireItem({ caminho, children }: { caminho: string; children: ReactNo
   return children
 }
 
-/** Rota de um item da Configuração. */
 function itemConfiguracao(caminho: string, elemento: ReactNode) {
   return <Route key={caminho} path={`${caminho}/*`} element={<RequireItem caminho={caminho}>{elemento}</RequireItem>} />
 }

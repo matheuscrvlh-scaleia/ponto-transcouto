@@ -279,11 +279,6 @@
   background: var(--positivo-bg);
 }
 
-.perfil-tag-admin {
-  color: var(--text-h);
-  background: var(--muted);
-}
-
 .etiquetas {
   display: flex;
   flex-wrap: wrap;

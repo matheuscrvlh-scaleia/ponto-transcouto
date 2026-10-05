@@ -49,7 +49,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
-        {/* alertas de erro no canto inferior esquerdo, em qualquer tela */}
+        {/* notificações no canto inferior direito, em qualquer tela */}
         <CentralAlertas />
         {/* último recurso: um erro fora das páginas (ex.: na sidebar) não deixa a tela em branco */}
         <LimiteErro telaCheia>

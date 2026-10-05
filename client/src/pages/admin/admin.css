@@ -8,16 +8,6 @@
   --login-field-bg: var(--surface);
   --login-accent: var(--accent);
   --login-accent-hover: var(--accent-hover);
-  --sucesso: #15803d;
-  --sucesso-bg: rgba(22, 163, 74, 0.1);
-  --sucesso-border: rgba(22, 163, 74, 0.3);
-}
-
-:root[data-theme='dark'] .admin-content,
-:root[data-theme='dark'] .modal-content {
-  --sucesso: #86efac;
-  --sucesso-bg: rgba(134, 239, 172, 0.1);
-  --sucesso-border: rgba(134, 239, 172, 0.3);
 }
 
 .admin-content .btn-primary,
@@ -362,11 +352,6 @@
   border-radius: 12px;
   font-size: 13px;
   color: var(--text);
-}
-
-.cartao-admin.destaque {
-  border-color: var(--aviso-border);
-  background: var(--aviso-bg);
 }
 
 .cartao-admin.inativo {

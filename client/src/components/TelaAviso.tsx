@@ -70,11 +70,9 @@ function BotaoVoltar() {
 export function TelaNaoEncontrada({
   titulo = 'Página não encontrada',
   texto = 'O endereço que você tentou abrir não existe ou foi movido.',
-  telaCheia = false,
 }: {
   titulo?: string
   texto?: ReactNode
-  telaCheia?: boolean
 }) {
   return (
     <TelaAviso
@@ -82,7 +80,6 @@ export function TelaNaoEncontrada({
       ilustracao={<IlustracaoBusca />}
       titulo={titulo}
       texto={texto}
-      telaCheia={telaCheia}
       acoes={
         <>
           <BotaoVoltar />

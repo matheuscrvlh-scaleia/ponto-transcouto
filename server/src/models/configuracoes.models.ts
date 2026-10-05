@@ -75,8 +75,10 @@ export async function limitesDaEmpresa(empresaId: number) {
     return rows[0] ?? null
 }
 
-// Ciclos futuros ainda não iniciados são recriados pela régua do worker com a configuração nova.
-/** Ciclos futuros que ainda não começaram (só pendentes/cancelados sem tentativa); `tipo` restringe a um tipo. */
+/**
+ * Descarta ciclos futuros que ainda não começaram (só pendentes/cancelados sem tentativa); `tipo` restringe a um
+ * tipo. A régua do worker os recria com a configuração nova.
+ */
 export async function descartarCiclosNaoIniciados(
     empresaId: number,
     executor: Executor,

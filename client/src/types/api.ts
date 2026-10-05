@@ -497,7 +497,6 @@ export interface PedidoCadastrosResposta {
   ja_pendente?: boolean
 }
 
-/** POST /integracao/tempo-real/atualizar (202): colaboradores do escopo postos no início da fila do tempo real. */
 /** GET /integracao/atividade: o que está sendo puxado da FriPonto agora e falhas recentes. */
 export interface AtividadeIntegracao {
   sincronizando: boolean
@@ -515,6 +514,7 @@ export interface ForcarSincronizacaoResposta {
   tempo_real: PedidoTempoRealResposta | null
 }
 
+/** POST /integracao/tempo-real/atualizar (202): colaboradores do escopo postos no início da fila do tempo real. */
 export interface PedidoTempoRealResposta {
   colaboradores: number
   /** Quanto leva para atualizar todos (cota da FriPonto); null sem estimativa. */

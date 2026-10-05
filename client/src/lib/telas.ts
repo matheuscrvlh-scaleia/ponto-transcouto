@@ -25,10 +25,4 @@ export const TELAS: InfoTela[] = [
   { id: 'fechamentos', rotulo: 'Fechamentos', secao: 'Configuração', caminho: '/configuracao/fechamentos', descricao: 'Acompanhar as extrações semanais e do fechamento do mês' },
 ]
 
-export const TODAS_AS_TELAS: Tela[] = TELAS.map((tela) => tela.id)
-
 export const SECOES_TELAS = ['Gestão', 'Configuração'] as const
-
-export function infoTela(id: Tela) {
-  return TELAS.find((tela) => tela.id === id)!
-}

@@ -292,25 +292,6 @@
   outline-offset: 1px;
 }
 
-.lg-page .form-info,
-.lg-page .form-erro {
-  font-size: 13px;
-  border-radius: 14px;
-  padding: 10px 16px;
-}
-
-.lg-page .form-info {
-  color: var(--positivo);
-  background: var(--positivo-bg);
-  border: 1px solid color-mix(in srgb, var(--positivo) 30%, transparent);
-}
-
-.lg-page .form-erro {
-  color: var(--danger);
-  background: var(--danger-bg);
-  border: 1px solid var(--danger-border);
-}
-
 .lg-botao {
   margin-top: 6px;
   height: clamp(48px, 5vh, 54px);

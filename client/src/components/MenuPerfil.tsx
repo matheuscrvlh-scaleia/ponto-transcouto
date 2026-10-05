@@ -24,7 +24,6 @@ export function MenuPerfil({ className = '' }: { className?: string }) {
     }
     document.addEventListener('pointerdown', fecharFora)
     document.addEventListener('keydown', teclar)
-    // foco no primeiro item ao abrir
     raizRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
     return () => {
       document.removeEventListener('pointerdown', fecharFora)
