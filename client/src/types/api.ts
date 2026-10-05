@@ -476,8 +476,11 @@ export interface StatusIntegracao {
     sincronizacao_pendente: boolean
   }
   worker: { online: boolean; visto_em: DataHoraISO | null; status: string | null }
-  cota: { usadas_ultima_hora: number; limite_por_hora: number }
+  /** `libera_em`: com a cota cheia, quando abre a próxima vaga. */
+  cota: { usadas_ultima_hora: number; limite_por_hora: number; libera_em: DataHoraISO | null }
   fila: { pendentes: number; processando: number; falhas: number }
+  /** Lote em extração (ciclos com fechamento na fila); null sem nada na fila. */
+  progresso: ProgressoExtracao | null
   tempo_real: {
     ativo: boolean
     colaboradores: number
@@ -488,6 +491,27 @@ export interface StatusIntegracao {
   }
   /** Unidades que este usuário pode puxar (gestor: só as dele). */
   unidades: { id: number; nome: string }[]
+}
+
+/** Em colaboradores (uma chamada de cálculo por colaborador). */
+export interface ProgressoExtracao {
+  total: number
+  feitos: number
+  restantes: number
+  /** Estimativa pela cota da FriPonto; null com o serviço de extração offline. */
+  previsao_fim: DataHoraISO | null
+  fechamentos: {
+    id: number
+    status: StatusFechamento
+    tentativas: number
+    proxima_tentativa_em: DataHoraISO | null
+    tipo: TipoCiclo
+    periodo_inicio: DataISO
+    data_referencia: DataISO
+    unidade: string
+    total: number
+    feitos: number
+  }[]
 }
 
 /** POST /integracao/cadastros (202) */

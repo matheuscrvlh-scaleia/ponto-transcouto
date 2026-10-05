@@ -52,6 +52,19 @@ export type FechamentoPlano = {
     data_referencia: string
 }
 
+export type FechamentoProgresso = {
+    id: number
+    status: string
+    tentativas: number
+    proxima_tentativa_em: Date | null
+    tipo: 'semanal' | 'fechamento_mes'
+    periodo_inicio: string
+    data_referencia: string
+    unidade: string
+    total: number
+    feitos: number
+}
+
 export type SemanaPlano = {
     data_referencia: string
     periodo_inicio: string

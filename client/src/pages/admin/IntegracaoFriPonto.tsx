@@ -128,7 +128,8 @@ export function IntegracaoFriPonto() {
 
       {dados && (
         <>
-          <AvisosStatus status={dados} ehAdmin={ehAdmin} />
+          <AvisosStatus status={dados} ehAdmin={ehAdmin} linkFechamentos={linkFechamentos} />
+          <ProgressoExtracaoLote status={dados} linkFechamentos={linkFechamentos} />
           <CartoesStatus
             status={dados}
             podeConfigurar={podePuxarCadastros}
@@ -324,11 +325,151 @@ export function IntegracaoFriPonto() {
   )
 }
 
+/* ---------- Progresso da extração ---------- */
+
+type FechamentoLote = NonNullable<StatusIntegracao['progresso']>['fechamentos'][number]
+
+function nomeCiclo(f: Pick<FechamentoLote, 'tipo' | 'periodo_inicio' | 'data_referencia'>) {
+  const periodo = `${formatarData(f.periodo_inicio, { ano: false })} a ${formatarData(f.data_referencia, { ano: false })}`
+  return f.tipo === 'fechamento_mes' ? `Fechamento do mês (${periodo})` : `Semana até ${formatarData(f.data_referencia, { ano: false })}`
+}
+
+/** Situação de uma unidade no lote, em palavras. */
+function situacaoUnidade(f: FechamentoLote, cotaEsgotada: boolean, agora: number): { texto: string; classe: string } {
+  if (f.status === 'sucesso') return { texto: 'Publicado', classe: 'pilula-sucesso' }
+  if (f.status === 'falhou') return { texto: 'Falhou', classe: 'pilula-falhou' }
+  if (f.status === 'processando') return { texto: 'Extraindo', classe: 'pilula-processando' }
+  if (f.total > 0 && f.feitos >= f.total) return { texto: 'Publicando', classe: 'pilula-processando' }
+  if (f.proxima_tentativa_em && new Date(f.proxima_tentativa_em).getTime() > agora) {
+    return { texto: `Nova tentativa às ${formatarHoraOuData(f.proxima_tentativa_em)}`, classe: 'pilula-pendente' }
+  }
+  if (f.feitos > 0 && cotaEsgotada) return { texto: 'Aguardando cota', classe: 'pilula-pendente' }
+  return { texto: 'Na fila', classe: 'pilula-inativo' }
+}
+
+function ProgressoExtracaoLote({ status, linkFechamentos }: { status: StatusIntegracao; linkFechamentos: string | null }) {
+  const { progresso, cota, worker } = status
+  // relógio da tela: o "em ~X" e as novas tentativas andam mesmo entre uma atualização e outra
+  const [agora, setAgora] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setAgora(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  if (!progresso) return null
+
+  const { total, feitos, restantes, previsao_fim: previsao, fechamentos } = progresso
+  const pct = total ? Math.floor((feitos / total) * 100) : 0
+  const cotaEsgotada = cota.usadas_ultima_hora >= cota.limite_por_hora
+  const publicados = fechamentos.filter((f) => f.status === 'sucesso').length
+  const ciclos = [...new Map(fechamentos.map((f) => [`${f.tipo}-${f.data_referencia}`, nomeCiclo(f)])).values()]
+  const variosCiclos = ciclos.length > 1
+  const minutosAteFim = previsao ? (new Date(previsao).getTime() - agora) / 60_000 : null
+
+  return (
+    <section className="integ-bloco integ-progresso" aria-labelledby="titulo-progresso">
+      <div className="integ-bloco-cabecalho">
+        <div>
+          <h2 id="titulo-progresso">Extração em andamento</h2>
+          <p className="integ-bloco-sub">
+            {ciclos.join(' · ')} · {fechamentos.length} {fechamentos.length === 1 ? 'unidade' : 'unidades'}
+          </p>
+        </div>
+        <span className={cotaEsgotada && restantes > 0 ? 'pilula pilula-pendente' : 'pilula pilula-processando'}>
+          {cotaEsgotada && restantes > 0 ? 'Aguardando cota' : 'Extraindo'}
+        </span>
+      </div>
+
+      <div className="integ-progresso-numeros">
+        <div className="integ-progresso-numero">
+          <span className="integ-progresso-valor">{pct}%</span>
+          <span className="integ-sub">concluído</span>
+        </div>
+        <div className="integ-progresso-numero">
+          <span className="integ-progresso-valor">
+            {feitos}
+            <small>/{total}</small>
+          </span>
+          <span className="integ-sub">colaboradores extraídos</span>
+        </div>
+        <div className="integ-progresso-numero">
+          <span className="integ-progresso-valor">{restantes}</span>
+          <span className="integ-sub">{restantes === 1 ? 'falta' : 'faltam'}</span>
+        </div>
+        <div className="integ-progresso-numero">
+          <span className="integ-progresso-valor">{previsao && restantes > 0 ? formatarHoraOuData(previsao) : '—'}</span>
+          <span className="integ-sub">
+            {!worker.online
+              ? 'serviço offline: sem previsão'
+              : restantes === 0
+                ? 'publicando'
+                : `previsão de término${minutosAteFim != null && minutosAteFim > 0 ? ` (em ~${formatarIntervalo(minutosAteFim)})` : ''}`}
+          </span>
+        </div>
+      </div>
+
+      <div
+        className="integ-progresso-barra"
+        role="progressbar"
+        aria-label="Colaboradores extraídos"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={feitos}
+      >
+        <span style={{ width: `${pct}%` }} />
+      </div>
+
+      <p className="integ-sub">
+        {publicados} de {fechamentos.length} {fechamentos.length === 1 ? 'unidade publicada' : 'unidades publicadas'}. A FriPonto
+        permite {cota.limite_por_hora} cálculos por hora (um por colaborador)
+        {cotaEsgotada && cota.libera_em
+          ? `; a cota está cheia e volta a liberar às ${formatarHoraOuData(cota.libera_em)}, sem precisar fazer nada.`
+          : '.'}
+        {linkFechamentos && (
+          <>
+            {' '}
+            Cada unidade aparece em <Link to={linkFechamentos}>Fechamentos</Link> assim que termina.
+          </>
+        )}
+      </p>
+
+      <ul className="integ-progresso-unidades" aria-label="Progresso por unidade">
+        {fechamentos.map((f) => {
+          const situacao = situacaoUnidade(f, cotaEsgotada, agora)
+          const pctUnidade = f.total ? Math.floor((f.feitos / f.total) * 100) : 0
+          return (
+            <li key={f.id}>
+              <span className="integ-progresso-nome">
+                {f.unidade}
+                {variosCiclos && <span className="integ-sub">{nomeCiclo(f)}</span>}
+              </span>
+              <span className={`pilula ${situacao.classe}`}>{situacao.texto}</span>
+              <span className="integ-progresso-mini" aria-hidden="true">
+                <span style={{ width: `${pctUnidade}%` }} />
+              </span>
+              <span className="integ-progresso-conta">
+                {f.feitos}/{f.total}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
 /* ---------- Status ---------- */
 
-function AvisosStatus({ status, ehAdmin }: { status: StatusIntegracao; ehAdmin: boolean }) {
-  const { empresa, worker } = status
-  if (empresa.credenciais_configuradas && worker.online) return null
+function AvisosStatus({
+  status,
+  ehAdmin,
+  linkFechamentos,
+}: {
+  status: StatusIntegracao
+  ehAdmin: boolean
+  linkFechamentos: string | null
+}) {
+  const { empresa, worker, fila } = status
+  if (empresa.credenciais_configuradas && worker.online && fila.falhas === 0) return null
 
   return (
     <div className="integ-avisos">
@@ -351,6 +492,18 @@ function AvisosStatus({ status, ehAdmin }: { status: StatusIntegracao; ehAdmin: 
           aceitos e ficam na fila até ele voltar.
         </Aviso>
       )}
+      {fila.falhas > 0 && (
+        <Aviso>
+          {fila.falhas === 1 ? '1 fechamento falhou' : `${fila.falhas} fechamentos falharam`} nos últimos 60 dias.{' '}
+          {linkFechamentos ? (
+            <>
+              Veja o motivo e reprocesse em <Link to={linkFechamentos}>Fechamentos</Link>.
+            </>
+          ) : (
+            'Fale com o RH ou com a equipe Scale IA.'
+          )}
+        </Aviso>
+      )}
     </div>
   )
 }
@@ -363,7 +516,7 @@ interface CartoesStatusProps {
 }
 
 function CartoesStatus({ status, podeConfigurar, podeAtualizarTempoReal, onAtualizarTempoReal }: CartoesStatusProps) {
-  const { empresa, worker, cota, fila } = status
+  const { empresa, worker, cota } = status
   const limite = Math.max(cota.limite_por_hora, 1)
   const pctCota = Math.min(100, Math.round((cota.usadas_ultima_hora / limite) * 100))
   const cotaEsgotada = cota.usadas_ultima_hora >= cota.limite_por_hora
@@ -418,8 +571,8 @@ function CartoesStatus({ status, podeConfigurar, podeAtualizarTempoReal, onAtual
 
       <li className="integ-cartao">
         <div className="integ-cartao-topo">
-          <span className="integ-rotulo">Cota na última hora</span>
-          {cotaEsgotada && <span className="pilula pilula-falhou">Esgotada</span>}
+          <span className="integ-rotulo">Cota da FriPonto</span>
+          {cotaEsgotada && <span className="pilula pilula-pendente">Cheia</span>}
         </div>
         <span className="integ-valor">
           {cota.usadas_ultima_hora}/{cota.limite_por_hora}
@@ -436,26 +589,10 @@ function CartoesStatus({ status, podeConfigurar, podeAtualizarTempoReal, onAtual
             <span style={{ width: `${pctCota}%` }} />
           </div>
         </div>
-        <span className="integ-sub">Chamadas de cálculo ao FriPonto.</span>
-      </li>
-
-      <li className="integ-cartao">
-        <div className="integ-cartao-topo">
-          <span className="integ-rotulo">Fila</span>
-          {fila.processando > 0 && <span className="pilula pilula-processando">Em andamento</span>}
-        </div>
-        <div className="integ-fila">
-          <span>
-            <strong>{fila.pendentes}</strong> pendente{fila.pendentes === 1 ? '' : 's'}
-          </span>
-          <span>
-            <strong>{fila.processando}</strong> processando
-          </span>
-          <span className={fila.falhas > 0 ? 'texto-negativo' : undefined}>
-            <strong>{fila.falhas}</strong> com falha
-          </span>
-        </div>
-        <span className="integ-sub">Fechamentos esperando ou em extração.</span>
+        <span className="integ-sub">
+          Cálculos na FriPonto na última hora
+          {cotaEsgotada && cota.libera_em ? `; volta a liberar às ${formatarHoraOuData(cota.libera_em)}.` : '.'}
+        </span>
       </li>
 
       <CartaoTempoReal

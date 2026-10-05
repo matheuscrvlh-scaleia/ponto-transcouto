@@ -66,7 +66,7 @@
 
 .integ-status {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
   margin: 0;
   padding: 0;
@@ -82,12 +82,14 @@
 
 .integ-cartao-topo {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
 .integ-rotulo {
+  white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
@@ -116,24 +118,6 @@
 
 .integ-sub strong {
   color: var(--text-h);
-}
-
-.integ-fila {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.integ-fila strong {
-  font-size: 18px;
-  color: var(--text-h);
-  font-variant-numeric: tabular-nums;
-}
-
-.integ-fila .texto-negativo strong {
-  color: var(--negativo);
 }
 
 .integ-avisos {
@@ -488,6 +472,103 @@
   padding: 8px 14px 6px;
 }
 
+/* ----- Progresso da extração ----- */
+
+.integ-progresso {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--app-borda));
+}
+
+.integ-progresso-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 20px;
+}
+
+.integ-progresso-numero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.integ-progresso-valor {
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.integ-progresso-valor small {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.integ-progresso-barra,
+.integ-progresso-mini {
+  display: block;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.integ-progresso-barra {
+  height: 12px;
+}
+
+.integ-progresso-mini {
+  height: 6px;
+}
+
+.integ-progresso-barra span,
+.integ-progresso-mini span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.integ-progresso-unidades {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--app-borda);
+}
+
+.integ-progresso-unidades li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(80px, 160px) 56px;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--app-borda);
+}
+
+.integ-progresso-unidades li:last-child {
+  border-bottom: none;
+}
+
+.integ-progresso-nome {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.integ-progresso-conta {
+  font-size: 13px;
+  text-align: right;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ----- Responsivo ----- */
 
 @media (max-width: 900px) {
@@ -530,6 +611,19 @@
 
   .integ-historico li {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .integ-progresso-valor {
+    font-size: 22px;
+  }
+
+  /* nome em cima; situação, barra e contagem embaixo */
+  .integ-progresso-unidades li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .integ-progresso-nome {
+    grid-column: 1 / -1;
   }
 }
 

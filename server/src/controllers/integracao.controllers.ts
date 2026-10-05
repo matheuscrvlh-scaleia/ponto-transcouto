@@ -10,6 +10,7 @@ import * as integracaoModel from '../models/integracao.models'
 import * as tempoRealModel from '../models/tempo-real.models'
 import { periodoDeHoje, proximosCiclos, type CicloPrevisto } from '../services/calendario.service'
 import { empresaDoUsuario, exigirEmpresa } from '../services/escopo.service'
+import { cotaLiberaEm, previsaoTermino } from '../services/previsao.service'
 import {
     empresaIntegracaoQuerySchema,
     listaIntegracaoQuerySchema,
@@ -171,7 +172,7 @@ export async function status(req: FastifyRequest, res: FastifyReply) {
     const { empresaId, unidades } = await escopo(req, empresa_id)
 
     const unidadeIds = unidades.map(u => u.id)
-    const [empresa, worker, fila, rotas, cota, config, aoVivo] = await Promise.all([
+    const [empresa, worker, fila, rotas, cota, config, aoVivo, lote, chamadasCalculo] = await Promise.all([
         integracaoModel.empresa(empresaId),
         integracaoModel.worker(),
         integracaoModel.fila(empresaId, unidadeIds),
@@ -179,8 +180,11 @@ export async function status(req: FastifyRequest, res: FastifyReply) {
         fechamentosModel.limiteCota(empresaId),
         configuracoesModel.buscar(empresaId),
         tempoRealModel.resumoEmpresa(empresaId, unidadeIds),
+        integracaoModel.progressoFila(empresaId, unidadeIds),
+        integracaoModel.chamadasCalculoUltimaHora(empresaId),
     ])
     if (!empresa) throw naoEncontrado('Empresa não encontrada.')
+    const limitePorHora = cota ?? LIMITE_SECULLUM_POR_HORA
 
     let elegiveis = 0
     if (config) {
@@ -204,11 +208,40 @@ export async function status(req: FastifyRequest, res: FastifyReply) {
             usadas_ultima_hora: rotas
                 .filter(r => r.rota.toLowerCase().startsWith('calcular'))
                 .reduce((soma, r) => soma + r.usadas, 0),
-            limite_por_hora: cota ?? LIMITE_SECULLUM_POR_HORA,
+            limite_por_hora: limitePorHora,
+            libera_em: cotaLiberaEm(chamadasCalculo, limitePorHora),
         },
         fila,
+        progresso: montarProgresso(lote, chamadasCalculo, limitePorHora, worker?.online ?? false),
         unidades,
     })
+}
+
+/** Lote em extração: quanto já foi, quanto falta e quando deve terminar (null = nada na fila). */
+function montarProgresso(
+    lote: Awaited<ReturnType<typeof integracaoModel.progressoFila>>,
+    chamadasCalculo: Date[],
+    limitePorHora: number,
+    workerOnline: boolean,
+) {
+    if (lote.length === 0) return null
+    const fechamentos = lote.map(f => ({
+        ...f,
+        // publicado: todos resolvidos, mesmo que o cadastro tenha mudado depois
+        feitos: f.status === 'sucesso' ? f.total : Math.min(f.feitos, f.total),
+    }))
+    const naFila = fechamentos.filter(f => f.status === 'pendente' || f.status === 'processando')
+    const total = fechamentos.reduce((soma, f) => soma + f.total, 0)
+    const feitos = fechamentos.reduce((soma, f) => soma + f.feitos, 0)
+    const restantes = naFila.reduce((soma, f) => soma + f.total - f.feitos, 0)
+    return {
+        total,
+        feitos,
+        restantes,
+        // uma chamada de cálculo por colaborador que falta; sem o worker, não há como prever
+        previsao_fim: workerOnline ? previsaoTermino({ restantes, limitePorHora, chamadasRecentes: chamadasCalculo }) : null,
+        fechamentos,
+    }
 }
 
 /** Tempo real: põe os colaboradores do escopo no começo da fila (a cota continua valendo). */

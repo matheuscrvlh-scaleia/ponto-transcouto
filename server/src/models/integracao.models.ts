@@ -1,11 +1,13 @@
 import { db, type Executor } from '../db/database'
 import { unidadesPermitidasSql } from '../db/escopo'
 import type { Ator } from '../types/auth.types'
+import { SQL_ELEGIVEL, SQL_FEITO } from './extracao.models'
 import { comCredenciais } from './sincronizacao.models'
 import type {
     CicloExistente,
     ExecucaoIntegracao,
     FechamentoPlano,
+    FechamentoProgresso,
     RegistroHistorico,
     UnidadeEscopo,
 } from '../types/integracao.types'
@@ -77,6 +79,44 @@ export async function fila(empresaId: number, unidadeIds: number[]) {
         [empresaId, unidadeIds],
     )
     return rows[0]
+}
+
+/**
+ * Fechamentos dos ciclos que ainda têm extração na fila (o lote em andamento), com quantos colaboradores
+ * entram e quantos já estão resolvidos. Os já publicados do mesmo ciclo vêm junto, para o total não encolher.
+ */
+export async function progressoFila(empresaId: number, unidadeIds: number[]) {
+    const { rows } = await db.query<FechamentoProgresso>(
+        `SELECT f.id, f.status, f.tentativas, f.proxima_tentativa_em,
+                c.tipo, c.periodo_inicio::text AS periodo_inicio, c.data_referencia::text AS data_referencia,
+                coalesce(u.nome_exibicao, u.razao_social) AS unidade,
+                count(col.id)::int AS total,
+                count(col.id) FILTER (WHERE ${SQL_FEITO})::int AS feitos
+           FROM fechamentos f
+           JOIN ciclos c ON c.id = f.ciclo_id
+           JOIN unidades u ON u.id = f.unidade_id
+           LEFT JOIN colaboradores col ON col.unidade_id = f.unidade_id AND ${SQL_ELEGIVEL}
+          WHERE f.empresa_id = $1 AND f.unidade_id = ANY($2::int[]) AND f.status <> 'cancelado'
+            AND f.ciclo_id IN (SELECT f2.ciclo_id FROM fechamentos f2
+                                 JOIN ciclos c2 ON c2.id = f2.ciclo_id
+                                WHERE f2.empresa_id = $1 AND f2.unidade_id = ANY($2::int[])
+                                  AND f2.status IN ('pendente', 'processando') AND c2.gatilho_em <= now())
+          GROUP BY f.id, c.id, u.id
+          ORDER BY c.gatilho_em, f.id`,
+        [empresaId, unidadeIds],
+    )
+    return rows
+}
+
+/** Horário das chamadas de cálculo da última hora (mais antiga primeiro): cada uma libera a cota 1 h depois. */
+export async function chamadasCalculoUltimaHora(empresaId: number) {
+    const { rows } = await db.query<{ feita_em: Date }>(
+        `SELECT feita_em FROM chamadas_api
+          WHERE empresa_id = $1 AND rota ILIKE 'calcular%' AND feita_em > now() - interval '1 hour'
+          ORDER BY feita_em`,
+        [empresaId],
+    )
+    return rows.map(r => r.feita_em)
 }
 
 /** Ciclos da empresa com data de referência no período (qualquer agendamento). */

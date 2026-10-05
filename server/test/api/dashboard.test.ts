@@ -84,6 +84,19 @@ describe('dashboard da unidade', () => {
     })
 
     it('avisa semana de fechamento quando o fechamento mensal falhou e mostra o último publicado', async () => {
+        // o aviso vale até 7 dias do gatilho, e o seed data os ciclos pelo dia em que rodou:
+        // o cenário é montado aqui, com um fechamento do mês que falhou ontem (desfeito com a transação)
+        const { rows } = await db.query(
+            `INSERT INTO ciclos (empresa_id, tipo, periodo_inicio, data_referencia, gatilho_previsto_em, gatilho_em)
+             VALUES ($1, 'fechamento_mes', '1999-12-26', '2000-01-25', now() - interval '1 day', now() - interval '1 day')
+             RETURNING id`,
+            [ctx.empresaId],
+        )
+        await db.query(
+            `INSERT INTO fechamentos (ciclo_id, empresa_id, unidade_id, status, tentativas) VALUES ($1, $2, $3, 'falhou', 5)`,
+            [rows[0].id, ctx.empresaId, ctx.unidades.TRS],
+        )
+
         const res = await ctx.app.inject({
             method: 'GET',
             url: `/api/v1/unidades/${ctx.unidades.TRS}/dashboard`,

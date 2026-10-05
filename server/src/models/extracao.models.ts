@@ -179,24 +179,32 @@ export async function criarExecucao(fechamentoId: number, total: number, process
     return result.rows[0].id
 }
 
-export async function colaboradoresElegiveis(fechamentoId: number, ex: Executor = db) {
-    const result = await ex.query<ColaboradorElegivel>(
-        // a FriPonto não calcula demitidos ("Funcionário não encontrado" pelo CPF): o demitido no período
-        // que recebeu essa resposta conta como resolvido, senão a unidade nunca publicaria
-        `SELECT col.id, col.cpf,
-                EXISTS (SELECT 1 FROM registros_horas r
+/* Regras do fechamento sobre um colaborador `col` da unidade do fechamento `f` (ciclo `c`).
+   Usadas pelo worker e pelo progresso da tela de integração, para os dois contarem igual. */
+
+/** Entra no fechamento: ativo (ou demitido dentro do período) e admitido até a data de referência. */
+export const SQL_ELEGIVEL = `(col.ativo OR col.data_demissao >= c.periodo_inicio)
+            AND (col.data_admissao IS NULL OR col.data_admissao <= c.data_referencia)`
+
+/**
+ * Já resolvido no fechamento: tem registro. A FriPonto não calcula demitidos ("Funcionário não
+ * encontrado" pelo CPF): o demitido que recebeu essa resposta também conta, senão a unidade nunca publicaria.
+ */
+export const SQL_FEITO = `(EXISTS (SELECT 1 FROM registros_horas r
                          WHERE r.fechamento_id = f.id AND r.colaborador_id = col.id)
                 OR (NOT col.ativo AND EXISTS (
                         SELECT 1 FROM execucao_erros er
                           JOIN execucoes_extracao ex ON ex.id = er.execucao_id
                          WHERE ex.fechamento_id = f.id AND er.colaborador_id = col.id
-                           AND er.http_status = 400 AND er.mensagem ILIKE '%não encontrado%')) AS feito
+                           AND er.http_status = 400 AND er.mensagem ILIKE '%não encontrado%')))`
+
+export async function colaboradoresElegiveis(fechamentoId: number, ex: Executor = db) {
+    const result = await ex.query<ColaboradorElegivel>(
+        `SELECT col.id, col.cpf, ${SQL_FEITO} AS feito
            FROM fechamentos f
            JOIN ciclos c ON c.id = f.ciclo_id
            JOIN colaboradores col ON col.unidade_id = f.unidade_id
-          WHERE f.id = $1
-            AND (col.ativo OR col.data_demissao >= c.periodo_inicio)
-            AND (col.data_admissao IS NULL OR col.data_admissao <= c.data_referencia)
+          WHERE f.id = $1 AND ${SQL_ELEGIVEL}
           ORDER BY col.id`,
         [fechamentoId],
     )
