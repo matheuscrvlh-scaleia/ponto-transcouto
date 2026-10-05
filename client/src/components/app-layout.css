@@ -55,16 +55,15 @@
   text-decoration: none;
 }
 
+/* logo da Transcouto, no tamanho do antigo ícone */
 .brand-selo {
   flex-shrink: 0;
-  display: grid;
-  place-items: center;
+  display: block;
   width: 34px;
   height: 34px;
   border-radius: 11px;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--destaque-de), var(--destaque-ate));
-  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+  object-fit: cover;
+  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--destaque-ate) 70%, transparent);
 }
 
 .brand-nome {

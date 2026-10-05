@@ -31,6 +31,7 @@ import { SeletorEmpresa } from './SeletorEmpresa'
 import { SeletorUnidade } from './SeletorUnidade'
 import { ThemeToggle } from './ThemeToggle'
 import { DestinoTitulo } from './TituloPagina'
+import logoTranscouto from '../assets/favicon/favicon.png'
 import './app-layout.css'
 
 const classeLink = ({ isActive }: { isActive: boolean }) => (isActive ? 'app-nav-item active' : 'app-nav-item')
@@ -105,10 +106,8 @@ function CascaApp() {
       <aside className={menuAberto ? 'app-sidebar open' : 'app-sidebar'} aria-label="Menu principal">
         <div className="app-sidebar-top">
           <Link to="/" className="brand" onClick={fecharMenu}>
-            {/* mesmo símbolo da tela de login */}
-            <span className="brand-selo" aria-hidden="true">
-              <IconeRelogio tamanho={18} />
-            </span>
+            {/* logo da Transcouto (o mesmo do favicon) */}
+            <img className="brand-selo" src={logoTranscouto} alt="" width={34} height={34} />
             <span className="brand-nome">Copiloto de Ponto</span>
           </Link>
           <button type="button" className="app-sidebar-close" onClick={fecharMenu} aria-label="Fechar menu">
