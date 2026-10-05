@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
+import { alertarErro, alertarSucesso } from '../lib/alertas'
 import { Modal } from './Modal'
 
 async function copiar(texto: string, alvo: HTMLElement | null) {
@@ -22,7 +23,6 @@ async function copiar(texto: string, alvo: HTMLElement | null) {
 
 export function ModalSenhaTemporaria({ nome, senha, onFechar }: { nome: string; senha: string; onFechar: () => void }) {
   const codigo = useRef<HTMLElement>(null)
-  const [estado, setEstado] = useState<'' | 'copiada' | 'falhou'>('')
 
   return (
     <Modal titulo="Senha temporária" onFechar={onFechar}>
@@ -39,20 +39,14 @@ export function ModalSenhaTemporaria({ nome, senha, onFechar }: { nome: string; 
             type="button"
             className="btn-secondary"
             data-autofoco
-            onClick={async () => setEstado((await copiar(senha, codigo.current)) ? 'copiada' : 'falhou')}
+            onClick={async () => {
+              if (await copiar(senha, codigo.current)) alertarSucesso('Senha copiada para a área de transferência.')
+              else alertarErro('Não foi possível copiar automaticamente. Selecione a senha e copie manualmente.')
+            }}
           >
             Copiar
           </button>
         </div>
-        <p className="sr-only" aria-live="polite">
-          {estado === 'copiada' ? 'Senha copiada.' : ''}
-        </p>
-        {estado === 'copiada' && <p className="form-ok" aria-hidden="true">Senha copiada para a área de transferência.</p>}
-        {estado === 'falhou' && (
-          <p className="form-erro" role="alert">
-            Não foi possível copiar automaticamente. Selecione a senha e copie manualmente.
-          </p>
-        )}
         <div className="form-acoes">
           <button type="button" className="btn-primary" onClick={onFechar}>
             Já anotei, fechar

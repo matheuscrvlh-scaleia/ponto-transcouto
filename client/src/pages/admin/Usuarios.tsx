@@ -7,7 +7,7 @@ import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { ModalSenhaTemporaria } from '../../components/ModalSenhaTemporaria'
 import { IconeBloqueio, IconeChave, IconeCheck, IconeLapis, IconeLixeira, IconeMais } from '../../components/Icones'
 import { api } from '../../lib/api'
-import { mensagemDeErro } from '../../lib/erros'
+import { alertarFalha, alertarSucesso } from '../../lib/alertas'
 import { useRecurso } from '../../lib/useRecurso'
 import type { ClienteAdmin, GrupoPermissao, Paginado, UnidadeAdmin } from '../../types/api'
 import {
@@ -51,7 +51,6 @@ export function Usuarios() {
   const [unidadeId, setUnidadeId] = useState('')
   const [pagina, setPagina] = useState(1)
   const [modal, setModal] = useState<Modal>(null)
-  const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
 
   useEffect(() => {
     document.title = 'Usuários — Copiloto de Ponto'
@@ -101,7 +100,7 @@ export function Usuarios() {
 
   async function alterarAtivo(usuario: ClienteAdmin, valor: boolean) {
     await api(`/clientes/${usuario.id}`, { method: 'PATCH', json: { ativo: valor } })
-    setMensagem({ tipo: 'ok', texto: `${usuario.nome} ${valor ? 'reativado' : 'desativado'}.` })
+    alertarSucesso(`${usuario.nome} ${valor ? 'reativado' : 'desativado'}.`)
     lista.recarregar()
   }
 
@@ -109,7 +108,7 @@ export function Usuarios() {
     try {
       await alterarAtivo(usuario, true)
     } catch (e) {
-      setMensagem({ tipo: 'erro', texto: mensagemDeErro(e) })
+      alertarFalha(e)
     }
   }
 
@@ -156,12 +155,6 @@ export function Usuarios() {
           Novo usuário
         </button>
       </header>
-
-      {mensagem && (
-        <p className={mensagem.tipo === 'ok' ? 'form-ok' : 'form-erro'} role={mensagem.tipo === 'ok' ? 'status' : 'alert'}>
-          {mensagem.texto}
-        </p>
-      )}
 
       <CartaoPessoas>
         <BarraPessoas
@@ -308,10 +301,10 @@ export function Usuarios() {
             lista.recarregar()
             if (resultado.senha) {
               setModal({ tipo: 'senha', nome: resultado.nome, senha: resultado.senha })
-              setMensagem({ tipo: 'ok', texto: `Usuário ${resultado.nome} criado.` })
+              alertarSucesso(`Usuário ${resultado.nome} criado.`)
             } else {
               setModal(null)
-              setMensagem({ tipo: 'ok', texto: `Alterações de ${resultado.nome} salvas.` })
+              alertarSucesso(`Alterações de ${resultado.nome} salvas.`)
             }
           }}
         />
@@ -362,7 +355,7 @@ export function Usuarios() {
           onFechar={() => setModal(null)}
           onConfirmar={async () => {
             await api(`/clientes/${modal.usuario.id}`, { method: 'DELETE' })
-            setMensagem({ tipo: 'ok', texto: `${modal.usuario.nome} foi excluído.` })
+            alertarSucesso(`${modal.usuario.nome} foi excluído.`)
             setModal(null)
             lista.recarregar()
           }}

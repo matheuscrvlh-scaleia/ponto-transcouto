@@ -2,10 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { Campo } from '../../components/Campo'
 import { Modal } from '../../components/Modal'
 import { ApiError, api } from '../../lib/api'
-import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
+import { errosDeCampos } from '../../lib/erros'
 import { cpfValido, EMAIL_VALIDO, formatarTelefone, mascararCpfEntrada, mascararTelefoneEntrada } from '../../lib/formato'
 import type { ClienteAdmin, ContaCriada, GrupoPermissao, UnidadeAdmin } from '../../types/api'
 import { PreviaCadastro, SecaoCadastro } from './FormCadastro'
+import { alertarFalha } from '../../lib/alertas'
 
 interface Props {
   usuario: ClienteAdmin | null
@@ -36,7 +37,6 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
   const [grupoId, setGrupoId] = useState<number | null>(() => usuario?.grupo.id ?? grupoInicial(grupos))
   const [unidadeIds, setUnidadeIds] = useState<number[]>(() => usuario?.unidades.map((unidade) => unidade.id) ?? [])
   const [erros, setErros] = useState<Record<string, string>>({})
-  const [erroGeral, setErroGeral] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   const grupo = grupos.find((item) => item.id === grupoId) ?? (usuario && usuario.grupo.id === grupoId ? usuario.grupo : null)
@@ -64,7 +64,6 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
     event.preventDefault()
     const locais = validar()
     setErros(locais)
-    setErroGeral('')
     if (Object.keys(locais).length) return
 
     const emailLimpo = email.trim() || null
@@ -111,7 +110,7 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
       const campos = errosDeCampos(e)
       if (e instanceof ApiError && !e.campos && /cpf/i.test(e.message)) campos.cpf = e.message
       setErros(campos)
-      setErroGeral(Object.keys(campos).length && e instanceof ApiError && e.status === 400 ? '' : mensagemDeErro(e))
+      if (!(Object.keys(campos).length && e instanceof ApiError && e.status === 400)) alertarFalha(e)
       setEnviando(false)
     }
   }
@@ -240,11 +239,6 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
 
         {!editando && (
           <p className="modal-texto">Uma senha temporária será gerada e exibida uma única vez ao salvar.</p>
-        )}
-        {erroGeral && (
-          <p className="form-erro" role="alert">
-            {erroGeral}
-          </p>
         )}
         <div className="form-acoes">
           <button type="button" className="btn-secondary" onClick={onFechar}>

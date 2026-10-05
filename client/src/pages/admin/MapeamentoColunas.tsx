@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
 import { Aviso, Carregando, ErroCarregamento } from '../../components/Estados'
+import { alertarFalha, alertarSucesso } from '../../lib/alertas'
 import { ApiError, api } from '../../lib/api'
-import { mensagemDeErro } from '../../lib/erros'
 import { useRecurso } from '../../lib/useRecurso'
 import type { CampoMapeado, MapeamentoColuna, MapeamentoResposta } from '../../types/api'
 import { TituloPagina } from '../../components/TituloPagina'
@@ -61,7 +61,6 @@ function EditorMapeamento({ inicial, query }: { inicial: MapeamentoResposta; que
   const [linhas, setLinhas] = useState<Linha[]>(() => inicial.mapeamento.map(criarLinha))
   const [tentouSalvar, setTentouSalvar] = useState(false)
   const [errosServer, setErrosServer] = useState<string[]>([])
-  const [mensagem, setMensagem] = useState('')
   const [enviando, setEnviando] = useState(false)
   const ultimaAdicionada = useRef<number | null>(null)
 
@@ -80,21 +79,18 @@ function EditorMapeamento({ inicial, query }: { inicial: MapeamentoResposta; que
 
   function atualizar(chave: number, dados: Partial<MapeamentoColuna>) {
     setLinhas((atual) => atual.map((linha) => (linha.chave === chave ? { ...linha, ...dados } : linha)))
-    setMensagem('')
   }
 
   function adicionar(colunas: string[], focar = true) {
     const novas = colunas.map((coluna) => criarLinha({ coluna_secullum: coluna, campo: 'ignorar' }))
     if (focar && novas.length === 1) ultimaAdicionada.current = novas[0].chave
     setLinhas((atual) => [...atual, ...novas])
-    setMensagem('')
   }
 
   async function salvar(event: FormEvent) {
     event.preventDefault()
     setTentouSalvar(true)
     setErrosServer([])
-    setMensagem('')
     if (Object.keys(erros.porLinha).length || erros.gerais.length) return
 
     setEnviando(true)
@@ -107,10 +103,12 @@ function EditorMapeamento({ inicial, query }: { inicial: MapeamentoResposta; que
       setOriginal(mapeamento)
       setLinhas(mapeamento.map(criarLinha))
       setTentouSalvar(false)
-      setMensagem('Mapeamento salvo. Vale para as próximas extrações.')
+      alertarSucesso('Mapeamento salvo. Vale para as próximas extrações.')
     } catch (e) {
       const campos = e instanceof ApiError ? Object.values(e.campos ?? {}).flat() : []
-      setErrosServer(campos.length ? (campos as string[]) : [mensagemDeErro(e)])
+      // erros por coluna ficam no formulário; o resto vira notificação
+      if (campos.length) setErrosServer(campos as string[])
+      else alertarFalha(e)
     } finally {
       setEnviando(false)
     }
@@ -241,11 +239,6 @@ function EditorMapeamento({ inicial, query }: { inicial: MapeamentoResposta; que
                 <li key={texto}>{texto}</li>
               ))}
             </ul>
-          )}
-          {mensagem && (
-            <p className="form-ok" role="status">
-              {mensagem}
-            </p>
           )}
           <div className="form-acoes" style={{ justifyContent: 'space-between' }}>
             <button type="button" className="btn-secondary" onClick={() => adicionar([''])}>

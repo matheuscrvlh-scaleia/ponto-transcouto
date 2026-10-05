@@ -8,6 +8,8 @@ export class ApiError extends Error {
   status: number
   campos?: ErroApi['campos']
   detalhes?: unknown
+  /** A api() já mostrou este erro na central de alertas (sem conexão, erro do servidor). */
+  alertado = false
 
   constructor(status: number, corpo: Partial<ErroApi> | null) {
     super(corpo?.error ?? mensagemPadrao(status))
@@ -66,6 +68,7 @@ type Opcoes = Omit<RequestInit, 'body'> & {
 function alertarSeFor(erro: ApiError, metodo: string) {
   if (erro.status === 0 || (erro.status >= 500 && metodo !== 'GET')) {
     alertarErro({ titulo: tituloDoErroApi(erro.status), mensagem: erro.message })
+    erro.alertado = true
   }
 }
 

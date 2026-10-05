@@ -6,6 +6,7 @@ import { Modal } from '../../components/Modal'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { PilulaAtivo } from '../../components/PilulaStatus'
 import { ApiError, api } from '../../lib/api'
+import { alertarFalha, alertarSucesso } from '../../lib/alertas'
 import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
 import { formatarCnpj, formatarDataHora, normalizarBusca } from '../../lib/formato'
 import { useRecurso } from '../../lib/useRecurso'
@@ -29,7 +30,6 @@ export function Unidades() {
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [editando, setEditando] = useState<UnidadeAdmin | null>(null)
   const [desativando, setDesativando] = useState<UnidadeAdmin | null>(null)
-  const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
   const [sincronizando, setSincronizando] = useState(false)
   const { dados, erro, carregando, recarregar } = useRecurso(
     (signal) => api<UnidadeAdmin[]>('/admin/unidades', { signal, query }),
@@ -52,13 +52,12 @@ export function Unidades() {
 
   async function sincronizar() {
     setSincronizando(true)
-    setMensagem(null)
     try {
       await api('/admin/sincronizacoes', { method: 'POST', json: query })
-      setMensagem({ tipo: 'ok', texto: 'Sincronização solicitada. A lista é atualizada em alguns minutos, quando o robô rodar.' })
+      alertarSucesso('Sincronização solicitada. A lista é atualizada em alguns minutos, quando o robô rodar.')
       recarregarEmpresas()
     } catch (e) {
-      setMensagem({ tipo: 'erro', texto: mensagemDeErro(e) })
+      alertarFalha(e)
     } finally {
       setSincronizando(false)
     }
@@ -66,7 +65,7 @@ export function Unidades() {
 
   async function alterarAtivo(unidade: UnidadeAdmin, ativo: boolean) {
     await api(`/admin/unidades/${unidade.id}`, { method: 'PATCH', json: { ativo } })
-    setMensagem({ tipo: 'ok', texto: `${unidade.nome_exibicao ?? unidade.razao_social} ${ativo ? 'ativada' : 'desativada'}.` })
+    alertarSucesso(`${unidade.nome_exibicao ?? unidade.razao_social} ${ativo ? 'ativada' : 'desativada'}.`)
     recarregar()
   }
 
@@ -74,7 +73,7 @@ export function Unidades() {
     try {
       await alterarAtivo(unidade, true)
     } catch (e) {
-      setMensagem({ tipo: 'erro', texto: mensagemDeErro(e) })
+      alertarFalha(e)
     }
   }
 
@@ -92,12 +91,6 @@ export function Unidades() {
           {sincronizando ? 'Solicitando...' : 'Sincronizar com a FriPonto'}
         </button>
       </header>
-
-      {mensagem && (
-        <p className={mensagem.tipo === 'ok' ? 'form-ok' : 'form-erro'} role={mensagem.tipo === 'ok' ? 'status' : 'alert'}>
-          {mensagem.texto}
-        </p>
-      )}
 
       {carregando && <Carregando texto="Carregando unidades..." />}
       {erro && <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />}
@@ -235,7 +228,7 @@ export function Unidades() {
           onFechar={() => setEditando(null)}
           onSalvo={(atualizada) => {
             setEditando(null)
-            setMensagem({ tipo: 'ok', texto: `Nome salvo: ${atualizada.nome_exibicao ?? atualizada.razao_social}.` })
+            alertarSucesso(`Nome salvo: ${atualizada.nome_exibicao ?? atualizada.razao_social}.`)
             recarregar()
           }}
         />

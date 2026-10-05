@@ -6,6 +6,7 @@ import { Aviso, Carregando, ErroCarregamento } from '../../components/Estados'
 import { IconeCalendario, IconeUsuarios } from '../../components/Icones'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { PilulaStatus } from '../../components/PilulaStatus'
+import { alertarSucesso } from '../../lib/alertas'
 import { api } from '../../lib/api'
 import { formatarData, formatarDataHora, formatarDuracao, formatarHoraOuData, formatarIntervalo } from '../../lib/formato'
 import { NOME_PERFIL } from '../../lib/preferencias'
@@ -46,7 +47,6 @@ function textoTempoRealForcado({ colaboradores, minutos_estimados }: PedidoTempo
 export function IntegracaoFriPonto() {
   const { perfil, telas } = useAuth()
   const { empresaId, query, ehAdmin } = useEmpresaSelecionada()
-  const [mensagem, setMensagem] = useState('')
   const [pedindoCadastros, setPedindoCadastros] = useState(false)
   const [forcandoTempoReal, setForcandoTempoReal] = useState(false)
   const [paginaExecucoes, setPaginaExecucoes] = useState(1)
@@ -98,7 +98,7 @@ export function IntegracaoFriPonto() {
   }, [ativo, recarregarStatus, recarregarExecucoes])
 
   function aposPedido(texto: string) {
-    setMensagem(texto)
+    alertarSucesso(texto, 'Pedido enviado')
     avisarSincronizacaoPedida()
     recarregarStatus()
     setPaginaExecucoes(1)
@@ -122,12 +122,6 @@ export function IntegracaoFriPonto() {
         <TituloPagina>Integração FriPonto</TituloPagina>
         <p className="pagina-sub">Situação da conexão com o FriPonto e pedidos de nova extração de cadastros e de horas.</p>
       </header>
-
-      {mensagem && (
-        <p className="form-ok" role="status">
-          {mensagem}
-        </p>
-      )}
 
       {status.carregando && <Carregando texto="Carregando integração..." />}
       {status.erro && <ErroCarregamento erro={status.erro} onTentarDeNovo={status.recarregar} />}

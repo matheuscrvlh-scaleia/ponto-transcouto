@@ -2,9 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { Campo } from '../../components/Campo'
 import { Modal } from '../../components/Modal'
 import { api } from '../../lib/api'
-import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
+import { errosDeCampos } from '../../lib/erros'
 import { dataHoraLocalParaIso, formatarData, formatarDiaSemana, isoParaDataHoraLocal } from '../../lib/formato'
 import type { DataHoraISO, DataISO, TipoCiclo } from '../../types/api'
+import { alertarFalha } from '../../lib/alertas'
 
 export interface CicloParaAjuste {
   ciclo_id: number
@@ -19,7 +20,6 @@ export function ModalGatilho({ ciclo, onFechar, onSalvo }: { ciclo: CicloParaAju
   const [valor, setValor] = useState(() => isoParaDataHoraLocal(ciclo.gatilho_em))
   const [motivo, setMotivo] = useState('')
   const [erros, setErros] = useState<Record<string, string>>({})
-  const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   async function salvar(event: FormEvent) {
@@ -29,7 +29,6 @@ export function ModalGatilho({ ciclo, onFechar, onSalvo }: { ciclo: CicloParaAju
     if (!gatilho) locais.gatilho_em = 'Informe data e hora.'
     if (motivo.trim().length < 5) locais.motivo = 'Informe o motivo (mín. 5 caracteres).'
     setErros(locais)
-    setErro('')
     if (Object.keys(locais).length) return
 
     setEnviando(true)
@@ -41,7 +40,7 @@ export function ModalGatilho({ ciclo, onFechar, onSalvo }: { ciclo: CicloParaAju
       onSalvo()
     } catch (e) {
       setErros(errosDeCampos(e))
-      setErro(mensagemDeErro(e))
+      alertarFalha(e)
       setEnviando(false)
     }
   }
@@ -62,11 +61,6 @@ export function ModalGatilho({ ciclo, onFechar, onSalvo }: { ciclo: CicloParaAju
         <Campo rotulo="Motivo" erro={erros.motivo} ajuda="Fica registrado na auditoria.">
           {(props) => <textarea {...props} value={motivo} onChange={(event) => setMotivo(event.target.value)} maxLength={500} />}
         </Campo>
-        {erro && (
-          <p className="form-erro" role="alert">
-            {erro}
-          </p>
-        )}
         <div className="form-acoes">
           <button type="button" className="btn-secondary" onClick={onFechar}>
             Cancelar

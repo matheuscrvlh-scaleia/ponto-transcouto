@@ -3,9 +3,10 @@ import { useAuth } from '../../context/AuthContext'
 import { Campo } from '../../components/Campo'
 import { Modal } from '../../components/Modal'
 import { api } from '../../lib/api'
-import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
+import { errosDeCampos } from '../../lib/erros'
 import { SECOES_TELAS, TELAS } from '../../lib/telas'
 import type { AlcanceGrupo, GrupoPermissao, Tela } from '../../types/api'
+import { alertarFalha } from '../../lib/alertas'
 
 const ALCANCES: { valor: AlcanceGrupo; titulo: string; descricao: string }[] = [
   { valor: 'unidades', titulo: 'Só unidades vinculadas', descricao: 'Cada usuário vê apenas as unidades marcadas no cadastro dele.' },
@@ -29,7 +30,6 @@ export function ModalGrupo({ grupo, query, onFechar, onSalvo }: Props) {
   const [alcance, setAlcance] = useState<AlcanceGrupo>(grupo?.alcance ?? 'unidades')
   const [telas, setTelas] = useState<Tela[]>(grupo?.telas ?? ['dashboard'])
   const [erros, setErros] = useState<Record<string, string>>({})
-  const [erroGeral, setErroGeral] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   const ehEquipe = perfil === 'admin'
@@ -52,7 +52,6 @@ export function ModalGrupo({ grupo, query, onFechar, onSalvo }: Props) {
     if (nome.trim().length < 2) locais.nome = 'Informe o nome (mín. 2 caracteres).'
     if (telas.length === 0) locais.telas = 'Libere ao menos uma tela.'
     setErros(locais)
-    setErroGeral('')
     if (Object.keys(locais).length) return
 
     // mantém a ordem do catálogo
@@ -67,7 +66,7 @@ export function ModalGrupo({ grupo, query, onFechar, onSalvo }: Props) {
     } catch (e) {
       const campos = errosDeCampos(e)
       setErros(campos)
-      setErroGeral(Object.keys(campos).length ? '' : mensagemDeErro(e))
+      if (!Object.keys(campos).length) alertarFalha(e)
       setEnviando(false)
     }
   }
@@ -173,11 +172,6 @@ export function ModalGrupo({ grupo, query, onFechar, onSalvo }: Props) {
         {grupo && grupo.usuarios > 0 && (
           <p className="modal-texto">
             Vale na hora para {grupo.usuarios === 1 ? 'o usuário' : `os ${grupo.usuarios} usuários`} deste grupo, sem precisar entrar de novo.
-          </p>
-        )}
-        {erroGeral && (
-          <p className="form-erro" role="alert">
-            {erroGeral}
           </p>
         )}
         <div className="form-acoes">

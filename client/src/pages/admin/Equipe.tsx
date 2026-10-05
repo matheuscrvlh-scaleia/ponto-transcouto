@@ -7,7 +7,8 @@ import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { ModalSenhaTemporaria } from '../../components/ModalSenhaTemporaria'
 import { IconeBloqueio, IconeChave, IconeCheck, IconeLapis, IconeLixeira, IconeMais } from '../../components/Icones'
 import { ApiError, api } from '../../lib/api'
-import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
+import { alertarFalha, alertarSucesso } from '../../lib/alertas'
+import { errosDeCampos } from '../../lib/erros'
 import {
   cpfValido,
   dataDoInstante,
@@ -53,7 +54,6 @@ export function Equipe() {
   const [ativo, setAtivo] = useState<'' | 'true' | 'false'>('')
   const [pagina, setPagina] = useState(1)
   const [modal, setModal] = useState<ModalAberto>(null)
-  const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
 
   useEffect(() => {
     document.title = 'Usuários gestão — Copiloto de Ponto'
@@ -77,7 +77,7 @@ export function Equipe() {
 
   async function alterarAtivo(membro: MembroEquipe, valor: boolean) {
     await api(`/equipe/${membro.id}`, { method: 'PATCH', json: { ativo: valor } })
-    setMensagem({ tipo: 'ok', texto: `${membro.nome} ${valor ? 'reativado' : 'desativado'}.` })
+    alertarSucesso(`${membro.nome} ${valor ? 'reativado' : 'desativado'}.`)
     lista.recarregar()
   }
 
@@ -85,7 +85,7 @@ export function Equipe() {
     try {
       await alterarAtivo(membro, true)
     } catch (e) {
-      setMensagem({ tipo: 'erro', texto: mensagemDeErro(e) })
+      alertarFalha(e)
     }
   }
 
@@ -125,12 +125,6 @@ export function Equipe() {
           Novo membro
         </button>
       </header>
-
-      {mensagem && (
-        <p className={mensagem.tipo === 'ok' ? 'form-ok' : 'form-erro'} role={mensagem.tipo === 'ok' ? 'status' : 'alert'}>
-          {mensagem.texto}
-        </p>
-      )}
 
       <CartaoPessoas>
         <BarraPessoas
@@ -249,10 +243,10 @@ export function Equipe() {
             lista.recarregar()
             if (resultado.senha) {
               setModal({ tipo: 'senha', nome: resultado.nome, senha: resultado.senha })
-              setMensagem({ tipo: 'ok', texto: `${resultado.nome} adicionado à equipe.` })
+              alertarSucesso(`${resultado.nome} adicionado à equipe.`)
             } else {
               setModal(null)
-              setMensagem({ tipo: 'ok', texto: `Alterações de ${resultado.nome} salvas.` })
+              alertarSucesso(`Alterações de ${resultado.nome} salvas.`)
             }
           }}
         />
@@ -303,7 +297,7 @@ export function Equipe() {
           onFechar={() => setModal(null)}
           onConfirmar={async () => {
             await api(`/equipe/${modal.membro.id}`, { method: 'DELETE' })
-            setMensagem({ tipo: 'ok', texto: `${modal.membro.nome} foi excluído.` })
+            alertarSucesso(`${modal.membro.nome} foi excluído.`)
             setModal(null)
             lista.recarregar()
           }}
@@ -334,7 +328,6 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
   const [cargo, setCargo] = useState(membro?.cargo ?? '')
   const [telefone, setTelefone] = useState(membro?.telefone ? formatarTelefone(membro.telefone) : '')
   const [erros, setErros] = useState<Record<string, string>>({})
-  const [erroGeral, setErroGeral] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   function validar() {
@@ -353,7 +346,6 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
     event.preventDefault()
     const locais = validar()
     setErros(locais)
-    setErroGeral('')
     if (Object.keys(locais).length) return
 
     const emailLimpo = email.trim() || null
@@ -384,7 +376,7 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
       const campos = errosDeCampos(e)
       if (e instanceof ApiError && !e.campos && /cpf/i.test(e.message)) campos.cpf = e.message
       setErros(campos)
-      setErroGeral(Object.keys(campos).length && e instanceof ApiError && e.status === 400 ? '' : mensagemDeErro(e))
+      if (!(Object.keys(campos).length && e instanceof ApiError && e.status === 400)) alertarFalha(e)
       setEnviando(false)
     }
   }
@@ -460,11 +452,6 @@ function ModalMembro({ membro, onFechar, onSalvo }: ModalMembroProps) {
         {!editando && (
           <p className="modal-texto">
             O novo membro terá acesso a todas as empresas. Uma senha temporária será gerada e exibida uma única vez ao salvar.
-          </p>
-        )}
-        {erroGeral && (
-          <p className="form-erro" role="alert">
-            {erroGeral}
           </p>
         )}
         <div className="form-acoes">

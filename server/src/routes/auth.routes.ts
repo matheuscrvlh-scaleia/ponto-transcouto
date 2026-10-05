@@ -7,7 +7,7 @@ const limiteTentativas = { rateLimit: { max: 10, timeWindow: '1 minute' } }
 /** Login digitado, normalizado: CPF só com dígitos, e-mail em minúsculas. */
 function chaveDoLogin(body: unknown) {
     const login = String((body as { login?: unknown } | null)?.login ?? '').trim().toLowerCase()
-    const digitos = login.replace(/D/g, '')
+    const digitos = login.replace(/\D/g, '')
     return `login:${digitos.length === 11 && !login.includes('@') ? digitos : login}`
 }
 

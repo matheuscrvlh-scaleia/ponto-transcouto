@@ -8,6 +8,7 @@ import { Modal } from '../../components/Modal'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { TituloPagina } from '../../components/TituloPagina'
 import { api } from '../../lib/api'
+import { alertarFalha, alertarSucesso } from '../../lib/alertas'
 import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
 import {
   cnpjValido,
@@ -36,7 +37,6 @@ export function Empresas() {
   const navigate = useNavigate()
   const [editando, setEditando] = useState<Empresa | 'nova' | null>(null)
   const [desativando, setDesativando] = useState<Empresa | null>(null)
-  const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
   const [busca, setBusca] = useState('')
   const [situacao, setSituacao] = useState<'' | 'ativas' | 'inativas'>('')
 
@@ -60,7 +60,7 @@ export function Empresas() {
 
   async function alterarAtivo(empresa: Empresa, ativo: boolean) {
     await api(`/admin/empresas/${empresa.id}`, { method: 'PATCH', json: { ativo } })
-    setMensagem({ tipo: 'ok', texto: `${empresa.nome} ${ativo ? 'reativada' : 'desativada'}.` })
+    alertarSucesso(`${empresa.nome} ${ativo ? 'reativada' : 'desativada'}.`)
     recarregarEmpresas()
   }
 
@@ -79,7 +79,7 @@ export function Empresas() {
       : {
           rotulo: 'Reativar',
           icone: <IconeCheck tamanho={17} />,
-          onClick: () => alterarAtivo(empresa, true).catch((e) => setMensagem({ tipo: 'erro', texto: mensagemDeErro(e) })),
+          onClick: () => alterarAtivo(empresa, true).catch((e) => alertarFalha(e)),
         },
   ]
 
@@ -139,12 +139,6 @@ export function Empresas() {
           Nova empresa
         </button>
       </header>
-
-      {mensagem && (
-        <p className={mensagem.tipo === 'ok' ? 'form-ok' : 'form-erro'} role={mensagem.tipo === 'ok' ? 'status' : 'alert'}>
-          {mensagem.texto}
-        </p>
-      )}
 
       <CartaoPessoas>
         <BarraPessoas
@@ -244,7 +238,7 @@ export function Empresas() {
           onFechar={() => setEditando(null)}
           onSalvo={(empresa, nova) => {
             setEditando(null)
-            setMensagem({ tipo: 'ok', texto: `Empresa ${empresa.nome} ${nova ? 'criada' : 'atualizada'}.` })
+            alertarSucesso(`Empresa ${empresa.nome} ${nova ? 'criada' : 'atualizada'}.`)
             recarregarEmpresas()
           }}
         />
@@ -328,7 +322,6 @@ function ModalEmpresa({ empresa, onFechar, onSalvo }: ModalProps) {
   const [bancoId, setBancoId] = useState(empresa?.secullum_banco_id ?? '')
   const [ativo, setAtivo] = useState(empresa?.ativo ?? true)
   const [erros, setErros] = useState<Record<string, string>>({})
-  const [erroGeral, setErroGeral] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [teste, setTeste] = useState<TesteConexao | null>(null)
   const [testando, setTestando] = useState(false)
@@ -354,7 +347,6 @@ function ModalEmpresa({ empresa, onFechar, onSalvo }: ModalProps) {
     event.preventDefault()
     const locais = validar()
     setErros(locais)
-    setErroGeral('')
     if (Object.keys(locais).length) return
 
     const usuarioLimpo = usuario.trim() || null
@@ -394,7 +386,7 @@ function ModalEmpresa({ empresa, onFechar, onSalvo }: ModalProps) {
       onSalvo(atualizada, false)
     } catch (e) {
       setErros(errosDeCampos(e))
-      setErroGeral(mensagemDeErro(e))
+      alertarFalha(e)
       setEnviando(false)
     }
   }
@@ -639,11 +631,6 @@ function ModalEmpresa({ empresa, onFechar, onSalvo }: ModalProps) {
           </label>
         </SecaoCadastro>
 
-        {erroGeral && (
-          <p className="form-erro" role="alert">
-            {erroGeral}
-          </p>
-        )}
         <div className="form-acoes">
           <button type="button" className="btn-secondary" onClick={onFechar}>
             Cancelar

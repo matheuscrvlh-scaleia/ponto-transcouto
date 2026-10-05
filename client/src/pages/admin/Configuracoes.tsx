@@ -6,7 +6,8 @@ import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { Aviso, Carregando, ErroCarregamento } from '../../components/Estados'
 import { IconeAtividade, IconeCalendario, IconeRelogio, IconeSincronizar } from '../../components/Icones'
 import { api } from '../../lib/api'
-import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
+import { alertarFalha, alertarInfo, alertarSucesso } from '../../lib/alertas'
+import { errosDeCampos } from '../../lib/erros'
 import { entradaParaMinutos, formatarDataHora, formatarIntervalo, minutosParaEntrada } from '../../lib/formato'
 import { avisarSincronizacaoPedida } from '../../lib/sincronizacao'
 import { useRecurso } from '../../lib/useRecurso'
@@ -188,11 +189,9 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
   const [config, setConfig] = useState(inicial)
   const [form, setForm] = useState(() => paraFormulario(inicial))
   const [erros, setErros] = useState<Record<string, string>>({})
-  const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
   const [enviando, setEnviando] = useState(false)
   // "Forçar sincronização" (Atualização dos dados): o modal fica fora do <form>
   const [sincronizando, setSincronizando] = useState(false)
-  const [mensagemSincronizacao, setMensagemSincronizacao] = useState<string | null>(null)
   const textos = TEXTOS[secao]
 
   const { alteracoes } = validar(form, config, secao)
@@ -200,26 +199,24 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
 
   function alterar<K extends keyof Formulario>(campo: K, valor: Formulario[K]) {
     setForm((atual) => ({ ...atual, [campo]: valor }))
-    setMensagem(null)
   }
 
   async function salvar(event: FormEvent) {
     event.preventDefault()
     const resultado = validar(form, config, secao)
     setErros(resultado.erros)
-    setMensagem(null)
     if (Object.keys(resultado.erros).length) return
-    if (!Object.keys(resultado.alteracoes).length) return setMensagem({ tipo: 'ok', texto: 'Nada para salvar.' })
+    if (!Object.keys(resultado.alteracoes).length) return alertarInfo('Nada para salvar.')
 
     setEnviando(true)
     try {
       const salva = await api<Config>('/configuracoes', { method: 'PATCH', query, json: resultado.alteracoes })
       setConfig(salva)
       setForm(paraFormulario(salva))
-      setMensagem({ tipo: 'ok', texto: mensagemSalvo(secao, salva, config) })
+      alertarSucesso(mensagemSalvo(secao, salva, config))
     } catch (e) {
       setErros(errosDeCampos(e))
-      setMensagem({ tipo: 'erro', texto: mensagemDeErro(e) })
+      alertarFalha(e)
     } finally {
       setEnviando(false)
     }
@@ -326,11 +323,6 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
             Forçar sincronização
           </button>
         </div>
-        {mensagemSincronizacao && (
-          <p className="form-ok" role="status">
-            {mensagemSincronizacao}
-          </p>
-        )}
         <div className="modo-opcoes">
           {MODOS.map(({ valor, titulo, descricao, Icone }) => (
             <label key={valor} className={form.modo_extracao === valor ? 'modo-opcao ativo' : 'modo-opcao'}>
@@ -498,11 +490,6 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
         {campos}
 
         <div className="form-secao">
-          {mensagem && (
-            <p className={mensagem.tipo === 'ok' ? 'form-ok' : 'form-erro'} role={mensagem.tipo === 'ok' ? 'status' : 'alert'}>
-              {mensagem.texto}
-            </p>
-          )}
           <div className="form-acoes">
             {alterado && (
               <button
@@ -530,7 +517,7 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
           onFechar={() => setSincronizando(false)}
           onPedido={(texto) => {
             setSincronizando(false)
-            setMensagemSincronizacao(texto)
+            alertarSucesso(texto, 'Sincronização solicitada')
           }}
         />
       )}

@@ -5,7 +5,7 @@ import { GraficoDias, GraficoSemanas } from '../components/GraficoSemanas'
 import { Horas } from '../components/Horas'
 import { IndicadorCurva } from '../components/IndicadorCurva'
 import { SeloTempoReal } from '../components/SeloTempoReal'
-import { api, ApiError } from '../lib/api'
+import { api } from '../lib/api'
 import { baixarCsv, imprimirComoPdf, minutosCsv, paraNomeArquivo, type CelulaCsv } from '../lib/exportar'
 import {
   dataDoInstante,
@@ -19,6 +19,7 @@ import {
 import { useRecurso } from '../lib/useRecurso'
 import type { ColaboradorDetalhe, DiaHistorico, Minutos, SemanaHistorico } from '../types/api'
 import { TituloPagina } from '../components/TituloPagina'
+import { alertarFalha } from '../lib/alertas'
 
 const LIMITE_HISTORICO = 26
 /** Dias de histórico diário pedidos no tempo real (o server aceita 1..180). */
@@ -262,11 +263,9 @@ function linhasCsv(colaborador: ColaboradorDetalhe, historico: SemanaHistorico[]
 
 function ExportarHistorico({ colaborador }: { colaborador: ColaboradorDetalhe }) {
   const [gerando, setGerando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
 
   async function baixar() {
     setGerando(true)
-    setErro(null)
     try {
       const [historico, diario] = await Promise.all([
         api<SemanaHistorico[]>(`/colaboradores/${colaborador.id}/historico`, { query: { limite: LIMITE_EXPORTACAO } }),
@@ -276,7 +275,7 @@ function ExportarHistorico({ colaborador }: { colaborador: ColaboradorDetalhe })
       ])
       baixarCsv(`historico-${paraNomeArquivo(colaborador.nome)}-${hojeISO()}.csv`, linhasCsv(colaborador, historico, diario))
     } catch (err) {
-      setErro(err instanceof ApiError ? err.message : 'Não foi possível gerar o arquivo.')
+      alertarFalha(err, 'Não foi possível gerar o arquivo.')
     } finally {
       setGerando(false)
     }
@@ -295,11 +294,6 @@ function ExportarHistorico({ colaborador }: { colaborador: ColaboradorDetalhe })
       >
         Salvar PDF
       </button>
-      {erro && (
-        <p className="form-erro" role="alert">
-          {erro}
-        </p>
-      )}
     </div>
   )
 }

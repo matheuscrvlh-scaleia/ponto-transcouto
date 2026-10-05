@@ -5,6 +5,7 @@ import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
 import { Carregando, ErroCarregamento } from '../../components/Estados'
 import { IconeCheck, IconeEscudo, IconeLapis, IconeLixeira, IconeMais, IconeMenos, IconeUsuarios } from '../../components/Icones'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
+import { alertarSucesso } from '../../lib/alertas'
 import { api } from '../../lib/api'
 import { SECOES_TELAS, TELAS } from '../../lib/telas'
 import { useRecurso } from '../../lib/useRecurso'
@@ -25,7 +26,6 @@ export function Permissoes() {
   const { empresaId, query } = useEmpresaSelecionada()
   const ehEquipe = perfil === 'admin'
   const [modal, setModal] = useState<Modal>(null)
-  const [mensagem, setMensagem] = useState<string | null>(null)
 
   const grupos = useRecurso(
     (signal) => api<GrupoPermissao[]>('/permissoes/grupos', { signal, query }),
@@ -53,12 +53,6 @@ export function Permissoes() {
           </button>
         </div>
       </header>
-
-      {mensagem && (
-        <p className="form-ok" role="status">
-          {mensagem}
-        </p>
-      )}
 
       {grupos.carregando && !grupos.dados ? (
         <Carregando texto="Carregando grupos..." />
@@ -190,7 +184,7 @@ export function Permissoes() {
           query={query}
           onFechar={() => setModal(null)}
           onSalvo={(salvo) => {
-            setMensagem(modal.tipo === 'editar' ? `Grupo ${salvo.nome} salvo.` : `Grupo ${salvo.nome} criado.`)
+            alertarSucesso(modal.tipo === 'editar' ? `Grupo ${salvo.nome} salvo.` : `Grupo ${salvo.nome} criado.`)
             setModal(null)
             grupos.recarregar()
           }}
@@ -205,7 +199,7 @@ export function Permissoes() {
           onFechar={() => setModal(null)}
           onConfirmar={async () => {
             await api(`/permissoes/grupos/${modal.grupo.id}`, { method: 'DELETE' })
-            setMensagem(`Grupo ${modal.grupo.nome} excluído.`)
+            alertarSucesso(`Grupo ${modal.grupo.nome} excluído.`)
             setModal(null)
             grupos.recarregar()
           }}

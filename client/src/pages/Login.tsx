@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../lib/api'
 import { CampoSenha } from '../components/CampoSenha'
 import { IconeCadeado, IconeUsuario, LayoutAcesso } from '../components/LayoutAcesso'
+import { alertarErro, alertarInfo } from '../lib/alertas'
 
 function mensagemErro(erro: unknown): string {
   if (!(erro instanceof ApiError)) return 'Não foi possível entrar. Tente novamente em instantes.'
@@ -27,16 +28,19 @@ export function Login() {
   const [params] = useSearchParams()
   const [identificador, setIdentificador] = useState('')
   const [senha, setSenha] = useState('')
-  const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   const destino = (location.state as { de?: string } | null)?.de ?? '/'
+  const expirou = Boolean(params.get('expirou'))
+
+  useEffect(() => {
+    if (expirou) alertarInfo('Entre novamente para continuar.', 'Sua sessão expirou')
+  }, [expirou])
 
   if (!carregando && usuario) return <Navigate to={destino} replace />
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    setErro('')
     setEnviando(true)
 
     const valor = identificador.trim()
@@ -46,7 +50,7 @@ export function Login() {
       const logado = await entrar(login, senha)
       navigate(logado.deve_trocar_senha ? '/trocar-senha' : destino, { replace: true })
     } catch (e) {
-      setErro(mensagemErro(e))
+      if (!(e instanceof ApiError && e.alertado)) alertarErro({ titulo: 'Não foi possível entrar', mensagem: mensagemErro(e) })
       setEnviando(false)
     }
   }
@@ -59,11 +63,6 @@ export function Login() {
       subtitulo="Use seu e-mail ou CPF cadastrado."
     >
       <form className="lg-form" onSubmit={handleSubmit} noValidate>
-        {params.get('expirou') && !erro && (
-          <p className="form-info" role="status">
-            Sua sessão expirou. Entre novamente.
-          </p>
-        )}
         <div className="field">
           <label htmlFor="identificador">E-mail ou CPF</label>
           <div className="lg-pilula">
@@ -90,11 +89,6 @@ export function Login() {
           autoComplete="current-password"
           icone={<IconeCadeado />}
         />
-        {erro && (
-          <p className="form-erro" role="alert">
-            {erro}
-          </p>
-        )}
         <button className="lg-botao" type="submit" disabled={enviando || !identificador.trim() || !senha}>
           {enviando ? 'Entrando...' : 'Entrar'}
         </button>

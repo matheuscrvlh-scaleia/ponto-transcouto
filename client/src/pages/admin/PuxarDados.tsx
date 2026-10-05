@@ -3,9 +3,10 @@ import { Campo } from '../../components/Campo'
 import { Aviso } from '../../components/Estados'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../lib/api'
-import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
+import { errosDeCampos } from '../../lib/erros'
 import { diasEntre, formatarData, hojeISO, somarDias } from '../../lib/formato'
 import type { PedidoDadosResposta, PreviaDadosIntegracao, SemanaPrevia, StatusIntegracao } from '../../types/api'
+import { alertarFalha, alertarErro } from '../../lib/alertas'
 
 /** Mesmo limite do server (ele dá a palavra final). */
 const MAX_DIAS = 93
@@ -72,7 +73,6 @@ export function PuxarDados({ status, query, bloqueio, semUnidades, onPedido }: P
   const [previa, setPrevia] = useState<{ chave: string; dados: PreviaDadosIntegracao } | null>(null)
   const [carregandoPrevia, setCarregandoPrevia] = useState(false)
   const [enviando, setEnviando] = useState(false)
-  const [erro, setErro] = useState('')
   const [erroMotivo, setErroMotivo] = useState('')
 
   const { unidades } = status
@@ -96,11 +96,10 @@ export function PuxarDados({ status, query, bloqueio, semUnidades, onPedido }: P
   }
 
   async function verPrevia() {
-    setErro('')
     const problema = validarPeriodo()
     if (problema) {
       setPrevia(null)
-      return setErro(problema)
+      return alertarErro(problema)
     }
     const pedida = chave
     setCarregandoPrevia(true)
@@ -111,7 +110,7 @@ export function PuxarDados({ status, query, bloqueio, semUnidades, onPedido }: P
       setPrevia({ chave: pedida, dados })
     } catch (e) {
       setPrevia(null)
-      setErro(mensagemDeErro(e))
+      alertarFalha(e)
     } finally {
       setCarregandoPrevia(false)
     }
@@ -119,7 +118,6 @@ export function PuxarDados({ status, query, bloqueio, semUnidades, onPedido }: P
 
   async function confirmar() {
     if (!previaValida) return
-    setErro('')
     setErroMotivo('')
     const limpo = motivo.trim()
     if (limpo && limpo.length < MOTIVO_MINIMO) {
@@ -138,7 +136,7 @@ export function PuxarDados({ status, query, bloqueio, semUnidades, onPedido }: P
     } catch (e) {
       // 429 (limite de pedidos) e 400 chegam com a mensagem pronta em `error`
       setErroMotivo(errosDeCampos(e).motivo ?? '')
-      setErro(mensagemDeErro(e))
+      alertarFalha(e)
     } finally {
       setEnviando(false)
     }
@@ -234,13 +232,8 @@ export function PuxarDados({ status, query, bloqueio, semUnidades, onPedido }: P
         )}
       </Campo>
 
-      {erro && (
-        <p className="form-erro" role="alert">
-          {erro}
-        </p>
-      )}
 
-      {previaVencida && !erro && (
+      {previaVencida && (
         <p className="integ-texto" role="status">
           Você mudou o período ou a unidade. Veja a prévia de novo antes de confirmar.
         </p>

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Aviso, Carregando, ErroCarregamento } from '../../components/Estados'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { PilulaStatus } from '../../components/PilulaStatus'
+import { alertarSucesso } from '../../lib/alertas'
 import { api } from '../../lib/api'
 import { formatarData, formatarDataHora, formatarDiaSemana, formatarDuracao } from '../../lib/formato'
 import { useRecurso } from '../../lib/useRecurso'
@@ -36,7 +37,6 @@ export function TextoReprocessar({ fechamento }: { fechamento: FechamentoAdmin }
 export function DetalheFechamento() {
   const { fechamentoId } = useParams()
   const [acao, setAcao] = useState<Acao>(null)
-  const [aviso, setAviso] = useState('')
   const { ehAdmin } = useEmpresaAdmin()
   const { dados, erro, carregando, recarregar } = useRecurso(
     (signal) => api<FechamentoDetalhe>(`/admin/fechamentos/${fechamentoId}`, { signal }),
@@ -62,7 +62,7 @@ export function DetalheFechamento() {
 
   function concluir(mensagem: string) {
     setAcao(null)
-    setAviso(mensagem)
+    alertarSucesso(mensagem)
     recarregar()
   }
 
@@ -105,12 +105,6 @@ export function DetalheFechamento() {
           </div>
         )}
       </header>
-
-      {aviso && (
-        <p className="form-ok" role="status">
-          {aviso}
-        </p>
-      )}
 
       {dados.status === 'falhou' && dados.ultima_execucao?.mensagem_erro && (
         <Aviso>Última falha: {dados.ultima_execucao.mensagem_erro}</Aviso>
