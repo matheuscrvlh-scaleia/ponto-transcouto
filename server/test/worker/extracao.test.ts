@@ -176,6 +176,29 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
         expect(chamadas.find(c => c.url.endsWith('/Empresas'))?.headers.secullumidbancoselecionado).toBe(bancoId)
     })
 
+    it('demitido no período que a FriPonto não encontra não impede a publicação', async () => {
+        await sincronizarSoUnidadeA()
+        await client.query(`UPDATE colaboradores SET data_demissao = '2026-09-10' WHERE cpf = $1`, [CPF_DEMITIDO])
+        totaisPorCpf.set(CPF_ANA, [resposta('01:00', '', '', '')])
+        totaisPorCpf.set(CPF_BRUNO, [resposta('02:00', '', '', '')])
+
+        const mensal = await criarCiclo('fechamento_mes', '2026-08-26', '2026-09-25', '2001-01-01T09:00:00Z')
+        expect(await processar()).toBe(true)
+
+        const f = await um<{ status: string, total_colaboradores: number }>(
+            'SELECT status, total_colaboradores FROM fechamentos WHERE id = $1', [mensal.id],
+        )
+        expect(f).toEqual({ status: 'sucesso', total_colaboradores: 3 })
+        const erro = await um<{ http_status: number, mensagem: string }>(
+            `SELECT er.http_status, er.mensagem FROM execucao_erros er
+               JOIN execucoes_extracao ex ON ex.id = er.execucao_id
+               JOIN colaboradores c ON c.id = er.colaborador_id
+              WHERE ex.fechamento_id = $1 AND c.cpf = $2`, [mensal.id, CPF_DEMITIDO],
+        )
+        expect(erro.http_status).toBe(400)
+        expect(chamadasCalcular()).toHaveLength(3)
+    })
+
     it('executa ciclos completos: publica, calcula *_semana, respeita retry e cota, bloqueia mapeamento desconhecido', async () => {
         await sincronizarSoUnidadeA()
 

@@ -181,9 +181,16 @@ export async function criarExecucao(fechamentoId: number, total: number, process
 
 export async function colaboradoresElegiveis(fechamentoId: number, ex: Executor = db) {
     const result = await ex.query<ColaboradorElegivel>(
+        // a FriPonto não calcula demitidos ("Funcionário não encontrado" pelo CPF): o demitido no período
+        // que recebeu essa resposta conta como resolvido, senão a unidade nunca publicaria
         `SELECT col.id, col.cpf,
                 EXISTS (SELECT 1 FROM registros_horas r
-                         WHERE r.fechamento_id = f.id AND r.colaborador_id = col.id) AS feito
+                         WHERE r.fechamento_id = f.id AND r.colaborador_id = col.id)
+                OR (NOT col.ativo AND EXISTS (
+                        SELECT 1 FROM execucao_erros er
+                          JOIN execucoes_extracao ex ON ex.id = er.execucao_id
+                         WHERE ex.fechamento_id = f.id AND er.colaborador_id = col.id
+                           AND er.http_status = 400 AND er.mensagem ILIKE '%não encontrado%')) AS feito
            FROM fechamentos f
            JOIN ciclos c ON c.id = f.ciclo_id
            JOIN colaboradores col ON col.unidade_id = f.unidade_id
