@@ -8,14 +8,12 @@ import { ModalSenhaTemporaria } from '../../components/ModalSenhaTemporaria'
 import { IconeBloqueio, IconeChave, IconeCheck, IconeLapis, IconeLixeira, IconeMais } from '../../components/Icones'
 import { api } from '../../lib/api'
 import { mensagemDeErro } from '../../lib/erros'
-import { NOME_PERFIL } from '../../lib/preferencias'
 import { useRecurso } from '../../lib/useRecurso'
-import type { ClienteAdmin, Paginado, PerfilCliente, UnidadeAdmin } from '../../types/api'
+import type { ClienteAdmin, GrupoPermissao, Paginado, UnidadeAdmin } from '../../types/api'
 import {
   BarraPessoas,
   CartaoPessoas,
   ContatoPessoa,
-  EtiquetaPerfil,
   EtiquetasUnidades,
   FiltroPessoas,
   MenuAcoesPessoa,
@@ -39,18 +37,16 @@ type Modal =
   | { tipo: 'senha'; nome: string; senha: string }
   | null
 
-/* Usuários das empresas clientes (RH e gestores). A equipe Scale IA fica em Administração › Usuários gestão. */
+/* Usuários das empresas clientes, cada um num grupo de permissão (Configuração → Permissões).
+   A equipe Scale IA fica em Administração › Usuários gestão. */
 export function Usuarios() {
   const { usuario: eu } = useAuth()
   const { empresaId, ehAdmin, query } = useEmpresaSelecionada()
   const [busca, setBusca] = useState('')
   const [buscaAplicada, setBuscaAplicada] = useState('')
   const [params] = useSearchParams()
-  // a tela de Permissões abre esta lista já filtrada por perfil (?perfil=gestor)
-  const [perfil, setPerfil] = useState<PerfilCliente | ''>(() => {
-    const inicial = params.get('perfil')
-    return inicial === 'rh' || inicial === 'gestor' ? inicial : ''
-  })
+  // a tela de Permissões abre esta lista já filtrada por grupo (?grupo=12)
+  const [grupoId, setGrupoId] = useState(() => (/^\d+$/.test(params.get('grupo') ?? '') ? params.get('grupo')! : ''))
   const [ativo, setAtivo] = useState<'' | 'true' | 'false'>('')
   const [unidadeId, setUnidadeId] = useState('')
   const [pagina, setPagina] = useState(1)
@@ -71,7 +67,7 @@ export function Usuarios() {
 
   const filtros = {
     busca: buscaAplicada,
-    perfil,
+    grupo_id: grupoId,
     ativo,
     unidade_id: unidadeId,
     empresa_id: query.empresa_id,
@@ -87,6 +83,13 @@ export function Usuarios() {
     `unidades-admin-${empresaId}`,
   )
   const unidadesVinculaveis = (unidades.dados ?? []).filter((unidade) => unidade.nome_exibicao)
+  const grupos = useRecurso(
+    (signal) => api<GrupoPermissao[]>('/permissoes/grupos', { signal, query }),
+    `grupos-permissao-${empresaId}`,
+  )
+  const listaGrupos = grupos.dados ?? []
+  // grupos em que quem está vendo pode mexer (o server confere de novo)
+  const gruposEditaveis = new Set(listaGrupos.filter((grupo) => grupo.pode_editar).map((grupo) => grupo.id))
 
   // ids de clientes e da equipe podem coincidir: "sou eu" só vale para quem também é cliente
   const ehEu = (usuario: ClienteAdmin) => eu?.tipo === 'cliente' && usuario.id === eu.id
@@ -111,10 +114,10 @@ export function Usuarios() {
   }
 
   const totalPaginas = lista.dados ? Math.max(1, Math.ceil(lista.dados.total / POR_PAGINA)) : 1
-  const temFiltro = Boolean(buscaAplicada || perfil || ativo || unidadeId)
+  const temFiltro = Boolean(buscaAplicada || grupoId || ativo || unidadeId)
 
-  // o RH gerencia os gestores e a própria conta; contas de outros RH ficam com a equipe (o server confere)
-  const podeGerenciar = (usuario: ClienteAdmin) => ehAdmin || usuario.perfil === 'gestor' || ehEu(usuario)
+  // cada um gerencia a própria conta e os usuários de grupos que não passam do dele (o server confere)
+  const podeGerenciar = (usuario: ClienteAdmin) => ehAdmin || ehEu(usuario) || gruposEditaveis.has(usuario.grupo.id)
 
   const acoes = (usuario: ClienteAdmin): AcaoPessoa[] => (podeGerenciar(usuario) ? acoesDe(usuario) : [])
 
@@ -147,7 +150,7 @@ export function Usuarios() {
     <section className="pagina">
       <TituloPagina>Usuários</TituloPagina>
       <header className="pessoas-topo">
-        <p>Cadastre o RH e os gestores da empresa e defina quais unidades cada gestor acompanha.</p>
+        <p>Cadastre os usuários da empresa, escolha o grupo de permissão de cada um e as unidades que ele acompanha.</p>
         <button type="button" className="pessoas-novo" onClick={() => setModal({ tipo: 'criar' })}>
           <IconeMais tamanho={18} />
           Novo usuário
@@ -168,10 +171,13 @@ export function Usuarios() {
           placeholder="Buscar por nome, e-mail ou CPF"
           contagem={lista.dados ? `${lista.dados.total} ${lista.dados.total === 1 ? 'usuário' : 'usuários'}` : undefined}
         >
-          <FiltroPessoas rotulo="Perfil" valor={perfil} onMudar={(valor) => mudarFiltro(() => setPerfil(valor as PerfilCliente | ''))}>
+          <FiltroPessoas rotulo="Grupo" valor={grupoId} onMudar={(valor) => mudarFiltro(() => setGrupoId(valor))}>
             <option value="">Todos</option>
-            <option value="gestor">{NOME_PERFIL.gestor}</option>
-            <option value="rh">{NOME_PERFIL.rh}</option>
+            {listaGrupos.map((grupo) => (
+              <option key={grupo.id} value={grupo.id}>
+                {grupo.nome}
+              </option>
+            ))}
           </FiltroPessoas>
           <FiltroPessoas rotulo="Situação" valor={ativo} onMudar={(valor) => mudarFiltro(() => setAtivo(valor as typeof ativo))}>
             <option value="">Todas</option>
@@ -224,7 +230,7 @@ export function Usuarios() {
                   <tr>
                     <th scope="col">Usuário</th>
                     <th scope="col">Contato</th>
-                    <th scope="col">Perfil</th>
+                    <th scope="col">Grupo</th>
                     <th scope="col">Unidades</th>
                     <th scope="col">Situação</th>
                     <th scope="col">Último acesso</th>
@@ -243,10 +249,10 @@ export function Usuarios() {
                         <ContatoPessoa email={usuario.email} telefone={usuario.telefone} cpf={usuario.cpf_mascarado} />
                       </td>
                       <td>
-                        <EtiquetaPerfil perfil={usuario.perfil} />
+                        <EtiquetaGrupo usuario={usuario} />
                       </td>
                       <td>
-                        <EtiquetasUnidades nomes={nomesUnidades(usuario)} todas={usuario.perfil !== 'gestor'} />
+                        <EtiquetasUnidades nomes={nomesUnidades(usuario)} todas={usuario.grupo.alcance === 'empresa'} />
                       </td>
                       <td>
                         <Situacao ativo={usuario.ativo} senhaTemporaria={usuario.deve_trocar_senha} />
@@ -271,11 +277,11 @@ export function Usuarios() {
                     <MenuAcoesPessoa nome={usuario.nome} acoes={acoes(usuario)} />
                   </div>
                   <div className="pessoas-cartao-info">
-                    <EtiquetaPerfil perfil={usuario.perfil} />
+                    <EtiquetaGrupo usuario={usuario} />
                     <Situacao ativo={usuario.ativo} senhaTemporaria={usuario.deve_trocar_senha} />
                     <UltimoAcesso iso={usuario.ultimo_login_em} />
                   </div>
-                  {usuario.perfil === 'gestor' && (
+                  {usuario.grupo.alcance === 'unidades' && (
                     <div className="pessoas-cartao-info">
                       <EtiquetasUnidades nomes={nomesUnidades(usuario)} max={3} />
                     </div>
@@ -296,6 +302,7 @@ export function Usuarios() {
           ehAdmin={ehAdmin}
           ehProprio={modal.tipo === 'editar' && ehEu(modal.usuario)}
           unidades={unidadesVinculaveis}
+          grupos={listaGrupos}
           onFechar={() => setModal(null)}
           onSalvo={(resultado) => {
             lista.recarregar()
@@ -369,5 +376,15 @@ export function Usuarios() {
 
       {modal?.tipo === 'senha' && <ModalSenhaTemporaria nome={modal.nome} senha={modal.senha} onFechar={() => setModal(null)} />}
     </section>
+  )
+}
+
+/** Nome do grupo, na cor do alcance (empresa toda x unidades vinculadas). */
+function EtiquetaGrupo({ usuario }: { usuario: ClienteAdmin }) {
+  const alcance = usuario.grupo.alcance === 'empresa' ? 'Vê todas as unidades da empresa' : 'Vê só as unidades vinculadas'
+  return (
+    <span className={`perfil-tag perfil-tag-${usuario.perfil}`} title={`${alcance} · ${usuario.grupo.telas.length} telas liberadas`}>
+      {usuario.grupo.nome}
+    </span>
   )
 }

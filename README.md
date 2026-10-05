@@ -31,18 +31,24 @@ Usuários da Demo: `gestor@demo.local` e `rh@demo.local`, senha `demo12345`.
 
 ## Produção (Docker)
 
-`docker-compose.yml` sobe quatro serviços: `caddy` (HTTPS automático, portas 80/443) → `web` (Nginx com o build do client, repassa `/api` para a API) → `api`; e o `worker` (mesma imagem do server, rodar só um). O banco continua no Supabase.
+`docker-compose.yml` sobe dois serviços:
+
+| Serviço | Porta (host → container) | O que é |
+|---|---|---|
+| `api` | 3001 → 3000 | API com o worker embutido (`WORKER_EMBUTIDO=true`); manter uma réplica só |
+| `web` | 8081 → 80 | Nginx com o build do client; repassa `/api` para a `api` |
+
+O HTTPS fica com o proxy da VPS, apontando para a 8081. O banco continua no Supabase.
 
 ```bash
-cp .env.example .env                 # DOMINIO (DNS apontando para a VPS)
-cp server/.env.example server/.env   # NODE_ENV=production, CORS_ORIGIN=https://<DOMINIO>, TRUST_PROXY=2
+cp server/.env.example server/.env   # CORS_ORIGIN=https://<domínio do front>, TRUST_PROXY (ver abaixo)
 docker compose build
 docker compose run --rm api node --import tsx src/db/migrate.ts --dry-run
 docker compose run --rm api node --import tsx src/db/migrate.ts
 docker compose up -d
 ```
 
-`TRUST_PROXY=2` porque há dois proxies na frente da API (Caddy e Nginx). Na VPS (IPv4), use a connection string do *Session pooler* do Supabase.
+`TRUST_PROXY` = quantos proxies há na frente da API: `2` com proxy da VPS → `web` → `api`. Na VPS (IPv4), use a connection string do *Session pooler* do Supabase.
 
 ## Scripts do server
 

@@ -1,12 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, sessao } from '../lib/api'
-import type { LoginResposta, MeResposta, Perfil, TrocarSenhaResposta, UnidadeRef, UsuarioSessao } from '../types/api'
+import type { LoginResposta, MeResposta, Perfil, Tela, TrocarSenhaResposta, UnidadeRef, UsuarioSessao } from '../types/api'
 
 interface AuthState {
   usuario: UsuarioSessao | null
   unidades: UnidadeRef[]
   perfil: Perfil | null
+  /** Telas liberadas pelo grupo de permissão (a equipe Scale IA tem todas). */
+  telas: Tela[]
+  /** O usuário vê esta tela (ou alguma destas)? */
+  podeVer: (...telas: Tela[]) => boolean
   carregando: boolean
   entrar: (login: string, senha: string) => Promise<UsuarioSessao>
   sair: () => void
@@ -78,18 +82,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [recarregar],
   )
 
+  const telas = useMemo(() => usuario?.telas ?? [], [usuario])
+  const podeVer = useCallback((...lista: Tela[]) => lista.some((tela) => telas.includes(tela)), [telas])
+
   const valor = useMemo<AuthState>(
     () => ({
       usuario,
       unidades,
       perfil: usuario?.perfil ?? null,
+      telas,
+      podeVer,
       carregando,
       entrar,
       sair,
       trocarSenha,
       recarregar,
     }),
-    [usuario, unidades, carregando, entrar, sair, trocarSenha, recarregar],
+    [usuario, unidades, telas, podeVer, carregando, entrar, sair, trocarSenha, recarregar],
   )
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>

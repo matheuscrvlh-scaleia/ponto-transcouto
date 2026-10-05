@@ -6,9 +6,9 @@ import { entradasDaSecao, itensPermitidos, SECAO_CONFIGURACAO, type SecaoAdmin }
    Integrações, Configurações) junta várias telas; aqui o usuário troca entre elas. Com uma aba só
    (ex.: gestor em Integrações), a barra não aparece. */
 export function AbasConfiguracao({ secao: secaoBase = SECAO_CONFIGURACAO }: { secao?: SecaoAdmin }) {
-  const { perfil } = useAuth()
+  const { perfil, telas } = useAuth()
   const { pathname } = useLocation()
-  const secao = { ...secaoBase, itens: itensPermitidos(secaoBase, perfil) }
+  const secao = { ...secaoBase, itens: itensPermitidos(secaoBase, perfil, telas) }
   const base = secaoBase.base
 
   const entrada = entradasDaSecao(secao).find((item) =>

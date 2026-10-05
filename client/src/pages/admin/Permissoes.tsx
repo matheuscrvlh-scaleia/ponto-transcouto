@@ -1,283 +1,239 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
-import { IconeCheck, IconeEscudo, IconeMenos, IconeUsuarios } from '../../components/Icones'
+import { Carregando, ErroCarregamento } from '../../components/Estados'
+import { IconeCheck, IconeEscudo, IconeLapis, IconeLixeira, IconeMais, IconeMenos, IconeUsuarios } from '../../components/Icones'
+import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { api } from '../../lib/api'
-import { NOME_PERFIL } from '../../lib/preferencias'
+import { SECOES_TELAS, TELAS } from '../../lib/telas'
 import { useRecurso } from '../../lib/useRecurso'
-import type { Paginado, Perfil } from '../../types/api'
+import type { GrupoPermissao } from '../../types/api'
+import { ModalGrupo } from './ModalGrupo'
 import './permissoes.css'
 import { TituloPagina } from '../../components/TituloPagina'
 
-const PERFIS: Perfil[] = ['admin', 'rh', 'gestor']
+type Modal = { tipo: 'criar' } | { tipo: 'editar'; grupo: GrupoPermissao } | { tipo: 'excluir'; grupo: GrupoPermissao } | null
 
-const RESUMO_PERFIL: Record<Perfil, string> = {
-  admin: 'Time da Scale IA: acesso a todas as empresas, à Configuração e à Administração do sistema.',
-  rh: 'Cuida da própria empresa: usuários, unidades, alertas, atualização dos dados e acompanhamento dos fechamentos.',
-  gestor: 'Acompanha o banco de horas das unidades vinculadas a ele e pode pedir nova extração dos dados delas.',
-}
+const ROTULO_ALCANCE = { empresa: 'Toda a empresa', unidades: 'Unidades vinculadas' } as const
 
-type Nivel = 'total' | 'parcial' | 'nenhum'
-type Celula = { nivel: Nivel; texto?: string }
-type Linha = { area: string; descricao: string; perfis: Record<Perfil, Celula> }
-
-const SEM_ACESSO: Celula = { nivel: 'nenhum' }
-
-/* Espelha as regras do servidor (exigirPerfil nas rotas, regras de RH nos
-   controllers e a função unidades_permitidas do banco). Ao mudar uma regra
-   lá, atualize aqui. */
-const MATRIZ: { grupo: string; linhas: Linha[] }[] = [
-  {
-    grupo: 'Gestão',
-    linhas: [
-      {
-        area: 'Dashboard',
-        descricao: 'Banco de horas, indicadores e detalhe dos colaboradores',
-        perfis: {
-          admin: { nivel: 'total', texto: 'Todas as empresas' },
-          rh: { nivel: 'parcial', texto: 'Todas as unidades da empresa' },
-          gestor: { nivel: 'parcial', texto: 'Só unidades vinculadas' },
-        },
-      },
-    ],
-  },
-  {
-    grupo: 'Configuração',
-    linhas: [
-      {
-        area: 'Usuários',
-        descricao: 'Cadastrar RH e gestores, vincular unidades e redefinir senha',
-        perfis: {
-          admin: { nivel: 'total', texto: 'Qualquer empresa' },
-          rh: { nivel: 'parcial', texto: 'Somente a própria empresa' },
-          gestor: SEM_ACESSO,
-        },
-      },
-      {
-        area: 'Integração FriPonto',
-        descricao:
-          'Situação da conexão, pedidos de nova extração (ou de refazer o fechamento do mês, no tempo real), atualizar o tempo real agora e histórico de solicitações',
-        perfis: {
-          admin: { nivel: 'total', texto: 'Qualquer empresa' },
-          rh: { nivel: 'parcial', texto: 'Ver, puxar cadastros e dados e atualizar o tempo real agora, na empresa toda' },
-          gestor: { nivel: 'parcial', texto: 'Ver, puxar dados e atualizar o tempo real agora, só nas suas unidades' },
-        },
-      },
-      {
-        area: 'Atualização dos dados',
-        descricao: 'Modo semanal ou tempo real e o dia e a hora da extração (no tempo real, só a hora do fechamento do mês)',
-        perfis: {
-          admin: { nivel: 'total', texto: 'Qualquer empresa' },
-          rh: { nivel: 'parcial', texto: 'Escolher semanal ou tempo real, dia e hora' },
-          gestor: SEM_ACESSO,
-        },
-      },
-      {
-        area: 'Unidades',
-        descricao: 'Nome de exibição, ativação e sincronização com o ponto',
-        perfis: {
-          admin: { nivel: 'total', texto: 'Qualquer empresa' },
-          rh: { nivel: 'parcial', texto: 'Unidades da empresa' },
-          gestor: SEM_ACESSO,
-        },
-      },
-      {
-        area: 'Alertas e horas pagas',
-        descricao: 'Limites “fora da curva”, teto e origem das horas pagas',
-        perfis: {
-          admin: { nivel: 'total', texto: 'Qualquer empresa' },
-          rh: { nivel: 'parcial', texto: 'Da própria empresa' },
-          gestor: SEM_ACESSO,
-        },
-      },
-      {
-        area: 'Fechamentos',
-        descricao: 'Histórico de extrações e publicação dos dados',
-        perfis: {
-          admin: { nivel: 'total', texto: 'Consultar, reprocessar, publicar e ajustar agendamento' },
-          rh: { nivel: 'parcial', texto: 'Somente consulta' },
-          gestor: SEM_ACESSO,
-        },
-      },
-      {
-        area: 'Permissões',
-        descricao: 'O que cada perfil pode fazer (esta tela)',
-        perfis: {
-          admin: { nivel: 'total', texto: 'Consulta' },
-          rh: { nivel: 'total', texto: 'Consulta' },
-          gestor: SEM_ACESSO,
-        },
-      },
-    ],
-  },
-  {
-    grupo: 'Administração',
-    linhas: [
-      {
-        area: 'Administração do sistema',
-        descricao: 'Empresas, mapeamento de colunas, ações nos fechamentos, calendário de extração e equipe Scale IA',
-        perfis: {
-          admin: { nivel: 'total' },
-          rh: SEM_ACESSO,
-          gestor: SEM_ACESSO,
-        },
-      },
-    ],
-  },
-  {
-    grupo: 'Conta',
-    linhas: [
-      {
-        area: 'Conta própria',
-        descricao: 'Ver o perfil e trocar a própria senha',
-        perfis: {
-          admin: { nivel: 'total' },
-          rh: { nivel: 'total' },
-          gestor: { nivel: 'total' },
-        },
-      },
-    ],
-  },
-]
-
-const ROTULO_NIVEL: Record<Nivel, string> = {
-  total: 'Acesso completo',
-  parcial: 'Acesso limitado',
-  nenhum: 'Sem acesso',
-}
-
-function CelulaPermissao({ celula }: { celula: Celula }) {
-  return (
-    <span className={`perm-celula perm-${celula.nivel}`}>
-      <span className="perm-marca" aria-hidden="true">
-        {celula.nivel === 'nenhum' ? <IconeMenos tamanho={14} /> : <IconeCheck tamanho={14} />}
-      </span>
-      <span className="perm-celula-texto">
-        <span className="sr-only">{ROTULO_NIVEL[celula.nivel]}. </span>
-        {celula.texto ?? (celula.nivel === 'nenhum' ? '' : ROTULO_NIVEL[celula.nivel])}
-      </span>
-    </span>
-  )
-}
-
-/** Quantas pessoas ativas existem no perfil (só o total da paginação interessa). */
-function useTotalAtivos(perfil: Perfil, empresaId: number | undefined, habilitado: boolean) {
-  // equipe Scale IA vem de /equipe (sem empresa); RH e gestores, de /clientes da empresa em foco
-  const caminho = perfil === 'admin' ? '/equipe' : '/clientes'
-  const query = perfil === 'admin' ? { ativo: 'true', por_pagina: 1 } : { perfil, ativo: 'true', empresa_id: empresaId, por_pagina: 1 }
-  const recurso = useRecurso(
-    (signal) => (habilitado ? api<Paginado<unknown>>(caminho, { signal, query }) : Promise.resolve(null)),
-    `perm-total-${perfil}-${empresaId ?? 'propria'}-${habilitado}`,
-  )
-  return recurso.dados?.total ?? null
-}
-
+/* Grupos de permissão da empresa: cada grupo libera um conjunto de telas e define se os
+   usuários veem a empresa toda ou só as unidades vinculadas. RH e Gestor são os grupos
+   padrão (editáveis, não excluíveis). A equipe Scale IA tem acesso total e fica fora. */
 export function Permissoes() {
-  const { perfil: meuPerfil } = useAuth()
-  const { query } = useEmpresaSelecionada()
-  const ehEquipe = meuPerfil === 'admin'
+  const { perfil } = useAuth()
+  const { empresaId, query } = useEmpresaSelecionada()
+  const ehEquipe = perfil === 'admin'
+  const [modal, setModal] = useState<Modal>(null)
+  const [mensagem, setMensagem] = useState<string | null>(null)
 
-  // O RH não gerencia a equipe Scale IA: o cartão dela não mostra contagem nem link para ele.
-  const totais: Record<Perfil, number | null> = {
-    admin: useTotalAtivos('admin', undefined, ehEquipe),
-    rh: useTotalAtivos('rh', query.empresa_id, true),
-    gestor: useTotalAtivos('gestor', query.empresa_id, true),
-  }
+  const grupos = useRecurso(
+    (signal) => api<GrupoPermissao[]>('/permissoes/grupos', { signal, query }),
+    `grupos-permissao-${empresaId}`,
+  )
 
   useEffect(() => {
     document.title = 'Permissões — Copiloto de Ponto'
   }, [])
 
-  const linkPerfil = (perfil: Perfil) => (perfil === 'admin' ? '/admin/equipe' : `/configuracao/usuarios?perfil=${perfil}`)
-  const textoTotal = (perfil: Perfil, total: number | null) => {
-    if (total == null) return perfil === 'admin' ? 'Ver equipe' : 'Ver usuários'
-    if (perfil === 'admin') return `${total} ${total === 1 ? 'membro ativo' : 'membros ativos'}`
-    return `${total} ${total === 1 ? 'usuário ativo' : 'usuários ativos'}`
-  }
+  const lista = grupos.dados ?? []
 
   return (
     <section className="pagina perm">
+      <TituloPagina>Permissões</TituloPagina>
       <header className="pagina-header-linha">
-        <div className="pagina-header">
-          <TituloPagina>Permissões</TituloPagina>
-          <p className="pagina-sub">O que cada perfil pode fazer no Copiloto de Ponto.</p>
+        <p className="pagina-sub">Crie grupos de permissão e escolha as telas que cada grupo pode acessar.</p>
+        <div className="perm-acoes-topo">
+          <Link to="/configuracao/usuarios" className="btn-secondary btn-compact">
+            Gerenciar usuários
+          </Link>
+          <button type="button" className="btn-primary btn-compact perm-novo" onClick={() => setModal({ tipo: 'criar' })}>
+            <IconeMais tamanho={16} />
+            Novo grupo
+          </button>
         </div>
-        <Link to="/configuracao/usuarios" className="btn-primary btn-compact">
-          Gerenciar usuários
-        </Link>
       </header>
 
-      <ul className="perm-perfis">
-        {PERFIS.map((perfil) => (
-          <li key={perfil} className={`perm-perfil perm-perfil-${perfil}`}>
-            <div className="perm-perfil-topo">
-              <span className="perm-perfil-icone" aria-hidden="true">
-                <IconeEscudo tamanho={20} />
-              </span>
-              <h2>{NOME_PERFIL[perfil]}</h2>
-            </div>
-            <p>{RESUMO_PERFIL[perfil]}</p>
-            {(perfil !== 'admin' || ehEquipe) && (
-              <Link to={linkPerfil(perfil)} className="perm-perfil-link">
-                <IconeUsuarios tamanho={16} />
-                {textoTotal(perfil, totais[perfil])}
-                <span aria-hidden="true">→</span>
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
+      {mensagem && (
+        <p className="form-ok" role="status">
+          {mensagem}
+        </p>
+      )}
 
-      <div className="perm-card">
-        <div className="perm-tabela-rolagem">
-          <table className="perm-tabela">
-            <caption className="sr-only">Permissões por perfil</caption>
-            <thead>
-              <tr>
-                <th scope="col">Área</th>
-                {PERFIS.map((perfil) => (
-                  <th key={perfil} scope="col">
-                    {NOME_PERFIL[perfil]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            {MATRIZ.map(({ grupo, linhas }) => (
-              <tbody key={grupo}>
-                <tr className="perm-grupo">
-                  <th scope="rowgroup" colSpan={PERFIS.length + 1}>
-                    {grupo}
-                  </th>
-                </tr>
-                {linhas.map((linha) => (
-                  <tr key={linha.area}>
-                    <th scope="row">
-                      <span className="perm-area">{linha.area}</span>
-                      <span className="perm-area-desc">{linha.descricao}</span>
-                    </th>
-                    {PERFIS.map((perfil) => (
-                      <td key={perfil} data-perfil={NOME_PERFIL[perfil]}>
-                        <CelulaPermissao celula={linha.perfis[perfil]} />
-                      </td>
+      {grupos.carregando && !grupos.dados ? (
+        <Carregando texto="Carregando grupos..." />
+      ) : grupos.erro ? (
+        <ErroCarregamento erro={grupos.erro} onTentarDeNovo={grupos.recarregar} />
+      ) : (
+        <>
+          <ul className="perm-perfis">
+            <li className="perm-perfil perm-perfil-admin">
+              <div className="perm-perfil-topo">
+                <span className="perm-perfil-icone" aria-hidden="true">
+                  <IconeEscudo tamanho={20} />
+                </span>
+                <h2>Equipe Scale IA</h2>
+              </div>
+              <p>Time da Scale IA: acesso total a todas as empresas, à Configuração e à Administração. Não muda por grupo.</p>
+              {ehEquipe && (
+                <Link to="/admin/equipe" className="perm-perfil-link">
+                  <IconeUsuarios tamanho={16} />
+                  Ver equipe
+                  <span aria-hidden="true">→</span>
+                </Link>
+              )}
+            </li>
+
+            {lista.map((grupo) => (
+              <li key={grupo.id} className="perm-perfil">
+                <div className="perm-perfil-topo">
+                  <span className="perm-perfil-icone" aria-hidden="true">
+                    <IconeEscudo tamanho={20} />
+                  </span>
+                  <h2>{grupo.nome}</h2>
+                  <span className="perm-etiquetas">
+                    {grupo.padrao && <span className="perm-etiqueta">Padrão</span>}
+                    {grupo.proprio && <span className="perm-etiqueta perm-etiqueta-voce">Seu grupo</span>}
+                  </span>
+                  {grupo.pode_editar && (
+                    <span className="perm-grupo-acoes">
+                      <button
+                        type="button"
+                        className="perm-icone-botao"
+                        onClick={() => setModal({ tipo: 'editar', grupo })}
+                        aria-label={`Editar ${grupo.nome}`}
+                        title="Editar"
+                      >
+                        <IconeLapis tamanho={16} />
+                      </button>
+                      {!grupo.padrao && (
+                        <button
+                          type="button"
+                          className="perm-icone-botao perigo"
+                          onClick={() => setModal({ tipo: 'excluir', grupo })}
+                          aria-label={`Excluir ${grupo.nome}`}
+                          title="Excluir"
+                        >
+                          <IconeLixeira tamanho={16} />
+                        </button>
+                      )}
+                    </span>
+                  )}
+                </div>
+                {grupo.descricao && <p>{grupo.descricao}</p>}
+                <p className="perm-resumo">
+                  {ROTULO_ALCANCE[grupo.alcance]} · {grupo.telas.length} {grupo.telas.length === 1 ? 'tela' : 'telas'}
+                </p>
+                <Link to={`/configuracao/usuarios?grupo=${grupo.id}`} className="perm-perfil-link">
+                  <IconeUsuarios tamanho={16} />
+                  {grupo.usuarios} {grupo.usuarios === 1 ? 'usuário' : 'usuários'}
+                  <span aria-hidden="true">→</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="perm-card">
+            <div className="perm-tabela-rolagem">
+              <table className="perm-tabela">
+                <caption className="sr-only">Telas liberadas por grupo de permissão</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Tela</th>
+                    <th scope="col">Equipe Scale IA</th>
+                    {lista.map((grupo) => (
+                      <th key={grupo.id} scope="col">
+                        {grupo.nome}
+                      </th>
                     ))}
                   </tr>
+                </thead>
+                {SECOES_TELAS.map((secao) => (
+                  <tbody key={secao}>
+                    <tr className="perm-grupo">
+                      <th scope="rowgroup" colSpan={lista.length + 2}>
+                        {secao}
+                      </th>
+                    </tr>
+                    {TELAS.filter((tela) => tela.secao === secao).map((tela) => (
+                      <tr key={tela.id}>
+                        <th scope="row">
+                          <span className="perm-area">{tela.rotulo}</span>
+                          <span className="perm-area-desc">{tela.descricao}</span>
+                        </th>
+                        <td data-perfil="Equipe Scale IA">
+                          <Marca liberada total />
+                        </td>
+                        {lista.map((grupo) => (
+                          <td key={grupo.id} data-perfil={grupo.nome}>
+                            <Marca liberada={grupo.telas.includes(tela.id)} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
                 ))}
-              </tbody>
-            ))}
-          </table>
-        </div>
-        <p className="perm-nota">
-          Os perfis são definidos pelo sistema. Para mudar o que uma pessoa pode fazer, altere o perfil dela — e, para
-          gestores, as unidades vinculadas — em <Link to="/configuracao/usuarios">Usuários</Link>.
-          {ehEquipe && (
-            <>
-              {' '}
-              A equipe Scale IA é gerenciada em <Link to="/admin/equipe">Administração › Usuários gestão</Link>.
-            </>
+              </table>
+            </div>
+            <p className="perm-nota">
+              O alcance do grupo define as unidades: <strong>toda a empresa</strong> ou só as <strong>unidades vinculadas</strong>{' '}
+              a cada usuário (marcadas em <Link to="/configuracao/usuarios">Usuários</Link>). Ninguém libera telas que o próprio
+              grupo não tem, nem altera o grupo ao qual pertence.
+            </p>
+          </div>
+        </>
+      )}
+
+      {(modal?.tipo === 'criar' || modal?.tipo === 'editar') && (
+        <ModalGrupo
+          grupo={modal.tipo === 'editar' ? modal.grupo : null}
+          query={query}
+          onFechar={() => setModal(null)}
+          onSalvo={(salvo) => {
+            setMensagem(modal.tipo === 'editar' ? `Grupo ${salvo.nome} salvo.` : `Grupo ${salvo.nome} criado.`)
+            setModal(null)
+            grupos.recarregar()
+          }}
+        />
+      )}
+
+      {modal?.tipo === 'excluir' && (
+        <ModalConfirmacao
+          titulo="Excluir grupo"
+          rotuloConfirmar="Excluir grupo"
+          perigo
+          onFechar={() => setModal(null)}
+          onConfirmar={async () => {
+            await api(`/permissoes/grupos/${modal.grupo.id}`, { method: 'DELETE' })
+            setMensagem(`Grupo ${modal.grupo.nome} excluído.`)
+            setModal(null)
+            grupos.recarregar()
+          }}
+        >
+          {modal.grupo.usuarios > 0 ? (
+            <p>
+              <strong>{modal.grupo.nome}</strong> tem {modal.grupo.usuarios} {modal.grupo.usuarios === 1 ? 'usuário' : 'usuários'}.
+              Mova {modal.grupo.usuarios === 1 ? 'ele' : 'eles'} para outro grupo em Usuários antes de excluir.
+            </p>
+          ) : (
+            <p>
+              O grupo <strong>{modal.grupo.nome}</strong> será apagado. Essa ação não pode ser desfeita.
+            </p>
           )}
-        </p>
-      </div>
+        </ModalConfirmacao>
+      )}
     </section>
+  )
+}
+
+function Marca({ liberada, total = false }: { liberada: boolean; total?: boolean }) {
+  const nivel = !liberada ? 'nenhum' : total ? 'total' : 'parcial'
+  return (
+    <span className={`perm-celula perm-${nivel}`}>
+      <span className="perm-marca" aria-hidden="true">
+        {liberada ? <IconeCheck tamanho={14} /> : <IconeMenos tamanho={14} />}
+      </span>
+      <span className="sr-only">{liberada ? 'Liberada' : 'Sem acesso'}</span>
+    </span>
   )
 }

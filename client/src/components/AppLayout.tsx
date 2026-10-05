@@ -63,7 +63,7 @@ export function AppLayout() {
 }
 
 function CascaApp() {
-  const { usuario, unidades, perfil, sair } = useAuth()
+  const { usuario, unidades, perfil, telas, podeVer, sair } = useAuth()
   const [menuAberto, setMenuAberto] = useState(false)
   const [destinoTitulo, setDestinoTitulo] = useState<HTMLDivElement | null>(null)
   const { navRef, rolagem } = useRolagemDoMenu()
@@ -81,12 +81,12 @@ function CascaApp() {
   const semNota = naConfiguracao || naAdministracao || noPerfil
   const secaoAtual: Record<string, boolean> = { configuracao: naConfiguracao, administracao: naAdministracao }
 
-  const secoes = secoesPermitidas(perfil)
+  const secoes = secoesPermitidas(perfil, telas)
   const unicaUnidade = unidades.length === 1 ? unidades[0] : null
   // Dashboard e Colaboradores seguem a unidade em foco (a escolhida no seletor)
   const unidadeEmFoco = unicaUnidade?.id ?? matchUnidade?.params.unidadeId
   const nome = usuario?.nome ?? 'Usuário'
-  const nomePerfil = perfil ? NOME_PERFIL[perfil] : ''
+  const nomePerfil = usuario?.grupo?.nome ?? (perfil ? NOME_PERFIL[perfil] : '')
 
   function fecharMenu() {
     setMenuAberto(false)
@@ -131,24 +131,31 @@ function CascaApp() {
             contemPaginaAtual={naGestao}
             onAlternar={alternarSecao}
           >
-            {/* `end`: na lista ou no detalhe de colaboradores quem fica ativo é "Colaboradores" */}
-            <NavLink
-              to={unidadeEmFoco ? `/unidades/${unidadeEmFoco}` : '/unidades'}
-              end
-              className={classeLink}
-              onClick={fecharMenu}
-            >
-              <IconePainel className="app-nav-icone" />
-              <span>{unicaUnidade ? unicaUnidade.nome_exibicao : 'Dashboard'}</span>
-            </NavLink>
-            <NavLink to="/batidas" className={classeLink} onClick={fecharMenu}>
-              <IconeBatidas className="app-nav-icone" />
-              <span>Batidas</span>
-            </NavLink>
-            <NavLink to={caminhoColaboradores(unidadeEmFoco)} className={classeLink} onClick={fecharMenu}>
-              <IconeUsuarios className="app-nav-icone" />
-              <span>Colaboradores</span>
-            </NavLink>
+            {/* cada item aparece se o grupo de permissão libera a tela */}
+            {podeVer('dashboard') && (
+              // `end`: na lista ou no detalhe de colaboradores quem fica ativo é "Colaboradores"
+              <NavLink
+                to={unidadeEmFoco ? `/unidades/${unidadeEmFoco}` : '/unidades'}
+                end
+                className={classeLink}
+                onClick={fecharMenu}
+              >
+                <IconePainel className="app-nav-icone" />
+                <span>{unicaUnidade ? unicaUnidade.nome_exibicao : 'Dashboard'}</span>
+              </NavLink>
+            )}
+            {podeVer('batidas') && (
+              <NavLink to="/batidas" className={classeLink} onClick={fecharMenu}>
+                <IconeBatidas className="app-nav-icone" />
+                <span>Batidas</span>
+              </NavLink>
+            )}
+            {podeVer('colaboradores') && (
+              <NavLink to={caminhoColaboradores(unidadeEmFoco)} className={classeLink} onClick={fecharMenu}>
+                <IconeUsuarios className="app-nav-icone" />
+                <span>Colaboradores</span>
+              </NavLink>
+            )}
           </SecaoMenu>
 
           {secoes.map((secao) => (

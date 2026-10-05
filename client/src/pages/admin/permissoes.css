@@ -8,7 +8,7 @@
 
 .perm-perfis {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
   margin: 0;
   padding: 0;
@@ -175,7 +175,7 @@
 }
 
 .perm-tabela td {
-  min-width: 170px;
+  min-width: 110px;
 }
 
 .perm-celula {
@@ -234,11 +234,6 @@
 
 /* ----- Responsivo ----- */
 
-@media (max-width: 900px) {
-  .perm-perfis {
-    grid-template-columns: 1fr;
-  }
-}
 
 /* Celular: cada área vira um bloco, com o perfil escrito antes de cada célula. */
 @media (max-width: 640px) {
@@ -301,5 +296,257 @@
     font-size: 12px;
     font-weight: 600;
     color: var(--text);
+  }
+}
+
+/* ----- Grupos de permissão: ações e etiquetas ----- */
+
+.perm-acoes-topo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.perm-acoes-topo .btn-secondary {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.perm-novo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.perm-perfil-topo h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.perm-etiquetas {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.perm-etiqueta {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--muted);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.perm-etiqueta-voce {
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.perm-grupo-acoes {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.perm-icone-botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.perm-icone-botao:hover {
+  background: var(--muted);
+  color: var(--accent);
+}
+
+.perm-icone-botao.perigo:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.perm-icone-botao:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.perm-perfil p.perm-resumo {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.perm-tabela thead th + th {
+  white-space: nowrap;
+}
+
+/* ----- Modal do grupo ----- */
+
+.grupo-bloco {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.grupo-bloco legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.grupo-contagem {
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-suave);
+  border-radius: 999px;
+}
+
+.grupo-alcances {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.grupo-alcance {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 12px 40px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.grupo-alcance input {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  accent-color: var(--accent);
+}
+
+.grupo-alcance.ativo {
+  border-color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.grupo-alcance.bloqueado {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.grupo-alcance-titulo {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.grupo-alcance-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.grupo-secao + .grupo-secao {
+  margin-top: 6px;
+}
+
+.grupo-secao-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--accent);
+}
+
+.grupo-secao-topo .btn-link {
+  margin: 0;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.grupo-telas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.grupo-tela {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.grupo-tela input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.grupo-tela.marcada {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--accent-suave);
+}
+
+.grupo-tela.bloqueada {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.grupo-tela-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.grupo-tela-nome {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.grupo-tela-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .grupo-alcances,
+  .grupo-telas {
+    grid-template-columns: 1fr;
   }
 }

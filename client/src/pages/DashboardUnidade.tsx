@@ -46,9 +46,9 @@ export function DashboardUnidade() {
   const { unidadeId } = useParams()
   // sem unidade na URL (/unidades): painel consolidado de todas as unidades do usuário
   const consolidado = !unidadeId
-  const { perfil, unidades: unidadesSessao } = useAuth()
+  const { telas, unidades: unidadesSessao } = useAuth()
   const { empresa: empresaEmFoco } = useEmpresaAdmin()
-  const linkFechamentos = caminhoFechamentos(perfil)
+  const linkFechamentos = caminhoFechamentos(telas)
   const location = useLocation()
   const navigate = useNavigate()
   // grupo de colaboradores aberto a partir de um gráfico (faixa de saldo ou parte do medidor)

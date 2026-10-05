@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
-import { RequirePerfil } from '../../components/RequirePerfil'
 import { TelaNaoEncontrada } from '../../components/TelaAviso'
 import { useAuth } from '../../context/AuthContext'
 import { AbasConfiguracao } from './AbasConfiguracao'
@@ -11,35 +10,35 @@ import { Equipe } from './Equipe'
 import { Fechamentos } from './Fechamentos'
 import { IntegracaoFriPonto } from './IntegracaoFriPonto'
 import { MapeamentoColunas } from './MapeamentoColunas'
-import { itensPermitidos, perfisDoItem, SECAO_ADMINISTRACAO, SECAO_CONFIGURACAO, type SecaoAdmin } from './navegacao'
+import { itemPermitido, itensPermitidos, SECAO_ADMINISTRACAO, SECAO_CONFIGURACAO, type SecaoAdmin } from './navegacao'
 import { Permissoes } from './Permissoes'
 import { Unidades } from './Unidades'
 import { Usuarios } from './Usuarios'
 
 /* Carregado sob demanda pelo App. A guarda de cada seção fica no App (quem vê ao menos
-   um item dela); aqui cada item da Configuração confere os próprios perfis — o gestor
-   só entra em Integração FriPonto. */
+   um item dela); aqui cada item da Configuração confere a própria tela no grupo de
+   permissão do usuário (Configuração → Permissões). */
 
 /** Índice da seção: o primeiro item que o perfil vê. */
 function PrimeiroItem({ secao }: { secao: SecaoAdmin }) {
-  const { perfil } = useAuth()
-  const [primeiro] = itensPermitidos(secao, perfil)
+  const { perfil, telas } = useAuth()
+  const [primeiro] = itensPermitidos(secao, perfil, telas)
   return primeiro ? <Navigate to={primeiro.caminho} replace /> : <Navigate to="/" replace />
 }
 
-/** Rota de um item da Configuração, liberada só para os perfis do item. */
+/** Item da Configuração liberado para o usuário; senão volta para o primeiro item que ele vê. */
+function RequireItem({ caminho, children }: { caminho: string; children: ReactNode }) {
+  const { perfil, telas } = useAuth()
+  const item = SECAO_CONFIGURACAO.itens.find((atual) => atual.caminho === caminho)
+  if (!item || !itemPermitido(SECAO_CONFIGURACAO, item, perfil, telas)) {
+    return <Navigate to={SECAO_CONFIGURACAO.base} replace />
+  }
+  return children
+}
+
+/** Rota de um item da Configuração. */
 function itemConfiguracao(caminho: string, elemento: ReactNode) {
-  return (
-    <Route
-      key={caminho}
-      path={`${caminho}/*`}
-      element={
-        <RequirePerfil perfis={perfisDoItem(SECAO_CONFIGURACAO, caminho)} redirecionarPara={SECAO_CONFIGURACAO.base}>
-          {elemento}
-        </RequirePerfil>
-      }
-    />
-  )
+  return <Route key={caminho} path={`${caminho}/*`} element={<RequireItem caminho={caminho}>{elemento}</RequireItem>} />
 }
 
 /** /configuracao/* — gestão da própria empresa (a equipe escolhe a empresa no seletor). */

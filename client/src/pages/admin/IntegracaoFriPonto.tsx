@@ -44,7 +44,7 @@ function textoTempoRealForcado({ colaboradores, minutos_estimados }: PedidoTempo
 /* Configuração → Integração FriPonto. Equipe e RH veem a empresa toda e puxam cadastros e dados;
    o gestor vê a mesma tela, mas só puxa dados das unidades dele (o server filtra `unidades`). */
 export function IntegracaoFriPonto() {
-  const { perfil } = useAuth()
+  const { perfil, telas } = useAuth()
   const { empresaId, query, ehAdmin } = useEmpresaSelecionada()
   const [mensagem, setMensagem] = useState('')
   const [pedindoCadastros, setPedindoCadastros] = useState(false)
@@ -79,7 +79,7 @@ export function IntegracaoFriPonto() {
 
   const dados = status.dados
   const podePuxarCadastros = perfil === 'admin' || perfil === 'rh'
-  const linkFechamentos = caminhoFechamentos(perfil)
+  const linkFechamentos = caminhoFechamentos(telas)
 
   // atualiza sozinha enquanto houver algo andando (mesmo esquema do painel de fechamentos)
   const recarregarStatus = status.recarregar

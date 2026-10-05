@@ -4,11 +4,8 @@ import { Modal } from '../../components/Modal'
 import { ApiError, api } from '../../lib/api'
 import { errosDeCampos, mensagemDeErro } from '../../lib/erros'
 import { cpfValido, EMAIL_VALIDO, formatarTelefone, mascararCpfEntrada, mascararTelefoneEntrada } from '../../lib/formato'
-import { NOME_PERFIL } from '../../lib/preferencias'
-import type { ClienteAdmin, ContaCriada, PerfilCliente, UnidadeAdmin } from '../../types/api'
+import type { ClienteAdmin, ContaCriada, GrupoPermissao, UnidadeAdmin } from '../../types/api'
 import { PreviaCadastro, SecaoCadastro } from './FormCadastro'
-
-const PERFIS: PerfilCliente[] = ['gestor', 'rh']
 
 interface Props {
   usuario: ClienteAdmin | null
@@ -17,22 +14,37 @@ interface Props {
   ehAdmin: boolean
   ehProprio: boolean
   unidades: UnidadeAdmin[]
+  /** grupos de permissão da empresa (Configuração → Permissões) */
+  grupos: GrupoPermissao[]
   onFechar: () => void
   onSalvo: (resultado: { nome: string; senha?: string }) => void
 }
 
-export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades, onFechar, onSalvo }: Props) {
+/** Grupo sugerido para um usuário novo: o Gestor padrão, se quem cadastra pode usá-lo. */
+function grupoInicial(grupos: GrupoPermissao[]) {
+  const disponiveis = grupos.filter((grupo) => grupo.pode_editar)
+  return (disponiveis.find((grupo) => grupo.padrao === 'gestor') ?? disponiveis[0])?.id ?? null
+}
+
+export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades, grupos, onFechar, onSalvo }: Props) {
   const editando = usuario !== null
   const [nome, setNome] = useState(usuario?.nome ?? '')
   const [email, setEmail] = useState(usuario?.email ?? '')
   const [cpf, setCpf] = useState('')
   const [cargo, setCargo] = useState(usuario?.cargo ?? '')
   const [telefone, setTelefone] = useState(usuario?.telefone ? formatarTelefone(usuario.telefone) : '')
-  const [perfil, setPerfil] = useState<PerfilCliente>(usuario?.perfil ?? 'gestor')
+  const [grupoId, setGrupoId] = useState<number | null>(() => usuario?.grupo.id ?? grupoInicial(grupos))
   const [unidadeIds, setUnidadeIds] = useState<number[]>(() => usuario?.unidades.map((unidade) => unidade.id) ?? [])
   const [erros, setErros] = useState<Record<string, string>>({})
   const [erroGeral, setErroGeral] = useState('')
   const [enviando, setEnviando] = useState(false)
+
+  const grupo = grupos.find((item) => item.id === grupoId) ?? (usuario && usuario.grupo.id === grupoId ? usuario.grupo : null)
+  // alcance "unidades vinculadas": escolhe as unidades que a pessoa vê
+  const porUnidade = (grupo?.alcance ?? 'unidades') === 'unidades'
+  // grupos que quem cadastra pode usar (mais o atual, para aparecer selecionado)
+  const opcoesGrupo = grupos.filter((item) => item.pode_editar || item.id === usuario?.grupo.id)
+  const grupoTravado = ehProprio || (usuario !== null && !grupos.find((item) => item.id === usuario.grupo.id)?.pode_editar && !ehAdmin)
 
   function validar() {
     const saida: Record<string, string> = {}
@@ -43,7 +55,8 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
     if (digitosTelefone && (digitosTelefone.length < 10 || digitosTelefone.length > 11)) saida.telefone = 'Informe DDD e número.'
     const temCpf = Boolean(cpf) || Boolean(usuario?.cpf_mascarado)
     if (!email.trim() && !temCpf) saida.email = 'Informe e-mail ou CPF (usados para entrar).'
-    if (perfil === 'gestor' && unidadeIds.length === 0) saida.unidade_ids = 'Escolha ao menos uma unidade.'
+    if (!grupoId) saida.grupo_id = 'Escolha o grupo de permissão.'
+    if (porUnidade && unidadeIds.length === 0) saida.unidade_ids = 'Escolha ao menos uma unidade.'
     return saida
   }
 
@@ -67,11 +80,11 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
             nome: nome.trim(),
             email: emailLimpo,
             cpf: cpfDigitos,
-            perfil,
+            grupo_id: grupoId,
             cargo: cargoLimpo,
             telefone: telefoneDigitos,
             empresa_id: ehAdmin ? empresaId : undefined,
-            unidade_ids: perfil === 'gestor' ? unidadeIds : [],
+            unidade_ids: porUnidade ? unidadeIds : [],
           },
         })
         return onSalvo({ nome: nome.trim(), senha: criado.senha_temporaria })
@@ -83,14 +96,14 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
       if (cpfDigitos) alteracoes.cpf = cpfDigitos
       if (cargoLimpo !== usuario.cargo) alteracoes.cargo = cargoLimpo
       if (telefoneDigitos !== usuario.telefone) alteracoes.telefone = telefoneDigitos
-      if (perfil !== usuario.perfil) alteracoes.perfil = perfil
+      if (grupoId !== usuario.grupo.id) alteracoes.grupo_id = grupoId
       if (Object.keys(alteracoes).length) {
         await api(`/clientes/${usuario.id}`, { method: 'PATCH', json: alteracoes })
       }
 
-      const anteriores = usuario.perfil === 'gestor' ? usuario.unidades.map((unidade) => unidade.id) : []
-      const mudouUnidades = [...anteriores].sort().join() !== [...unidadeIds].sort().join() || perfil !== usuario.perfil
-      if (perfil === 'gestor' && mudouUnidades) {
+      const anteriores = usuario.grupo.alcance === 'unidades' ? usuario.unidades.map((unidade) => unidade.id) : []
+      const mudouUnidades = [...anteriores].sort().join() !== [...unidadeIds].sort().join() || grupoId !== usuario.grupo.id
+      if (porUnidade && mudouUnidades) {
         await api(`/clientes/${usuario.id}/unidades`, { method: 'PUT', json: { unidade_ids: unidadeIds } })
       }
       onSalvo({ nome: nome.trim() })
@@ -115,7 +128,7 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
         <PreviaCadastro
           nome={nome}
           vazio="Nome do usuário"
-          sub={[NOME_PERFIL[perfil], cargo.trim()].filter(Boolean).join(' · ')}
+          sub={[grupo?.nome, cargo.trim()].filter(Boolean).join(' · ')}
         />
 
         <SecaoCadastro titulo="Dados pessoais">
@@ -179,12 +192,22 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
               )}
             </Campo>
           </div>
-          <Campo rotulo="Perfil" erro={erros.perfil} ajuda={ehProprio ? 'Você não pode alterar o próprio perfil.' : perfilAjuda(perfil)}>
+          <Campo
+            rotulo="Grupo de permissão"
+            erro={erros.grupo_id}
+            ajuda={ehProprio ? 'Você não pode trocar o próprio grupo.' : grupoAjuda(grupo)}
+          >
             {(props) => (
-              <select {...props} value={perfil} disabled={ehProprio} onChange={(event) => setPerfil(event.target.value as PerfilCliente)}>
-                {PERFIS.filter((item) => ehAdmin || item === 'gestor' || item === usuario?.perfil).map((item) => (
-                  <option key={item} value={item}>
-                    {NOME_PERFIL[item]}
+              <select
+                {...props}
+                value={grupoId ?? ''}
+                disabled={grupoTravado}
+                onChange={(event) => setGrupoId(event.target.value ? Number(event.target.value) : null)}
+              >
+                {grupoId === null && <option value="">Escolha um grupo</option>}
+                {opcoesGrupo.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nome}
                   </option>
                 ))}
               </select>
@@ -192,8 +215,8 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
           </Campo>
         </SecaoCadastro>
 
-        {perfil === 'gestor' && (
-          <SecaoCadastro titulo="Unidades que o gestor vê" descricao={`${unidadeIds.length} de ${ordenadas.length} marcadas.`}>
+        {porUnidade && (
+          <SecaoCadastro titulo="Unidades que o usuário vê" descricao={`${unidadeIds.length} de ${ordenadas.length} marcadas.`}>
             {ordenadas.length === 0 ? (
               <p className="texto-suave">Nenhuma unidade com nome de exibição. Configure em Unidades.</p>
             ) : (
@@ -236,7 +259,10 @@ export function ModalUsuario({ usuario, empresaId, ehAdmin, ehProprio, unidades,
   )
 }
 
-function perfilAjuda(perfil: PerfilCliente) {
-  if (perfil === 'gestor') return 'Vê somente as unidades marcadas abaixo.'
-  return 'Vê todas as unidades da empresa e cuida da Configuração (usuários, unidades, alertas).'
+function grupoAjuda(grupo: Pick<GrupoPermissao, 'alcance' | 'telas'> | null) {
+  if (!grupo) return 'As telas de cada grupo são definidas em Permissões.'
+  const telas = `${grupo.telas.length} ${grupo.telas.length === 1 ? 'tela liberada' : 'telas liberadas'}`
+  return grupo.alcance === 'empresa'
+    ? `Vê todas as unidades da empresa · ${telas}.`
+    : `Vê somente as unidades marcadas abaixo · ${telas}.`
 }

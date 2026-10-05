@@ -23,6 +23,14 @@ export function Perfil() {
 
   if (!usuario) return null
 
+  // cliente: o nome do grupo de permissão; equipe: "Equipe Scale IA"
+  const nomeAcesso = usuario.grupo?.nome ?? (perfil ? NOME_PERFIL[perfil] : null)
+  const descricaoAcesso = usuario.grupo
+    ? `${usuario.telas.length} ${usuario.telas.length === 1 ? 'tela liberada' : 'telas liberadas'} pelo grupo de permissão.`
+    : perfil
+      ? DESCRICAO_PERFIL[perfil]
+      : null
+
   const ordenadas = [...unidades].sort((a, b) => a.nome_exibicao.localeCompare(b.nome_exibicao, 'pt-BR'))
 
   return (
@@ -38,7 +46,7 @@ export function Perfil() {
           <div className="perfil-identidade">
             <h2>{usuario.nome}</h2>
             <div className="perfil-meta">
-              {perfil && <span className="perfil-pilula">{NOME_PERFIL[perfil]}</span>}
+              {nomeAcesso && <span className="perfil-pilula">{nomeAcesso}</span>}
               {usuario.email && (
                 <span className="perfil-email">
                   <IconeEmail tamanho={15} />
@@ -62,12 +70,12 @@ export function Perfil() {
               <dt>E-mail</dt>
               <dd>{usuario.email || 'Não informado'}</dd>
             </div>
-            {perfil && (
+            {nomeAcesso && (
               <div>
-                <dt>Perfil de acesso</dt>
+                <dt>{usuario.grupo ? 'Grupo de permissão' : 'Perfil de acesso'}</dt>
                 <dd>
-                  {NOME_PERFIL[perfil]}
-                  <small>{DESCRICAO_PERFIL[perfil]}</small>
+                  {nomeAcesso}
+                  {descricaoAcesso && <small>{descricaoAcesso}</small>}
                 </dd>
               </div>
             )}

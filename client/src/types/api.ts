@@ -23,6 +23,40 @@ export interface UnidadeRef {
   empresa_id: number
 }
 
+/** Telas que um grupo de permissão libera (catálogo em lib/telas.ts). */
+export type Tela =
+  | 'dashboard'
+  | 'batidas'
+  | 'colaboradores'
+  | 'usuarios'
+  | 'permissoes'
+  | 'integracao'
+  | 'atualizacao'
+  | 'unidades'
+  | 'alertas'
+  | 'fechamentos'
+
+/** 'empresa' = todas as unidades da empresa; 'unidades' = só as vinculadas ao usuário. */
+export type AlcanceGrupo = 'empresa' | 'unidades'
+
+/** GET /permissoes/grupos */
+export interface GrupoPermissao {
+  id: number
+  empresa_id: number
+  nome: string
+  descricao: string | null
+  alcance: AlcanceGrupo
+  telas: Tela[]
+  /** grupos criados pelo sistema (não podem ser excluídos) */
+  padrao: 'rh' | 'gestor' | null
+  usuarios: number
+  atualizado_em: DataHoraISO
+  /** quem está vendo pode editar/excluir (não passa do que ele tem e não é o grupo dele) */
+  pode_editar: boolean
+  /** é o grupo de quem está vendo */
+  proprio: boolean
+}
+
 export interface UsuarioSessao {
   /** Ids de equipe e clientes podem coincidir: use `tipo` junto para identificar a pessoa. */
   id: number
@@ -32,6 +66,10 @@ export interface UsuarioSessao {
   perfil: Perfil
   empresa_id: number | null
   deve_trocar_senha: boolean
+  /** Telas liberadas pelo grupo (a equipe Scale IA tem todas). */
+  telas: Tela[]
+  /** Grupo de permissão do cliente; null para a equipe. */
+  grupo: { id: number; nome: string } | null
 }
 
 export interface LoginResposta {
@@ -384,7 +422,9 @@ export interface ClienteAdmin {
   id: number
   nome: string
   email: string | null
+  /** derivado do alcance do grupo: rh = empresa toda, gestor = unidades vinculadas */
   perfil: PerfilCliente
+  grupo: { id: number; nome: string; alcance: AlcanceGrupo; telas: Tela[] }
   cargo: string | null
   telefone: string | null
   empresa_id: number

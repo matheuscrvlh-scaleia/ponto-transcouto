@@ -7,6 +7,7 @@ import { CentralAlertas } from './components/CentralAlertas'
 import { Carregando } from './components/Estados'
 import { RequireAuth } from './components/RequireAuth'
 import { RequirePerfil } from './components/RequirePerfil'
+import { RequireTela } from './components/RequireTela'
 import { LimiteErro, TelaNaoEncontrada } from './components/TelaAviso'
 import { Batidas } from './pages/Batidas'
 import { Colaboradores } from './pages/Colaboradores'
@@ -16,10 +17,13 @@ import { Inicio } from './pages/Inicio'
 import { Login } from './pages/Login'
 import { Perfil } from './pages/Perfil'
 import { TrocarSenha } from './pages/TrocarSenha'
-import { perfisDaSecao, SECAO_CONFIGURACAO } from './pages/admin/navegacao'
+import { SECAO_CONFIGURACAO } from './pages/admin/navegacao'
+import type { Tela } from './types/api'
 
-// quem vê ao menos um item da Configuração (o gestor só a Integração FriPonto; cada item confere os seus)
-const PERFIS_CONFIGURACAO = perfisDaSecao(SECAO_CONFIGURACAO)
+// quem tem ao menos uma tela da Configuração no grupo de permissão (cada item confere a sua)
+const TELAS_CONFIGURACAO = SECAO_CONFIGURACAO.itens.flatMap((item) => (item.tela ? [item.tela] : []))
+// o detalhe do colaborador abre a partir do Dashboard, de Colaboradores e de Batidas
+const TELAS_DETALHE: Tela[] = ['dashboard', 'colaboradores', 'batidas']
 
 // Configuração e Administração ficam no mesmo pedaço carregado sob demanda
 const carregarAdmin = () => import('./pages/admin/AdminRotas')
@@ -57,20 +61,29 @@ export default function App() {
                 <Route element={<AppLayout />}>
                   <Route index element={<Inicio />} />
                   <Route path="perfil" element={<Perfil />} />
-                  <Route path="unidades" element={<DashboardUnidade />} />
-                  <Route path="unidades/:unidadeId" element={<DashboardUnidade />} />
-                  <Route path="unidades/:unidadeId/colaboradores" element={<Colaboradores />} />
-                  <Route path="unidades/:unidadeId/colaboradores/:colaboradorId" element={<DetalheColaborador />} />
-                  <Route path="batidas" element={<Batidas />} />
-                  <Route path="colaboradores" element={<Colaboradores />} />
+                  {/* Gestão: cada tela vale pelo grupo de permissão (Configuração → Permissões) */}
+                  <Route element={<RequireTela telas={['dashboard']} />}>
+                    <Route path="unidades" element={<DashboardUnidade />} />
+                    <Route path="unidades/:unidadeId" element={<DashboardUnidade />} />
+                  </Route>
+                  <Route element={<RequireTela telas={['colaboradores']} />}>
+                    <Route path="unidades/:unidadeId/colaboradores" element={<Colaboradores />} />
+                    <Route path="colaboradores" element={<Colaboradores />} />
+                  </Route>
+                  <Route element={<RequireTela telas={TELAS_DETALHE} />}>
+                    <Route path="unidades/:unidadeId/colaboradores/:colaboradorId" element={<DetalheColaborador />} />
+                  </Route>
+                  <Route element={<RequireTela telas={['batidas']} />}>
+                    <Route path="batidas" element={<Batidas />} />
+                  </Route>
                   <Route
                     path="configuracao/*"
                     element={
-                      <RequirePerfil perfis={PERFIS_CONFIGURACAO}>
+                      <RequireTela telas={TELAS_CONFIGURACAO}>
                         <Suspense fallback={<Carregando />}>
                           <RotasConfiguracao />
                         </Suspense>
-                      </RequirePerfil>
+                      </RequireTela>
                     }
                   />
                   {REDIRECIONAMENTOS.map(([de, para]) => (

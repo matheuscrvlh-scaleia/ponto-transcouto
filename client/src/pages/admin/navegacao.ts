@@ -1,9 +1,11 @@
-import type { Perfil } from '../../types/api'
+import type { Perfil, Tela } from '../../types/api'
 
 export interface ItemMenu {
   caminho: string
   rotulo: string
-  /** Perfis que veem este item; sem isso, valem os perfis padrão da seção. */
+  /** Tela que o grupo de permissão precisa liberar (Configuração). */
+  tela?: Tela
+  /** Perfis que veem este item (sem tela); sem isso, valem os perfis padrão da seção. */
   perfis?: Perfil[]
 }
 
@@ -32,17 +34,16 @@ export const SECAO_CONFIGURACAO: SecaoAdmin = {
   id: 'configuracao',
   titulo: 'Configuração',
   base: '/configuracao',
-  perfis: ['admin', 'rh'],
+  // cada item vale pela tela liberada no grupo de permissão (Configuração → Permissões)
+  perfis: ['admin', 'rh', 'gestor'],
   itens: [
-    { caminho: 'usuarios', rotulo: 'Usuários' },
-    // o gestor entra só aqui (puxa dados das unidades dele)
-    { caminho: 'integracao', rotulo: 'Integração FriPonto', perfis: ['admin', 'rh', 'gestor'] },
-    // modo (semanal / tempo real), dia e hora: RH e equipe
-    { caminho: 'atualizacao', rotulo: 'Atualização dos dados', perfis: ['admin', 'rh'] },
-    { caminho: 'unidades', rotulo: 'Unidades' },
-    { caminho: 'alertas', rotulo: 'Alertas e horas pagas' },
-    { caminho: 'fechamentos', rotulo: 'Fechamentos' },
-    { caminho: 'permissoes', rotulo: 'Permissões' },
+    { caminho: 'usuarios', rotulo: 'Usuários', tela: 'usuarios' },
+    { caminho: 'integracao', rotulo: 'Integração FriPonto', tela: 'integracao' },
+    { caminho: 'atualizacao', rotulo: 'Atualização dos dados', tela: 'atualizacao' },
+    { caminho: 'unidades', rotulo: 'Unidades', tela: 'unidades' },
+    { caminho: 'alertas', rotulo: 'Alertas e horas pagas', tela: 'alertas' },
+    { caminho: 'fechamentos', rotulo: 'Fechamentos', tela: 'fechamentos' },
+    { caminho: 'permissoes', rotulo: 'Permissões', tela: 'permissoes' },
   ],
   grupos: [
     { id: 'usuarios', rotulo: 'Usuários', abas: ['usuarios', 'permissoes'] },
@@ -70,25 +71,22 @@ export const SECAO_ADMINISTRACAO: SecaoAdmin = {
   ],
 }
 
-/** Perfis que acessam um item da seção. */
-export function perfisDoItem(secao: SecaoAdmin, caminho: string): Perfil[] {
-  return secao.itens.find((item) => item.caminho === caminho)?.perfis ?? secao.perfis
+/** O usuário (perfil + telas do grupo) vê o item? */
+export function itemPermitido(secao: SecaoAdmin, item: ItemMenu, perfil: Perfil | null, telas: Tela[]) {
+  if (!perfil) return false
+  if (item.tela && !telas.includes(item.tela)) return false
+  return (item.perfis ?? secao.perfis).includes(perfil)
 }
 
-/** Itens da seção que o perfil vê. */
-export function itensPermitidos(secao: SecaoAdmin, perfil: Perfil | null): ItemMenu[] {
-  return perfil ? secao.itens.filter((item) => (item.perfis ?? secao.perfis).includes(perfil)) : []
+/** Itens da seção que o usuário vê. */
+export function itensPermitidos(secao: SecaoAdmin, perfil: Perfil | null, telas: Tela[]): ItemMenu[] {
+  return secao.itens.filter((item) => itemPermitido(secao, item, perfil, telas))
 }
 
-/** Perfis que veem ao menos um item da seção (guarda de rota da seção inteira). */
-export function perfisDaSecao(secao: SecaoAdmin): Perfil[] {
-  return [...new Set(secao.itens.flatMap((item) => item.perfis ?? secao.perfis))]
-}
-
-/** Seções que o perfil vê, já só com os itens permitidos a ele. */
-export function secoesPermitidas(perfil: Perfil | null): SecaoAdmin[] {
+/** Seções que o usuário vê, já só com os itens permitidos a ele. */
+export function secoesPermitidas(perfil: Perfil | null, telas: Tela[]): SecaoAdmin[] {
   return [SECAO_CONFIGURACAO, SECAO_ADMINISTRACAO]
-    .map((secao) => ({ ...secao, itens: itensPermitidos(secao, perfil) }))
+    .map((secao) => ({ ...secao, itens: itensPermitidos(secao, perfil, telas) }))
     .filter((secao) => secao.itens.length > 0)
 }
 
@@ -114,7 +112,7 @@ export function entradasDaSecao(secao: SecaoAdmin): EntradaMenu[] {
     .filter((entrada) => entrada.abas.length > 0)
 }
 
-/** Painel de fechamentos que o perfil acessa (as ações de equipe aparecem conforme o perfil). */
-export function caminhoFechamentos(perfil: Perfil | null) {
-  return perfil === 'admin' || perfil === 'rh' ? '/configuracao/fechamentos' : null
+/** Painel de fechamentos, se o grupo libera a tela (as ações de equipe aparecem conforme o perfil). */
+export function caminhoFechamentos(telas: Tela[]) {
+  return telas.includes('fechamentos') ? '/configuracao/fechamentos' : null
 }
