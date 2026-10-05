@@ -155,24 +155,6 @@
   color: #ffffff;
 }
 
-.filtros-admin {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-end;
-}
-
-.filtros-admin .field {
-  flex: 1 1 160px;
-  min-width: 0;
-}
-
-.filtros-admin .field input,
-.filtros-admin .field select {
-  min-height: 40px;
-  font-size: 14px;
-}
-
 /* Equipe em "Todas as empresas" numa tela de uma empresa só: botões para escolher */
 .escolha-empresa {
   display: flex;
@@ -263,35 +245,6 @@
   color: var(--aviso);
 }
 
-.resumo-linha {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.resumo-linha strong {
-  color: var(--text-h);
-}
-
-.grupo-semana + .grupo-semana {
-  margin-top: 16px;
-}
-
-.grupo-semana-titulo {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 12px;
-  padding: 12px 12px 6px;
-}
-
-.grupo-semana-titulo h2 {
-  font-size: 15px;
-  margin: 0;
-}
-
 .celula-sub {
   display: block;
   font-size: 12px;
@@ -378,25 +331,6 @@
 
 tr.linha-inativa > * {
   opacity: 0.6;
-}
-
-.info-lista {
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 14px 20px;
-}
-
-.info-lista dt {
-  font-size: 12px;
-  color: var(--text);
-}
-
-.info-lista dd {
-  margin: 2px 0 0;
-  color: var(--text-h);
-  font-size: 14px;
-  font-weight: 500;
 }
 
 .erro-bloco {
@@ -528,19 +462,6 @@ tr.linha-inativa > * {
   padding: 10px 12px 4px;
 }
 
-.detalhes-bloco summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--text-h);
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-}
-
-.detalhes-bloco[open] summary {
-  margin-bottom: 10px;
-}
-
 .card-cabecalho {
   display: flex;
   flex-wrap: wrap;
@@ -593,23 +514,6 @@ tr.linha-inativa > * {
 
   .tabela-edicao td:first-child {
     grid-column: 1 / -1;
-  }
-}
-
-.tabela-fechamentos td {
-  white-space: nowrap;
-}
-
-.tabela-fechamentos .celula-motivo {
-  display: block;
-  min-width: 200px;
-  max-width: 280px;
-  margin-top: 4px;
-}
-
-@media (max-width: 640px) {
-  .filtros-admin .field {
-    flex-basis: 140px;
   }
 }
 

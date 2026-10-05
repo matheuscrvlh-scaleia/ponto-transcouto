@@ -7,7 +7,9 @@ import { Horas } from '../components/Horas'
 import { IconeRelogio } from '../components/Icones'
 import { IndicadorCurva } from '../components/IndicadorCurva'
 import { SeloTempoReal } from '../components/SeloTempoReal'
-import { formatarData, iniciais, normalizarBusca } from '../lib/formato'
+import { RelatorioColaboradores } from './RelatorioColaboradores'
+import { baixarCsv, imprimirComoPdf, minutosCsv, paraNomeArquivo, type CelulaCsv } from '../lib/exportar'
+import { formatarData, formatarDataHora, hojeISO, iniciais, normalizarBusca } from '../lib/formato'
 import {
   caminhoColaboradores,
   ORDEM_PADRAO,
@@ -63,6 +65,44 @@ function passaNoFiltro(linha: LinhaDashboard, filtro: FiltroDashboard) {
   if (filtro === 'negativa') return linha.negativa_min > 0
   if (filtro === 'fora') return linha.fora_da_curva !== null
   return true
+}
+
+/** Filtro e busca atuais, em texto (cabeçalho da planilha e do PDF). */
+function descricaoFiltro(filtro: FiltroDashboard, busca: string) {
+  const rotulo = FILTROS.find((item) => item.valor === filtro)?.rotulo ?? 'Todos'
+  return busca.trim() ? `${rotulo} · busca “${busca.trim()}”` : rotulo
+}
+
+/** Ordem atual, em texto (cabeçalho do PDF). */
+function descricaoOrdem(ordem: { campo: CampoOrdem; direcao: Direcao }) {
+  const pronta = ORDENS_MOBILE.find((item) => item.valor === `${ordem.campo}.${ordem.direcao}`)
+  if (pronta) return pronta.rotulo
+  if (ordem.campo === 'nome') return 'Nome (Z–A)'
+  const rotulo = COLUNAS.find((coluna) => coluna.campo === ordem.campo)?.rotulo ?? ''
+  return `${rotulo} (${ordem.direcao === 'asc' ? 'menor' : 'maior'} primeiro)`
+}
+
+/** Planilha da lista como está na tela (mesmo filtro, busca e ordem). */
+function linhasPlanilha(linhas: Linha[], nomePainel: string, consolidado: boolean, filtro: string): CelulaCsv[][] {
+  const curva = (linha: Linha) =>
+    linha.fora_da_curva === 'positivo' ? 'Acima do limite' : linha.fora_da_curva === 'negativo' ? 'Abaixo do limite' : ''
+  return [
+    ['Colaboradores', nomePainel],
+    ['Filtro', filtro],
+    ['Exportado em', formatarDataHora(new Date().toISOString())],
+    [],
+    ['Nome', ...(consolidado ? ['Unidade'] : []), 'Função', 'Saldo banco', 'Extras', 'Negativas', 'Pagas', 'Fora da curva'],
+    ...linhas.map((linha) => [
+      linha.nome,
+      ...(consolidado ? [linha.unidade_nome] : []),
+      linha.funcao,
+      minutosCsv(linha.saldo_min),
+      minutosCsv(linha.extra_min),
+      minutosCsv(linha.negativa_min),
+      minutosCsv(linha.pagas_min),
+      curva(linha),
+    ]),
+  ]
 }
 
 /** Lista de colaboradores com saldo, extras, negativas e pagas (da unidade ou de todas as unidades). */
@@ -160,16 +200,45 @@ export function Colaboradores() {
 
   const complemento = (linha: Linha) => [consolidado ? linha.unidade_nome : null, linha.funcao].filter(Boolean).join(' · ')
   const nenhumColaborador = aoVivo || !fechamento ? 'Nenhum colaborador com dados' : 'Nenhum colaborador neste fechamento'
+  const filtroAtual = descricaoFiltro(filtro, busca)
+  const subtitulo = consolidado
+    ? `Banco de horas de ${unidadesPainel.length} ${unidadesPainel.length === 1 ? 'unidade' : 'unidades'}`
+    : `Banco de horas de ${nomePainel}`
+  // de quando são os números (cabeçalho do PDF)
+  const textoDados = aoVivo
+    ? ['Tempo real', `dados até ${dadosAte}`, atualizados].filter(Boolean).join(' · ')
+    : fechamento
+      ? `Dados até ${formatarData(fechamento.data_referencia)}${
+          !datasIguais ? ' (algumas unidades com dados anteriores)' : fechamento.semana_fechamento_mes ? ' (fechamento do mês)' : ''
+        }`
+      : null
+
+  function baixarPlanilha() {
+    baixarCsv(
+      `colaboradores-${paraNomeArquivo(nomePainel)}-${hojeISO()}.csv`,
+      linhasPlanilha(linhas, nomePainel, consolidado, filtroAtual),
+    )
+  }
 
   return (
     <section className="pagina dash">
-      <header className="dash-header">
+      {/* "Salvar PDF": relatório próprio para a folha; a tabela da tela fica de fora da impressão */}
+      <RelatorioColaboradores
+        titulo={nomePainel}
+        empresa={empresaEmFoco?.nome ?? null}
+        consolidado={consolidado}
+        linhas={linhas}
+        totalGeral={todos.length}
+        filtro={filtroAtual}
+        ordem={descricaoOrdem(ordem)}
+        dados={[subtitulo, textoDados].filter(Boolean).join(' · ')}
+      />
+
+      <header className="dash-header nao-imprimir">
         <TituloPagina>Colaboradores</TituloPagina>
         <p className="pagina-sub">
-          {consolidado
-            ? `Banco de horas de ${unidadesPainel.length} ${unidadesPainel.length === 1 ? 'unidade' : 'unidades'}` +
-              (empresaEmFoco ? ` · ${empresaEmFoco.nome}` : '')
-            : `Banco de horas de ${nomePainel}`}
+          {subtitulo}
+          {consolidado && empresaEmFoco && ` · ${empresaEmFoco.nome}`}
           {!aoVivo && fechamento && (
             <>
               {' — '}dados até {formatarData(fechamento.data_referencia)}
@@ -197,7 +266,7 @@ export function Colaboradores() {
         </EstadoVazio>
       ) : (
         <>
-          <section className="dash-card dash-area-lista" aria-labelledby="titulo-lista">
+          <section className="dash-card dash-area-lista nao-imprimir" aria-labelledby="titulo-lista">
             <div className="dash-card-topo">
               <div>
                 <h2 id="titulo-lista">{nomePainel}</h2>
@@ -216,9 +285,23 @@ export function Colaboradores() {
                   )}
                 </p>
               </div>
+              <div className="exportar nao-imprimir">
+                <button type="button" className="btn-secondary" onClick={baixarPlanilha} disabled={linhas.length === 0}>
+                  Baixar planilha
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => imprimirComoPdf(`Colaboradores - ${nomePainel}`)}
+                  disabled={linhas.length === 0}
+                  title="Abre a impressão do navegador; escolha “Salvar como PDF”"
+                >
+                  Salvar PDF
+                </button>
+              </div>
             </div>
 
-            <div className="filtros">
+            <div className="filtros nao-imprimir">
               <div className="busca">
                 <label htmlFor="busca-colaborador" className="sr-only">
                   Buscar colaborador por nome
@@ -382,7 +465,7 @@ export function Colaboradores() {
               Exibindo {todos.length} de {dados.total} colaboradores (limite por página).
             </p>
           )}
-          <p className="rodape-nota">Somente leitura. Ajustes de ponto são feitos pelo RH na FriPonto.</p>
+          <p className="rodape-nota nao-imprimir">Somente leitura. Ajustes de ponto são feitos pelo RH na FriPonto.</p>
         </>
       )}
     </section>

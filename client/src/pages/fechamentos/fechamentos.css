@@ -1,0 +1,491 @@
+/* ---------- Gestão → Fechamentos (lista por ciclo, calendário e detalhe) ---------- */
+
+/* "8/9": o total fica menor ao lado do número principal */
+.fech-kpi-de {
+  font-size: 0.55em;
+  font-weight: 600;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+/* lista à esquerda, calendário à direita (empilham em telas menores) */
+.fech-grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.fech-lista {
+  gap: 12px;
+}
+
+/* ----- Filtros ----- */
+
+.fech-filtros {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fech .segmento {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fech-segmento-n {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  background: var(--surface);
+  color: var(--text-h);
+}
+
+.fech .segmento.ativo .fech-segmento-n {
+  background: rgba(255, 255, 255, 0.22);
+  color: inherit;
+}
+
+.fech-campos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+}
+
+.fech-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fech-campo select {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  min-height: 42px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--muted);
+  color: var(--text-h);
+  color-scheme: light dark;
+}
+
+.fech-campo select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.fech-campos .btn-link {
+  min-height: 42px;
+}
+
+/* ----- Ciclos ----- */
+
+.fech-ciclos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fech-ciclo {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.fech-ciclo.com-falha {
+  border-color: var(--danger-border);
+}
+
+.fech-ciclo-resumo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fech-ciclo-resumo::-webkit-details-marker {
+  display: none;
+}
+
+.fech-ciclo-resumo:hover {
+  background: var(--muted);
+}
+
+.fech-ciclo-resumo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 16px;
+}
+
+.fech-ciclo[open] > .fech-ciclo-resumo {
+  border-bottom: 1px solid var(--border);
+}
+
+.fech-ciclo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fech-ciclo-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* seta que gira ao abrir */
+.fech-ciclo-titulo::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-right: 2px solid var(--text);
+  border-bottom: 2px solid var(--text);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.fech-ciclo[open] .fech-ciclo-titulo::before {
+  transform: rotate(45deg);
+}
+
+.fech-ciclo-titulo h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.fech-ciclo-sub {
+  padding-left: 17px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.fech-ciclo-placar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.fech-ciclo-contas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fech-conta {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.conta-andamento {
+  color: var(--positivo);
+  background: var(--positivo-bg);
+}
+
+.conta-falha {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.fech-ciclo-progresso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fech-barra {
+  display: block;
+  width: 120px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.fech-barra span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--destaque-de), var(--destaque-ate));
+}
+
+.fech-ciclo-n {
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fech-ciclo-n strong {
+  color: var(--text-h);
+}
+
+.fech-ciclo-aviso {
+  padding: 12px 16px 0;
+}
+
+.fech-ciclo .table-wrap {
+  border: none;
+  border-radius: 0;
+}
+
+.fech-tabela th,
+.fech-tabela td {
+  vertical-align: top;
+}
+
+.fech-tabela tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.fech-tabela tbody tr:hover {
+  background: var(--muted);
+}
+
+.fech-unidade a {
+  font-weight: 600;
+}
+
+.fech-tabela .celula-motivo {
+  display: block;
+  margin-top: 4px;
+}
+
+/* ----- Cartões (celular) ----- */
+
+.fech-cartoes {
+  padding: 10px;
+}
+
+.fech-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--muted);
+  font-size: 13px;
+}
+
+.fech-cartao.linha-negativo {
+  background: var(--danger-bg);
+}
+
+.fech-cartao-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fech-cartao-nome {
+  font-weight: 600;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.fech-cartao-acao {
+  align-self: flex-start;
+}
+
+/* ----- Calendário ----- */
+
+.fech-calendario {
+  gap: 10px;
+}
+
+.fech-agenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fech-agenda li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.fech-agenda li:last-child {
+  border-bottom: none;
+}
+
+.fech-agenda-data {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  width: 54px;
+  padding: 8px 0;
+  border-radius: 12px;
+  background: var(--accent-suave);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.fech-agenda-data strong {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.fech-agenda-data span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fech-agenda li.mes .fech-agenda-data {
+  background: var(--aviso-bg);
+  color: var(--aviso);
+}
+
+.fech-agenda-texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fech-agenda-titulo {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.fech-agenda-titulo::first-letter {
+  text-transform: uppercase;
+}
+
+.fech-agenda-sub {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.fech-agenda-acao {
+  flex-shrink: 0;
+}
+
+.fech-calendario-nota {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--muted);
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* ----- Detalhe ----- */
+
+.fech-detalhe-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.fech-detalhe-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.fech-detalhe-titulo h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.fech-detalhe-topo .pagina-sub {
+  margin-top: 6px;
+}
+
+.fech-detalhe-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fech-detalhe-acoes .dash-botao:disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
+}
+
+.fech-detalhe .lista-erros {
+  margin-top: 6px;
+}
+
+/* ----- Responsivo ----- */
+
+@media (max-width: 1280px) {
+  .fech-grade {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .fech-ciclo-resumo {
+    padding: 12px;
+  }
+
+  .fech-ciclo-placar {
+    width: 100%;
+    padding-left: 17px;
+  }
+
+  .fech-barra {
+    flex: 1;
+    width: auto;
+  }
+
+  .fech-ciclo-progresso {
+    flex: 1;
+  }
+
+  .fech-campo {
+    flex: 1 1 140px;
+  }
+
+  .fech-detalhe-titulo h2 {
+    font-size: 20px;
+  }
+
+  .fech-detalhe-acoes {
+    width: 100%;
+  }
+
+  .fech-detalhe-acoes .dash-botao {
+    flex: 1;
+  }
+}

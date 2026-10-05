@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { Aviso, Carregando, ErroCarregamento } from '../../components/Estados'
+import { IconeAtividade, IconeCalendario, IconeRelogio, IconeUsuarios } from '../../components/Icones'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { PilulaStatus } from '../../components/PilulaStatus'
+import { TituloPagina } from '../../components/TituloPagina'
+import { useEmpresaAdmin } from '../../context/EmpresaAdminContext'
 import { alertarSucesso } from '../../lib/alertas'
 import { api } from '../../lib/api'
-import { formatarData, formatarDataHora, formatarDiaSemana, formatarDuracao } from '../../lib/formato'
+import { dataDoInstante, formatarData, formatarDataHora, formatarDiaSemana, formatarDuracao, formatarHora } from '../../lib/formato'
 import { useRecurso } from '../../lib/useRecurso'
 import type { ErroExecucao, FechamentoAdmin, FechamentoDetalhe } from '../../types/api'
-import { estaAtrasado } from './fechamentos-util'
-import { ModalGatilho } from './ModalGatilho'
-import { useEmpresaAdmin } from '../../context/EmpresaAdminContext'
-import { TituloPagina } from '../../components/TituloPagina'
+import { ModalGatilho } from '../admin/ModalGatilho'
+import { estaAtrasado, NOME_TIPO } from './fechamentos-util'
+import '../admin/admin.css'
+import '../dashboard.css'
+import './fechamentos.css'
 
 const INTERVALO_ATUALIZACAO_MS = 10_000
 
@@ -22,7 +26,7 @@ export function TextoReprocessar({ fechamento }: { fechamento: FechamentoAdmin }
     <>
       <p>
         O fechamento de <strong>{fechamento.unidade.nome}</strong> (dados até {formatarData(fechamento.data_referencia)})
-        volta para a fila e será extraído de novo da Secullum assim que houver cota.
+        volta para a fila e será extraído de novo da FriPonto assim que houver cota.
       </p>
       {fechamento.status === 'sucesso' && (
         <p>
@@ -36,12 +40,15 @@ export function TextoReprocessar({ fechamento }: { fechamento: FechamentoAdmin }
 
 export function DetalheFechamento() {
   const { fechamentoId } = useParams()
+  const location = useLocation()
   const [acao, setAcao] = useState<Acao>(null)
   const { ehAdmin } = useEmpresaAdmin()
   const { dados, erro, carregando, recarregar } = useRecurso(
     (signal) => api<FechamentoDetalhe>(`/admin/fechamentos/${fechamentoId}`, { signal }),
     `fechamento-${fechamentoId}`,
   )
+  // volta para a lista com os filtros que estavam abertos
+  const voltarPara = (location.state as { de?: string } | null)?.de ?? '/fechamentos'
 
   const emAndamento = dados?.status === 'processando' || (dados ? estaAtrasado(dados) : false)
   useEffect(() => {
@@ -59,6 +66,9 @@ export function DetalheFechamento() {
 
   const podePublicar = dados.status !== 'sucesso' && dados.status !== 'processando' && dados.registros > 0
   const podeAjustarGatilho = dados.status !== 'sucesso' && dados.status !== 'processando'
+  const execucao = dados.ultima_execucao
+  const totalExecucao = execucao ? execucao.total_colaboradores || dados.total_colaboradores || 0 : 0
+  const pct = execucao && totalExecucao ? Math.round((execucao.processados / totalExecucao) * 100) : 0
 
   function concluir(mensagem: string) {
     setAcao(null)
@@ -67,103 +77,123 @@ export function DetalheFechamento() {
   }
 
   return (
-    <section className="pagina">
-      <Link to=".." relative="path" className="voltar">
-        ← Voltar ao painel
+    <section className="pagina dash fech fech-detalhe">
+      <Link to={voltarPara} className="voltar">
+        ← Voltar para Fechamentos
       </Link>
 
-      <header className="pagina-header-linha">
+      <header className="fech-detalhe-topo">
         <div>
-          <TituloPagina>
-            {dados.unidade.nome} <PilulaStatus status={dados.status} atrasado={estaAtrasado(dados)} />
-          </TituloPagina>
+          <TituloPagina>{dados.unidade.nome}</TituloPagina>
+          <div className="fech-detalhe-titulo">
+            <h2>Dados até {formatarData(dados.data_referencia)}</h2>
+            <PilulaStatus status={dados.status} atrasado={estaAtrasado(dados)} />
+            {dados.tipo === 'fechamento_mes' && <span className="badge badge-alerta">Fechamento do mês</span>}
+          </div>
           <p className="pagina-sub">
-            {dados.empresa.nome} · período de {formatarData(dados.periodo_inicio)} a {formatarData(dados.data_referencia)}
-            {dados.tipo === 'fechamento_mes' && ' (fechamento do mês)'}
+            {dados.empresa.nome} · período de {formatarData(dados.periodo_inicio)} a{' '}
+            {formatarData(dados.data_referencia)}
           </p>
         </div>
         {ehAdmin && (
-          <div className="barra-acoes">
+          <div className="fech-detalhe-acoes">
+            {podeAjustarGatilho && (
+              <button type="button" className="dash-botao" onClick={() => setAcao('gatilho')}>
+                Ajustar gatilho
+              </button>
+            )}
+            {podePublicar && (
+              <button type="button" className="dash-botao" onClick={() => setAcao('publicar')}>
+                Publicar mesmo assim
+              </button>
+            )}
             <button
               type="button"
-              className="btn-secondary"
+              className="dash-botao dash-botao-primario"
               onClick={() => setAcao('reprocessar')}
               disabled={dados.status === 'processando'}
             >
               Reprocessar
             </button>
-            {podePublicar && (
-              <button type="button" className="btn-secondary" onClick={() => setAcao('publicar')}>
-                Publicar mesmo assim
-              </button>
-            )}
-            {podeAjustarGatilho && (
-              <button type="button" className="btn-secondary" onClick={() => setAcao('gatilho')}>
-                Ajustar gatilho
-              </button>
-            )}
           </div>
         )}
       </header>
 
-      {dados.status === 'falhou' && dados.ultima_execucao?.mensagem_erro && (
-        <Aviso>Última falha: {dados.ultima_execucao.mensagem_erro}</Aviso>
-      )}
+      {dados.status === 'falhou' && execucao?.mensagem_erro && <Aviso>Última falha: {execucao.mensagem_erro}</Aviso>}
 
-      <section className="card" aria-labelledby="titulo-resumo">
-        <h2 id="titulo-resumo" className="sr-only">
-          Resumo
-        </h2>
-        <dl className="info-lista">
-          <div>
-            <dt>Gatilho</dt>
-            <dd>
-              {formatarDiaSemana(dados.gatilho_em)}
-              {dados.gatilho_ajustado && (
-                <span className="celula-sub">
-                  Regra: {formatarDiaSemana(dados.gatilho_previsto_em)}
-                  {dados.gatilho_ajustado_por && ` · ajustado por ${dados.gatilho_ajustado_por.nome}`}
-                </span>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Tentativas</dt>
-            <dd>{dados.tentativas}</dd>
-          </div>
-          <div>
-            <dt>Próxima tentativa</dt>
-            <dd>{formatarDataHora(dados.proxima_tentativa_em)}</dd>
-          </div>
-          <div>
-            <dt>Colaboradores</dt>
-            <dd>{dados.total_colaboradores ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>Registros de horas</dt>
-            <dd>{dados.registros}</dd>
-          </div>
-          <div>
-            <dt>Publicado em</dt>
-            <dd>{formatarDataHora(dados.publicado_em)}</dd>
-          </div>
-        </dl>
-      </section>
+      <div className="dash-kpis">
+        <div className="dash-kpi dash-kpi-destaque">
+          <p className="dash-kpi-rotulo">Colaboradores processados</p>
+          <p className="dash-kpi-valor">
+            {execucao ? execucao.processados : '—'}
+            {execucao && <span className="fech-kpi-de">/{totalExecucao || '?'}</span>}
+          </p>
+          <p className="dash-kpi-contexto">
+            <span className="dash-kpi-contexto-icone" aria-hidden="true">
+              <IconeUsuarios tamanho={14} />
+            </span>
+            {execucao ? `${pct}% na última execução` : 'Ainda não executado'}
+          </p>
+        </div>
+        <div className="dash-kpi">
+          <p className="dash-kpi-rotulo">Registros de horas</p>
+          <p className="dash-kpi-valor">{dados.registros}</p>
+          <p className="dash-kpi-contexto">
+            <span className="dash-kpi-contexto-icone" aria-hidden="true">
+              <IconeAtividade tamanho={14} />
+            </span>
+            {dados.total_colaboradores != null ? `de ${dados.total_colaboradores} colaboradores` : 'extraídos da FriPonto'}
+          </p>
+        </div>
+        <div className="dash-kpi">
+          <p className="dash-kpi-rotulo">Gatilho</p>
+          <p className="dash-kpi-valor">{formatarData(dataDoInstante(dados.gatilho_em), { ano: false })}</p>
+          <p className="dash-kpi-contexto">
+            <span className="dash-kpi-contexto-icone" aria-hidden="true">
+              <IconeRelogio tamanho={14} />
+            </span>
+            {formatarHora(dados.gatilho_em)}
+            {dados.gatilho_ajustado
+              ? ` · ajustado${dados.gatilho_ajustado_por ? ` por ${dados.gatilho_ajustado_por.nome}` : ''}`
+              : ` · ${NOME_TIPO[dados.tipo].toLowerCase()}`}
+          </p>
+        </div>
+        <div className="dash-kpi">
+          <p className="dash-kpi-rotulo">Publicado</p>
+          <p className="dash-kpi-valor">{dados.publicado_em ? formatarData(dataDoInstante(dados.publicado_em), { ano: false }) : '—'}</p>
+          <p className="dash-kpi-contexto">
+            <span className="dash-kpi-contexto-icone" aria-hidden="true">
+              <IconeCalendario tamanho={14} />
+            </span>
+            {dados.publicado_em
+              ? `às ${formatarHora(dados.publicado_em)}`
+              : dados.proxima_tentativa_em
+                ? `Próxima tentativa ${formatarDataHora(dados.proxima_tentativa_em)}`
+                : 'Ainda não publicado'}
+          </p>
+        </div>
+      </div>
 
-      <section className="card card-tabela" aria-labelledby="titulo-execucoes">
-        <h2 id="titulo-execucoes" className="card-tabela-titulo">
-          Execuções
-        </h2>
+      <section className="dash-card" aria-labelledby="titulo-execucoes">
+        <div className="dash-card-topo">
+          <div>
+            <h2 id="titulo-execucoes">Execuções</h2>
+            <p className="dash-card-sub">
+              {dados.tentativas} {dados.tentativas === 1 ? 'tentativa' : 'tentativas'}
+              {dados.gatilho_ajustado && ` · regra original: ${formatarDiaSemana(dados.gatilho_previsto_em)}`}
+            </p>
+          </div>
+        </div>
         {dados.execucoes.length === 0 ? (
-          <p className="texto-suave card-tabela-titulo">Nenhuma execução ainda.</p>
+          <p className="dash-vazio">Nenhuma execução ainda.</p>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="fech-tabela">
               <caption className="sr-only">Histórico de execuções</caption>
               <thead>
                 <tr>
                   <th scope="col">Início</th>
-                  <th scope="col">Status</th>
+                  <th scope="col">Situação</th>
                   <th scope="col">Disparo</th>
                   <th scope="col" className="num">
                     Processados
@@ -175,24 +205,24 @@ export function DetalheFechamento() {
                 </tr>
               </thead>
               <tbody>
-                {dados.execucoes.map((execucao) => (
-                  <tr key={execucao.id}>
+                {dados.execucoes.map((item) => (
+                  <tr key={item.id}>
                     <td>
-                      {formatarDataHora(execucao.iniciado_em)}
-                      <span className="celula-sub">{formatarDuracao(execucao.iniciado_em, execucao.finalizado_em)}</span>
+                      {formatarDataHora(item.iniciado_em)}
+                      <span className="celula-sub">{formatarDuracao(item.iniciado_em, item.finalizado_em)}</span>
                     </td>
                     <td>
-                      <PilulaStatus status={execucao.status} />
+                      <PilulaStatus status={item.status} />
                     </td>
                     <td>
-                      {execucao.disparo === 'manual' ? 'Manual' : 'Automático'}
-                      {execucao.disparado_por && <span className="celula-sub">{execucao.disparado_por.nome}</span>}
+                      {item.disparo === 'manual' ? 'Manual' : 'Automático'}
+                      {item.disparado_por && <span className="celula-sub">{item.disparado_por.nome}</span>}
                     </td>
                     <td className="num">
-                      {execucao.processados}/{execucao.total_colaboradores}
+                      {item.processados}/{item.total_colaboradores}
                     </td>
-                    <td className="num">{execucao.com_erro}</td>
-                    <td className="celula-motivo">{execucao.mensagem_erro ?? '—'}</td>
+                    <td className="num">{item.com_erro}</td>
+                    <td className="celula-motivo">{item.mensagem_erro ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -201,11 +231,16 @@ export function DetalheFechamento() {
         )}
       </section>
 
-      <section className="card" aria-labelledby="titulo-erros">
-        <h2 id="titulo-erros">Erros ({dados.erros.length})</h2>
-        {dados.erros.length === 0 ? (
-          <p>Nenhum erro registrado.</p>
-        ) : (
+      <section className="dash-card" aria-labelledby="titulo-erros">
+        <div className="dash-card-topo">
+          <div>
+            <h2 id="titulo-erros">Erros</h2>
+            <p className="dash-card-sub">
+              {dados.erros.length === 0 ? 'Nenhum erro registrado' : `${dados.erros.length} registrados nas execuções`}
+            </p>
+          </div>
+        </div>
+        {dados.erros.length > 0 && (
           <ul className="lista-erros">
             {dados.erros.map((item) => (
               <ItemErro key={item.id} erro={item} />

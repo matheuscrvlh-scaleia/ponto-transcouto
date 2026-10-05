@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { AppLayout } from './components/AppLayout'
@@ -29,6 +29,7 @@ const TELAS_DETALHE: Tela[] = ['dashboard', 'colaboradores', 'batidas']
 const carregarAdmin = () => import('./pages/admin/AdminRotas')
 const RotasConfiguracao = lazy(() => carregarAdmin().then((m) => ({ default: m.RotasConfiguracao })))
 const RotasAdministracao = lazy(() => carregarAdmin().then((m) => ({ default: m.RotasAdministracao })))
+const Fechamentos = lazy(() => import('./pages/fechamentos/Fechamentos').then((m) => ({ default: m.Fechamentos })))
 
 /* Endereços antigos da área admin que passaram para Configuração. */
 const REDIRECIONAMENTOS: [string, string][] = [
@@ -39,10 +40,15 @@ const REDIRECIONAMENTOS: [string, string][] = [
   ['admin/configuracoes', '/configuracao/alertas'],
 ]
 
-/** Redireciona mantendo a query (ex.: ?perfil=gestor). */
-function Redirecionar({ para }: { para: string }) {
+/* Endereços antigos dos fechamentos (o detalhe /:id vem junto). */
+const REDIRECIONAMENTOS_FECHAMENTOS = ['admin/fechamentos', 'configuracao/fechamentos']
+
+/** Redireciona mantendo a query (ex.: ?perfil=gestor); com `manterResto`, também o resto do caminho. */
+function Redirecionar({ para, manterResto = false }: { para: string; manterResto?: boolean }) {
   const { search } = useLocation()
-  return <Navigate to={{ pathname: para, search }} replace />
+  const resto = useParams()['*']
+  const destino = manterResto && resto ? `${para}/${resto}` : para
+  return <Navigate to={{ pathname: destino, search }} replace />
 }
 
 export default function App() {
@@ -76,6 +82,19 @@ export default function App() {
                   <Route element={<RequireTela telas={['batidas']} />}>
                     <Route path="batidas" element={<Batidas />} />
                   </Route>
+                  <Route element={<RequireTela telas={['fechamentos']} />}>
+                    <Route
+                      path="fechamentos/*"
+                      element={
+                        <Suspense fallback={<Carregando />}>
+                          <Fechamentos />
+                        </Suspense>
+                      }
+                    />
+                  </Route>
+                  {REDIRECIONAMENTOS_FECHAMENTOS.map((de) => (
+                    <Route key={de} path={`${de}/*`} element={<Redirecionar para="/fechamentos" manterResto />} />
+                  ))}
                   <Route
                     path="configuracao/*"
                     element={

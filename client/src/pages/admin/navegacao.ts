@@ -40,13 +40,12 @@ export const SECAO_CONFIGURACAO: SecaoAdmin = {
     { caminho: 'atualizacao', rotulo: 'Atualização dos dados', tela: 'atualizacao' },
     { caminho: 'unidades', rotulo: 'Unidades', tela: 'unidades' },
     { caminho: 'alertas', rotulo: 'Alertas e horas pagas', tela: 'alertas' },
-    { caminho: 'fechamentos', rotulo: 'Fechamentos', tela: 'fechamentos' },
     { caminho: 'permissoes', rotulo: 'Permissões', tela: 'permissoes' },
   ],
   grupos: [
     { id: 'usuarios', rotulo: 'Usuários', abas: ['usuarios', 'permissoes'] },
     { id: 'integracoes', rotulo: 'Integrações', abas: ['integracao', 'atualizacao'] },
-    { id: 'configuracoes', rotulo: 'Configurações', abas: ['unidades', 'alertas', 'fechamentos'] },
+    { id: 'configuracoes', rotulo: 'Configurações', abas: ['unidades', 'alertas'] },
   ],
 }
 
@@ -109,7 +108,7 @@ export function entradasDaSecao(secao: SecaoAdmin): EntradaMenu[] {
     .filter((entrada) => entrada.abas.length > 0)
 }
 
-/** Painel de fechamentos, se o grupo libera a tela (as ações de equipe aparecem conforme o perfil). */
+/** Tela de Fechamentos (Gestão), se o grupo libera a tela (as ações de equipe aparecem conforme o perfil). */
 export function caminhoFechamentos(telas: Tela[]) {
-  return telas.includes('fechamentos') ? '/configuracao/fechamentos' : null
+  return telas.includes('fechamentos') ? '/fechamentos' : null
 }

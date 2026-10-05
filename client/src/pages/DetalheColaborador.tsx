@@ -282,7 +282,7 @@ function ExportarHistorico({ colaborador }: { colaborador: ColaboradorDetalhe })
   }
 
   return (
-    <div className="detalhe-exportar nao-imprimir">
+    <div className="exportar nao-imprimir">
       <button type="button" className="btn-secondary" onClick={baixar} disabled={gerando}>
         {gerando ? 'Gerando CSV...' : 'Baixar CSV'}
       </button>

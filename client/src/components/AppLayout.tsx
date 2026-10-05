@@ -45,7 +45,6 @@ const ICONES_ITENS: Record<string, typeof IconeAjustes> = {
   atualizacao: IconeAtividade,
   unidades: IconeUnidade,
   alertas: IconeAjustes,
-  fechamentos: IconeCalendario,
   permissoes: IconeEscudo,
   empresas: IconeEmpresa,
   colunas: IconeColunas,
@@ -73,11 +72,13 @@ function CascaApp() {
   const naUnidades = Boolean(useMatch('/unidades/*'))
   const naBatidas = Boolean(useMatch('/batidas'))
   const naColaboradores = Boolean(useMatch('/colaboradores'))
-  const naGestao = naUnidades || naBatidas || naColaboradores
+  const naFechamentos = Boolean(useMatch('/fechamentos/*'))
+  const naGestao = naUnidades || naBatidas || naColaboradores || naFechamentos
   const naConfiguracao = Boolean(useMatch('/configuracao/*'))
   const naAdministracao = Boolean(useMatch('/admin/*'))
   const noPerfil = Boolean(useMatch('/perfil'))
-  const semNota = naConfiguracao || naAdministracao || noPerfil
+  // Fechamentos tem ações da equipe (reprocessar, publicar): não é "somente leitura"
+  const semNota = naConfiguracao || naAdministracao || noPerfil || naFechamentos
   const secaoAtual: Record<string, boolean> = { configuracao: naConfiguracao, administracao: naAdministracao }
 
   const secoes = secoesPermitidas(perfil, telas)
@@ -153,6 +154,12 @@ function CascaApp() {
               <NavLink to={caminhoColaboradores(unidadeEmFoco)} className={classeLink} onClick={fecharMenu}>
                 <IconeUsuarios className="app-nav-icone" />
                 <span>Colaboradores</span>
+              </NavLink>
+            )}
+            {podeVer('fechamentos') && (
+              <NavLink to="/fechamentos" className={classeLink} onClick={fecharMenu}>
+                <IconeCalendario className="app-nav-icone" />
+                <span>Fechamentos</span>
               </NavLink>
             )}
           </SecaoMenu>

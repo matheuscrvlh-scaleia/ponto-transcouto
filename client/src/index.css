@@ -954,21 +954,25 @@ tr.linha-negativo {
   margin-top: 8px;
 }
 
-.detalhe-exportar {
+/* Botões "Baixar planilha/CSV" e "Salvar PDF" (histórico do colaborador e lista de colaboradores) */
+.exportar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.detalhe-header .exportar {
   margin-top: 10px;
 }
 
-.detalhe-exportar .btn-secondary {
+.exportar .btn-secondary {
   width: auto;
   min-height: 36px;
   border-radius: 999px;
 }
 
-.detalhe-exportar .btn-secondary:disabled {
+.exportar .btn-secondary:disabled {
   opacity: 0.6;
   cursor: default;
 }

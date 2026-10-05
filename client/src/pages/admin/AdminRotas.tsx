@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { TelaNaoEncontrada } from '../../components/TelaAviso'
 import { useAuth } from '../../context/AuthContext'
 import { AbasConfiguracao } from './AbasConfiguracao'
@@ -7,7 +7,6 @@ import { AdminLayout, ComEmpresa } from './AdminLayout'
 import { Configuracoes } from './Configuracoes'
 import { Empresas } from './Empresas'
 import { Equipe } from './Equipe'
-import { Fechamentos } from './Fechamentos'
 import { IntegracaoFriPonto } from './IntegracaoFriPonto'
 import { MapeamentoColunas } from './MapeamentoColunas'
 import { itemPermitido, itensPermitidos, SECAO_ADMINISTRACAO, SECAO_CONFIGURACAO, type SecaoAdmin } from './navegacao'
@@ -54,7 +53,6 @@ export function RotasConfiguracao() {
             {itemConfiguracao('atualizacao', <Configuracoes secao="atualizacao" />)}
             {itemConfiguracao('unidades', <Unidades />)}
             {itemConfiguracao('alertas', <Configuracoes secao="alertas" />)}
-            {itemConfiguracao('fechamentos', <Fechamentos />)}
             {itemConfiguracao('permissoes', <Permissoes />)}
           </Route>
         </Route>
@@ -62,11 +60,6 @@ export function RotasConfiguracao() {
       </Route>
     </Routes>
   )
-}
-
-function RedirecionarFechamentos() {
-  const resto = useParams()['*']
-  return <Navigate to={`/configuracao/fechamentos${resto ? `/${resto}` : ''}`} replace />
 }
 
 /** /admin/* — administração do sistema, só equipe Scale IA. */
@@ -85,8 +78,6 @@ export function RotasAdministracao() {
             <Route path="calendario/*" element={<Configuracoes secao="calendario" />} />
           </Route>
         </Route>
-        {/* links antigos: os fechamentos ficam em Configuração → Configurações */}
-        <Route path="fechamentos/*" element={<RedirecionarFechamentos />} />
         <Route path="*" element={<TelaNaoEncontrada />} />
       </Route>
     </Routes>
