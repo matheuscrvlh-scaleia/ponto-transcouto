@@ -637,8 +637,10 @@
   stroke: var(--muted);
 }
 
+/* escala divergente: abaixo (vermelho) | dentro (neutro) | acima (azul do saldo);
+   o neutro não se confunde com o azul do destaque */
 .medidor-segmento.medidor-dentro {
-  stroke: var(--accent);
+  stroke: var(--medidor-neutro);
 }
 
 .medidor-segmento.medidor-acima {
@@ -716,7 +718,7 @@
 }
 
 .medidor-ponto.medidor-dentro {
-  background: var(--accent);
+  background: var(--medidor-neutro);
 }
 
 .medidor-ponto.medidor-acima {

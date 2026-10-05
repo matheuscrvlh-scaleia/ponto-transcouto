@@ -54,7 +54,7 @@
 .field textarea:focus {
   outline: none;
   border-color: var(--login-accent);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .field input:disabled,

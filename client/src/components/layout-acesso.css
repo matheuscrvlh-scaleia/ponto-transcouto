@@ -1,12 +1,12 @@
 /* ---------- Telas de acesso: login e troca de senha (prefixo lg-) ----------
    Usa os tokens de tema de index.css (--accent, --surface, --text-h...) e
-   deriva os tons de roxo localmente com color-mix, então acompanha o tema
+   deriva os tons de azul localmente com color-mix, então acompanha o tema
    escuro. O painel decorativo usa tons próprios para manter o texto branco
    legível nos dois temas. */
 
 .lg-page {
-  --lg-roxo-escuro: color-mix(in srgb, var(--accent) 62%, #1e0b4b);
-  --lg-roxo-claro: color-mix(in srgb, var(--accent) 88%, #ffffff);
+  --lg-azul-escuro: color-mix(in srgb, var(--accent) 62%, #0b1d4f);
+  --lg-azul-claro: color-mix(in srgb, var(--accent) 88%, #ffffff);
   --lg-anel: color-mix(in srgb, var(--accent) 22%, transparent);
   --lg-campo-bg: var(--surface);
   --lg-campo-borda: color-mix(in srgb, var(--border) 70%, var(--accent));
@@ -27,8 +27,8 @@
 }
 
 :root[data-theme='dark'] .lg-page {
-  --lg-roxo-escuro: color-mix(in srgb, var(--accent) 35%, #0d0820);
-  --lg-roxo-claro: color-mix(in srgb, var(--accent) 62%, #1e1040);
+  --lg-azul-escuro: color-mix(in srgb, var(--accent) 35%, #050b1f);
+  --lg-azul-claro: color-mix(in srgb, var(--accent) 62%, #0c1a40);
   --lg-campo-borda: var(--border);
 }
 
@@ -52,7 +52,7 @@
   flex-direction: column;
   padding: clamp(32px, 4vh, 64px) clamp(40px, 5vw, 104px) clamp(40px, 6vh, 80px);
   color: #ffffff;
-  background: linear-gradient(145deg, var(--lg-roxo-claro) 0%, var(--lg-roxo-escuro) 100%);
+  background: linear-gradient(145deg, var(--lg-azul-claro) 0%, var(--lg-azul-escuro) 100%);
 }
 
 .lg-deco {
@@ -64,7 +64,7 @@
 }
 
 .lg-deco-sombra {
-  fill: rgba(20, 6, 60, 0.22);
+  fill: rgba(6, 18, 56, 0.22);
 }
 
 .lg-deco-luz {
@@ -130,7 +130,7 @@
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 10px 30px -12px rgba(20, 6, 60, 0.6);
+    0 10px 30px -12px rgba(6, 18, 56, 0.6);
   backdrop-filter: blur(8px);
   font-size: clamp(15px, 1vw, 19px);
   font-weight: 700;
@@ -146,8 +146,8 @@
   aspect-ratio: 1;
   border-radius: 50%;
   background: #ffffff;
-  color: var(--lg-roxo-escuro);
-  box-shadow: 0 4px 12px -4px rgba(20, 6, 60, 0.5);
+  color: var(--lg-azul-escuro);
+  box-shadow: 0 4px 12px -4px rgba(6, 18, 56, 0.5);
 }
 
 .lg-sistema-icone svg {
@@ -305,9 +305,9 @@
   cursor: pointer;
   background: linear-gradient(
     90deg,
-    var(--lg-roxo-escuro) 0%,
-    var(--lg-roxo-claro) 50%,
-    var(--lg-roxo-escuro) 100%
+    var(--lg-azul-escuro) 0%,
+    var(--lg-azul-claro) 50%,
+    var(--lg-azul-escuro) 100%
   );
   box-shadow: color-mix(in srgb, var(--accent) 35%, transparent) 0 10px 22px -10px;
   transition:

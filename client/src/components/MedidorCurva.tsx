@@ -47,7 +47,7 @@ export function MedidorCurva({ dentro, acima, abaixo, onSelecionar }: Props) {
           aria-label={`${percentualDentro}% dos colaboradores dentro da curva: ${dentro} dentro, ${acima} acima e ${abaixo} abaixo do limite.`}
         >
           <defs>
-            {/* textura no segmento "acima" para não depender só da cor (azul × roxo) */}
+            {/* textura no segmento "acima" para não depender só da cor (acima é azul e o resto é neutro ou vermelho) */}
             <pattern id={hachura} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
               <rect width="6" height="6" className="medidor-hachura-fundo" />
               <line x1="1.5" y1="0" x2="1.5" y2="6" strokeWidth="3" className="medidor-hachura-linha" />

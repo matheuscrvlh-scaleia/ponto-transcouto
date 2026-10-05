@@ -136,7 +136,7 @@
   height: 38px;
   border-radius: 12px;
   color: var(--accent-contrast);
-  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #1e0b4b));
+  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #0b1d4f));
   box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 

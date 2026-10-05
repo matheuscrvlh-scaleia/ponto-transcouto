@@ -94,7 +94,7 @@ export function IconeCadeado() {
 }
 
 interface Props {
-  /** Título grande do painel roxo (h1). */
+  /** Título grande do painel azul (h1). */
   tituloPainel: string
   textoPainel: string
   /** Título do formulário (h2). */

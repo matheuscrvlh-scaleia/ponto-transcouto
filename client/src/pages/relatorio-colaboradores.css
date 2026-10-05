@@ -39,7 +39,7 @@
   justify-content: space-between;
   gap: 6mm;
   padding-bottom: 3mm;
-  border-bottom: 0.7mm solid #6d28d9;
+  border-bottom: 0.7mm solid #1e40af;
 }
 
 .rel-marca {
@@ -50,14 +50,14 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6d28d9;
+  color: #1e40af;
 }
 
 .rel-marca-selo {
   width: 3.6mm;
   height: 3.6mm;
   border-radius: 1mm;
-  background: linear-gradient(135deg, #8b5cf6, #5b21b6);
+  background: linear-gradient(135deg, #3b82f6, #1e3a8a);
 }
 
 .rel-titulo {
@@ -94,8 +94,8 @@
 .rel-chip {
   padding: 0.6mm 2.4mm;
   border-radius: 999px;
-  background: #f3f0ff;
-  color: #5b21b6;
+  background: #eef4ff;
+  color: #1e3a8a;
   font-weight: 600;
 }
 
@@ -143,7 +143,7 @@
 
 .rel-caixa-destaque {
   border-color: transparent;
-  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  background: linear-gradient(135deg, #2563eb, #1e3a8a);
 }
 
 .rel-caixa-destaque .rel-caixa-rotulo,
@@ -176,9 +176,9 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   text-align: left;
-  color: #4c1d95;
-  background: #f3f0ff;
-  border-bottom: 0.4mm solid #c4b5fd;
+  color: #1e3a8a;
+  background: #eef4ff;
+  border-bottom: 0.4mm solid #93c5fd;
 }
 
 .rel-tabela td {
@@ -269,8 +269,8 @@
   border-radius: 50%;
   font-size: 5.6pt;
   font-weight: 700;
-  color: #6d28d9;
-  background: #ede9fe;
+  color: #1e40af;
+  background: #dbeafe;
 }
 
 .rel-nome {

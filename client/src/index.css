@@ -5,8 +5,8 @@
   --text: #6b7280;
   --text-h: #111827;
   --border: #e5e7eb;
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
   --accent-contrast: #ffffff;
   --danger: #dc2626;
   --danger-bg: #fef2f2;
@@ -29,10 +29,12 @@
   --app-borda: rgba(17, 24, 39, 0.04);
   --raio-card: 20px;
   --sombra-suave: rgba(16, 24, 40, 0.04) 0 1px 2px, rgba(16, 24, 40, 0.06) 0 6px 18px -8px;
-  --accent-suave: #f1ebfe;
-  --destaque-de: #8b5cf6;
-  --destaque-ate: #5b21b6;
+  --accent-suave: #e8effd;
+  --destaque-de: #3b82f6;
+  --destaque-ate: #1e3a8a;
   --destaque-texto: #ffffff;
+  /* "dentro da curva" nos gráficos: neutro entre o vermelho (abaixo) e o azul (acima) */
+  --medidor-neutro: #b6bcc8;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
 
@@ -55,8 +57,8 @@
   --text: #9ca3af;
   --text-h: #f3f4f6;
   --border: #2a2c34;
-  --accent: #a78bfa;
-  --accent-hover: #c4b5fd;
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
   --accent-contrast: #17181d;
   --danger: #f87171;
   --danger-bg: rgba(248, 113, 113, 0.1);
@@ -76,10 +78,11 @@
   --app-bg: #0c0d10;
   --app-borda: rgba(255, 255, 255, 0.04);
   --sombra-suave: rgba(0, 0, 0, 0.35) 0 1px 2px, rgba(0, 0, 0, 0.3) 0 6px 18px -8px;
-  --accent-suave: rgba(167, 139, 250, 0.14);
-  --destaque-de: #7c3aed;
-  --destaque-ate: #4c1d95;
+  --accent-suave: rgba(96, 165, 250, 0.14);
+  --destaque-de: #2563eb;
+  --destaque-ate: #1e3a8a;
   --destaque-texto: #ffffff;
+  --medidor-neutro: #5b6170;
   color-scheme: dark;
 }
 
@@ -151,7 +154,7 @@ button {
 .field input:focus {
   outline: none;
   border-color: var(--login-accent);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .field input:-webkit-autofill,
@@ -1206,7 +1209,7 @@ tr.linha-negativo {
     --text: #4b5563;
     --text-h: #111827;
     --border: #e5e7eb;
-    --accent: #6d28d9;
+    --accent: #1d4ed8;
     --positivo: #1d4ed8;
     --positivo-bg: #eff6ff;
     --negativo: #b91c1c;
