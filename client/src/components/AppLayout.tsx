@@ -220,7 +220,10 @@ function CascaApp() {
           </div>
 
           <p className="app-assinatura">
-            Desenvolvido por <strong>Scale IA</strong>
+            Desenvolvido por{' '}
+            <a href="https://scaleia.ai" target="_blank" rel="noopener noreferrer">
+              Scale IA
+            </a>
           </p>
         </div>
       </aside>

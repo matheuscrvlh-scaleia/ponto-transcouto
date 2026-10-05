@@ -247,6 +247,17 @@ export function formatarHoraOuData(iso: DataHoraISO, { comData = false } = {}): 
   return comData || dia !== hojeISO() ? `${formatarData(dia, { ano: false })} às ${hora}` : hora
 }
 
+/** ISO → "hoje às 13:42", "amanhã às 06:00", "ontem às 18:10" ou "27/10 às 06:00" (horário de Brasília). */
+export function formatarQuando(iso: DataHoraISO): string {
+  const dia = dataDoInstante(iso)
+  const hoje = hojeISO()
+  const hora = formatarHora(iso)
+  if (dia === hoje) return `hoje às ${hora}`
+  if (dia === somarDias(hoje, 1)) return `amanhã às ${hora}`
+  if (dia === somarDias(hoje, -1)) return `ontem às ${hora}`
+  return `${formatarData(dia, { ano: dia.slice(0, 4) !== hoje.slice(0, 4) })} às ${hora}`
+}
+
 /** Intervalo em minutos → "25 min", "1h", "1h30". */
 export function formatarIntervalo(minutos: number): string {
   const total = Math.max(1, Math.round(minutos))

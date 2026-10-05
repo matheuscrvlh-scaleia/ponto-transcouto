@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
 import { alertarErro } from '../lib/alertas'
 import { api } from '../lib/api'
+import { formatarQuando } from '../lib/formato'
+import { IconeRelogio } from './Icones'
 import { ouvirSincronizacaoPedida } from '../lib/sincronizacao'
 import type { AtividadeIntegracao } from '../types/api'
 import './indicador-sincronizacao.css'
@@ -41,7 +43,8 @@ function descreverTarefas({ tarefas }: AtividadeIntegracao) {
 }
 
 /* Canto inferior direito: um aviãozinho voando enquanto algo é puxado da FriPonto
-   (pedidos e fila de extração). Também transforma falhas recentes da integração em
+   (pedidos e fila de extração), com a barra de quanto do lote já foi; com a extração parada
+   esperando a cota, um relógio e a hora da próxima coleta. Também transforma falhas recentes da integração em
    alertas de erro (RH e equipe). Fica no AppLayout, em todas as telas logadas. */
 export function IndicadorSincronizacao() {
   const { query } = useEmpresaAdmin()
@@ -101,30 +104,60 @@ export function IndicadorSincronizacao() {
     }
   }, [consultar])
 
-  if (!atividade?.sincronizando) return null
+  if (!atividade) return null
+  // parado esperando a cota da FriPonto: mostra quando volta (sem nada mais andando)
+  const aguardando = !atividade.sincronizando && atividade.retoma_em
+  if (!atividade.sincronizando && !aguardando) return null
 
+  const { progresso } = atividade
+  const pct = progresso && progresso.total > 0 ? Math.min(100, Math.round((progresso.feitos / progresso.total) * 100)) : null
   const offline = !atividade.worker_online
   const detalhe = descreverTarefas(atividade)
-  const titulo = offline
-    ? `Na fila da FriPonto (${detalhe}). O serviço de extração está offline: começa quando ele voltar.`
-    : `Sincronizando com a FriPonto: ${detalhe}`
+  const textoProgresso = progresso && pct !== null ? ` (${progresso.feitos} de ${progresso.total} colaboradores, ${pct}%)` : ''
+
+  let texto: string
+  let titulo: string
+  if (aguardando) {
+    texto = `Aguardando próxima coleta ${formatarQuando(atividade.retoma_em as string)}`
+    titulo = `A cota de cálculos da FriPonto (100 por hora) acabou; a coleta continua sozinha ${formatarQuando(
+      atividade.retoma_em as string,
+    )}${textoProgresso}`
+  } else if (offline) {
+    texto = 'Na fila · serviço offline'
+    titulo = `Na fila da FriPonto (${detalhe}). O serviço de extração está offline: começa quando ele voltar.`
+  } else {
+    texto = 'Sincronizando com a FriPonto'
+    titulo = `Sincronizando com a FriPonto: ${detalhe}${textoProgresso}`
+  }
+
+  const classe = ['indicador-sinc', aguardando ? 'aguardando' : offline ? 'offline' : ''].filter(Boolean).join(' ')
 
   return (
-    <Link
-      to="/configuracao/integracao"
-      className={offline ? 'indicador-sinc offline' : 'indicador-sinc'}
-      title={titulo}
-      aria-label={`${titulo}. Abrir Integração FriPonto.`}
-    >
+    <Link to="/configuracao/integracao" className={classe} title={titulo} aria-label={`${titulo}. Abrir Integração FriPonto.`}>
       <span className="indicador-sinc-aviao" aria-hidden="true">
-        <span className="indicador-sinc-rastro" />
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round">
-          <path d="M21 3 3 10.4l7.2 2.4L12.6 20 21 3Z" />
-          <path d="m10.2 12.8 4.6-4.6" />
-        </svg>
+        {aguardando ? (
+          <IconeRelogio tamanho={17} />
+        ) : (
+          <>
+            <span className="indicador-sinc-rastro" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round">
+              <path d="M21 3 3 10.4l7.2 2.4L12.6 20 21 3Z" />
+              <path d="m10.2 12.8 4.6-4.6" />
+            </svg>
+          </>
+        )}
       </span>
-      <span className="indicador-sinc-texto" role="status">
-        {offline ? 'Na fila · serviço offline' : 'Sincronizando com a FriPonto'}
+      <span className="indicador-sinc-corpo">
+        <span className="indicador-sinc-texto" role="status">
+          {texto}
+          {pct !== null && !offline && <span className="indicador-sinc-pct"> · {pct}%</span>}
+        </span>
+        {!offline && (
+          // com o lote em extração a barra mostra quanto já foi; sem número, só indica movimento
+          <span className={pct === null ? 'indicador-sinc-barra indeterminada' : 'indicador-sinc-barra'} aria-hidden="true">
+            <span style={pct === null ? undefined : { width: `${Math.max(pct, 3)}%` }} />
+          </span>
+        )}
       </span>
     </Link>
   )

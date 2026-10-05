@@ -4,11 +4,27 @@ import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
 import { Campo } from '../../components/Campo'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { Aviso, Carregando, ErroCarregamento } from '../../components/Estados'
-import { IconeAtividade, IconeCalendario, IconeRelogio, IconeSincronizar } from '../../components/Icones'
+import {
+  IconeAlerta,
+  IconeAtividade,
+  IconeBanco,
+  IconeCalendario,
+  IconeColunas,
+  IconeMoeda,
+  IconeRelogio,
+  IconeSincronizar,
+} from '../../components/Icones'
 import { api } from '../../lib/api'
 import { alertarFalha, alertarInfo, alertarSucesso } from '../../lib/alertas'
 import { errosDeCampos } from '../../lib/erros'
-import { entradaParaMinutos, formatarDataHora, formatarIntervalo, minutosParaEntrada } from '../../lib/formato'
+import {
+  entradaParaMinutos,
+  formatarDataHora,
+  formatarIntervalo,
+  formatarMinutos,
+  formatarQuando,
+  minutosParaEntrada,
+} from '../../lib/formato'
 import { avisarSincronizacaoPedida } from '../../lib/sincronizacao'
 import { useRecurso } from '../../lib/useRecurso'
 import type { Configuracoes as Config, ForcarSincronizacaoResposta, ModoExtracao } from '../../types/api'
@@ -70,6 +86,31 @@ const MODOS: { valor: ModoExtracao; titulo: string; descricao: string; Icone: ty
     Icone: IconeAtividade,
   },
 ]
+
+const ORIGENS: { valor: Config['origem_horas_pagas']; titulo: string; descricao: string; Icone: typeof IconeMoeda }[] = [
+  {
+    valor: 'teto',
+    titulo: 'Teto definido aqui',
+    descricao: 'As extras até o teto são pagas e o que passar vai para o banco de horas.',
+    Icone: IconeMoeda,
+  },
+  {
+    valor: 'coluna_secullum',
+    titulo: 'Coluna da FriPonto',
+    descricao: 'Usa o número de horas pagas que já vem calculado pela FriPonto (Secullum).',
+    Icone: IconeColunas,
+  },
+]
+
+/** "Com teto de 10:00 por semana, quem fizer 14:00 de extras recebe 10:00 pagas e 04:00 vão para o banco de horas." */
+function exemploTeto(tetoMin: number, periodicidade: Config['teto_periodicidade']) {
+  const por = periodicidade === 'semanal' ? 'por semana' : 'por mês'
+  if (tetoMin === 0) return `Com teto zero, nenhuma extra é paga: todas vão para o banco de horas.`
+  const extras = tetoMin + 4 * 60
+  return `Exemplo: com teto de ${formatarMinutos(tetoMin)} ${por}, quem fizer ${formatarMinutos(extras)} de extras recebe ${formatarMinutos(
+    tetoMin,
+  )} pagas e ${formatarMinutos(extras - tetoMin)} vão para o banco de horas.`
+}
 
 /** "toda quarta-feira às 06:00" / "todo sábado às 06:00". */
 function quandoExtrai(dia: number, hora: string) {
@@ -226,79 +267,169 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
     .map((campo) => String(config[campo as keyof Config]))
     .join('|')
 
-  const campoHoras = (campo: (typeof CAMPOS_HORAS)[number], rotulo: string, ajuda?: string) => (
+  /** Campo HH:MM; com `sinal`, o "−" ou "+" aparece fixo à esquerda (o valor é digitado sem ele). */
+  const campoHoras = (campo: (typeof CAMPOS_HORAS)[number], rotulo: string, ajuda?: string, sinal?: '−' | '+') => (
     <Campo rotulo={rotulo} erro={erros[campo]} ajuda={ajuda}>
-      {(props) => (
-        <input
-          {...props}
-          type="text"
-          inputMode="numeric"
-          placeholder="HH:MM"
-          value={form[campo]}
-          onChange={(event) => alterar(campo, event.target.value)}
-          onBlur={() => {
-            const minutos = entradaParaMinutos(form[campo])
-            if (minutos !== null) alterar(campo, minutosParaEntrada(minutos))
-          }}
-        />
-      )}
+      {(props) => {
+        const input = (
+          <input
+            {...props}
+            type="text"
+            inputMode="numeric"
+            placeholder="HH:MM"
+            value={form[campo]}
+            onChange={(event) => alterar(campo, event.target.value)}
+            onBlur={() => {
+              const minutos = entradaParaMinutos(form[campo])
+              if (minutos !== null) alterar(campo, minutosParaEntrada(minutos))
+            }}
+          />
+        )
+        if (!sinal) return input
+        return (
+          <span className={sinal === '+' ? 'config-com-sinal positivo' : 'config-com-sinal negativo'}>
+            <span className="config-sinal" aria-hidden="true">
+              {sinal}
+            </span>
+            {input}
+          </span>
+        )
+      }}
     </Campo>
   )
 
+  // valores digitados agora (para o exemplo do teto e a régua da curva acompanharem a edição)
+  const tetoMin = entradaParaMinutos(form.teto_horas_pagas_minutos)
+  const positivoMin = entradaParaMinutos(form.alerta_saldo_positivo_minutos)
+  const negativoMin = entradaParaMinutos(form.alerta_saldo_negativo_minutos)
+  const tetoSemanalProibido = config.modo_extracao === 'tempo_real'
+
   const camposAlertas = (
     <>
-      <fieldset className="form-secao">
-        <legend>Horas pagas</legend>
-        <div className="campos-grade">
-          <Campo rotulo="Origem das horas pagas" erro={erros.origem_horas_pagas}>
-            {(props) => (
-              <select
-                {...props}
-                value={form.origem_horas_pagas}
-                onChange={(event) => alterar('origem_horas_pagas', event.target.value as Formulario['origem_horas_pagas'])}
-              >
-                <option value="teto">Teto configurado aqui</option>
-                <option value="coluna_secullum">Coluna do cálculo da Secullum</option>
-              </select>
-            )}
-          </Campo>
-          {campoHoras(
-            'teto_horas_pagas_minutos',
-            'Teto de horas pagas',
-            form.origem_horas_pagas === 'teto'
-              ? 'Extras até o teto são pagas; o excedente vai para o banco.'
-              : 'Não usado enquanto a origem for a coluna da Secullum.',
-          )}
-          <Campo
-            rotulo="Periodicidade do teto"
-            erro={erros.teto_periodicidade}
-            ajuda={
-              config.modo_extracao === 'tempo_real'
-                ? 'No tempo real o teto é mensal: não há fotografia semanal.'
-                : undefined
-            }
-          >
-            {(props) => (
-              <select
-                {...props}
-                value={form.teto_periodicidade}
-                onChange={(event) => alterar('teto_periodicidade', event.target.value as Formulario['teto_periodicidade'])}
-              >
-                <option value="semanal" disabled={config.modo_extracao === 'tempo_real' && form.teto_periodicidade !== 'semanal'}>
-                  Semanal
-                </option>
-                <option value="mensal">Mensal</option>
-              </select>
-            )}
-          </Campo>
+      <fieldset className="config-bloco">
+        <legend className="sr-only">Horas pagas</legend>
+        <div className="config-bloco-topo">
+          <span className="config-bloco-icone" aria-hidden="true">
+            <IconeMoeda tamanho={20} />
+          </span>
+          <div>
+            <h2 className="config-bloco-titulo">Horas pagas</h2>
+            <p className="config-bloco-sub">De onde vem o número de horas extras pagas de cada colaborador.</p>
+          </div>
         </div>
+
+        <div className="modo-opcoes" role="radiogroup" aria-label="Origem das horas pagas">
+          {ORIGENS.map(({ valor, titulo, descricao, Icone }) => (
+            <label key={valor} className={form.origem_horas_pagas === valor ? 'modo-opcao ativo' : 'modo-opcao'}>
+              <input
+                type="radio"
+                name="origem_horas_pagas"
+                value={valor}
+                checked={form.origem_horas_pagas === valor}
+                onChange={() => alterar('origem_horas_pagas', valor)}
+              />
+              <span className="modo-opcao-icone" aria-hidden="true">
+                <Icone tamanho={20} />
+              </span>
+              <span className="modo-opcao-texto">
+                <span className="modo-opcao-titulo">
+                  {titulo}
+                  {config.origem_horas_pagas === valor && <span className="modo-opcao-atual">Em uso</span>}
+                </span>
+                <span className="modo-opcao-desc">{descricao}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {form.origem_horas_pagas === 'teto' ? (
+          <div className="config-teto">
+            <div className="campos-grade">
+              {campoHoras('teto_horas_pagas_minutos', 'Teto de horas pagas', 'Formato HH:MM. Zero = nenhuma extra é paga.')}
+              <div className="field">
+                <span className="config-rotulo" id="rotulo-periodicidade">
+                  Vale por
+                </span>
+                <div className="config-segmentos" role="radiogroup" aria-labelledby="rotulo-periodicidade">
+                  {(['semanal', 'mensal'] as const).map((valor) => {
+                    const bloqueado = valor === 'semanal' && tetoSemanalProibido && form.teto_periodicidade !== 'semanal'
+                    return (
+                      <label
+                        key={valor}
+                        className={['config-segmento', form.teto_periodicidade === valor ? 'ativo' : '', bloqueado ? 'bloqueado' : '']
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        <input
+                          type="radio"
+                          name="teto_periodicidade"
+                          value={valor}
+                          checked={form.teto_periodicidade === valor}
+                          disabled={bloqueado}
+                          onChange={() => alterar('teto_periodicidade', valor)}
+                        />
+                        {valor === 'semanal' ? 'Semana' : 'Mês'}
+                      </label>
+                    )
+                  })}
+                </div>
+                {tetoSemanalProibido && (
+                  <span className="field-ajuda">No tempo real o teto é mensal: não há fotografia semanal.</span>
+                )}
+              </div>
+            </div>
+            {tetoMin !== null && (
+              <p className="config-exemplo">
+                <IconeBanco tamanho={18} />
+                <span>{exemploTeto(tetoMin, form.teto_periodicidade)}</span>
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="config-exemplo">
+            <IconeColunas tamanho={18} />
+            <span>
+              As horas pagas vêm prontas do cálculo da FriPonto, na coluna marcada como “pagas” no mapeamento de colunas. O
+              teto não é usado.
+            </span>
+          </p>
+        )}
       </fieldset>
 
-      <fieldset className="form-secao">
-        <legend>Alertas “fora da curva”</legend>
+      <fieldset className="config-bloco">
+        <legend className="sr-only">Alertas fora da curva</legend>
+        <div className="config-bloco-topo">
+          <span className="config-bloco-icone" aria-hidden="true">
+            <IconeAlerta tamanho={20} />
+          </span>
+          <div>
+            <h2 className="config-bloco-titulo">Fora da curva</h2>
+            <p className="config-bloco-sub">
+              A partir de que saldo do banco de horas um colaborador ganha destaque no Dashboard e em Colaboradores.
+            </p>
+          </div>
+        </div>
+
+        <div className="curva-regua" aria-hidden="true">
+          <span className="curva-faixa curva-neg">
+            <strong>Abaixo do limite</strong>
+            {negativoMin !== null ? `até −${formatarMinutos(negativoMin)}` : '—'}
+          </span>
+          <span className="curva-faixa curva-meio">
+            <strong>Dentro da curva</strong>
+            {negativoMin !== null && positivoMin !== null
+              ? `−${formatarMinutos(negativoMin)} a +${formatarMinutos(positivoMin)}`
+              : '—'}
+          </span>
+          <span className="curva-faixa curva-pos">
+            <strong>Acima do limite</strong>
+            {positivoMin !== null ? `a partir de +${formatarMinutos(positivoMin)}` : '—'}
+          </span>
+        </div>
+
         <div className="campos-grade">
-          {campoHoras('alerta_saldo_positivo_minutos', 'Saldo positivo a partir de', 'Colaborador aparece como “acima do limite”.')}
-          {campoHoras('alerta_saldo_negativo_minutos', 'Saldo negativo a partir de', 'Informe sem sinal; ex.: 10:00 = −10:00.')}
+          {campoHoras('alerta_saldo_negativo_minutos', 'Abaixo do limite a partir de', 'Devendo horas. Informe sem o sinal.', '−')}
+          {campoHoras('alerta_saldo_positivo_minutos', 'Acima do limite a partir de', 'Horas sobrando no banco.', '+')}
         </div>
       </fieldset>
     </>
@@ -480,16 +611,21 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
     <section className="pagina">
       <header className="pagina-header">
         <TituloPagina>{textos.titulo}</TituloPagina>
-        <p className="pagina-sub">
-          Última alteração
-          {config.atualizado_por ? ` por ${config.atualizado_por.nome}` : ''} em {formatarDataHora(config.atualizado_em)}.
+        <p className="pagina-sub" title={formatarDataHora(config.atualizado_em)}>
+          Última alteração {formatarQuando(config.atualizado_em)}
+          {config.atualizado_por ? ` por ${config.atualizado_por.nome}` : ''}.
         </p>
       </header>
 
-      <form className="card" onSubmit={salvar} noValidate>
+      {/* Alertas: cada assunto num bloco próprio; as outras seções seguem num cartão só */}
+      <form className={secao === 'alertas' ? 'config-form' : 'card'} onSubmit={salvar} noValidate>
         {campos}
 
-        <div className="form-secao">
+        {/* fica grudada no rodapé da tela enquanto houver alteração por salvar */}
+        <div className={alterado ? 'config-rodape alterado' : 'config-rodape'}>
+          <span className="config-rodape-texto" role="status">
+            {alterado ? 'Alterações não salvas' : 'Tudo salvo'}
+          </span>
           <div className="form-acoes">
             {alterado && (
               <button
@@ -500,7 +636,7 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
                   setErros({})
                 }}
               >
-                Descartar alterações
+                Descartar
               </button>
             )}
             <button type="submit" className="btn-primary" disabled={enviando || !alterado}>

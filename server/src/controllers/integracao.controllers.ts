@@ -444,13 +444,30 @@ export async function atividade(req: FastifyRequest, res: FastifyReply) {
     const empresaId = empresaDoUsuario(req.usuario, empresa_id)
     const veErros = req.usuario.perfil === 'admin' || req.usuario.perfil === 'rh'
 
-    const [tarefas, worker, erros] = await Promise.all([
+    const [{ retoma_em, ...tarefas }, worker, erros, lote] = await Promise.all([
         integracaoModel.atividade(req.usuario, empresaId),
         integracaoModel.worker(),
         veErros ? integracaoModel.errosRecentes(req.usuario, empresaId) : Promise.resolve([]),
+        loteDaEmpresa(req, empresaId),
     ])
     const sincronizando = Object.values(tarefas).some(total => total > 0)
-    res.send({ sincronizando, tarefas, worker_online: worker?.online ?? false, erros })
+    // barra do indicador: colaboradores já extraídos do lote em andamento (só com uma empresa em foco)
+    const progresso = lote.length ? montarProgresso(lote, [], LIMITE_SECULLUM_POR_HORA, false) : null
+    res.send({
+        sincronizando,
+        tarefas,
+        worker_online: worker?.online ?? false,
+        erros,
+        progresso: progresso && { total: progresso.total, feitos: progresso.feitos },
+        retoma_em,
+    })
+}
+
+/** Lote em extração das unidades que o usuário vê; vazio com a equipe em "todas as empresas". */
+async function loteDaEmpresa(req: FastifyRequest, empresaId: number | null) {
+    if (empresaId == null) return []
+    const unidadeIds = await integracaoModel.idsUnidadesPermitidas(req.usuario, empresaId)
+    return unidadeIds.length ? integracaoModel.progressoFila(empresaId, unidadeIds) : []
 }
 
 export async function execucoes(req: FastifyRequest, res: FastifyReply) {

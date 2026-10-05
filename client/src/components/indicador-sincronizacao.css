@@ -77,6 +77,70 @@
   display: none;
 }
 
+/* texto em cima, barra de progresso embaixo */
+.indicador-sinc-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 190px;
+}
+
+.indicador-sinc-pct {
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.indicador-sinc-barra {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.indicador-sinc-barra span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--destaque-de), var(--destaque-ate));
+  transition: width 0.6s ease;
+}
+
+/* sem número (cadastros, batidas): um trecho que corre de um lado ao outro */
+.indicador-sinc-barra.indeterminada span {
+  width: 35%;
+  animation: indicador-sinc-correr 1.4s ease-in-out infinite;
+}
+
+/* esperando a cota voltar: relógio parado e barra apagada */
+.indicador-sinc.aguardando .indicador-sinc-aviao {
+  color: var(--text);
+  background: var(--muted);
+}
+
+.indicador-sinc.aguardando .indicador-sinc-aviao svg {
+  animation: none;
+}
+
+.indicador-sinc.aguardando .indicador-sinc-barra span {
+  background: color-mix(in srgb, var(--accent) 45%, var(--muted));
+}
+
+.indicador-sinc.aguardando .indicador-sinc-pct {
+  color: var(--text);
+}
+
+@keyframes indicador-sinc-correr {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(290%);
+  }
+}
+
 @keyframes indicador-sinc-voar {
   0%,
   100% {
@@ -123,6 +187,14 @@
     padding: 6px;
   }
 
+  .indicador-sinc-corpo {
+    min-width: 0;
+  }
+
+  .indicador-sinc-barra {
+    display: none;
+  }
+
   .indicador-sinc-texto {
     position: absolute;
     width: 1px;
@@ -136,7 +208,8 @@
 @media (prefers-reduced-motion: reduce) {
   .indicador-sinc,
   .indicador-sinc-aviao svg,
-  .indicador-sinc-rastro {
+  .indicador-sinc-rastro,
+  .indicador-sinc-barra.indeterminada span {
     animation: none;
   }
 }

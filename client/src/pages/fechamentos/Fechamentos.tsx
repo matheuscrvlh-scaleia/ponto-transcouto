@@ -3,7 +3,6 @@ import { Link, Route, Routes, useLocation, useSearchParams } from 'react-router-
 import { Aviso, Carregando, ErroCarregamento, EstadoVazio } from '../../components/Estados'
 import { IconeAtividade, IconeCalendario, IconeRelogio, IconeSetaDiagonal, IconeSincronizar } from '../../components/Icones'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
-import { PilulaStatus } from '../../components/PilulaStatus'
 import { TituloPagina } from '../../components/TituloPagina'
 import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
 import { alertarSucesso } from '../../lib/alertas'
@@ -11,21 +10,31 @@ import { api } from '../../lib/api'
 import {
   dataDoInstante,
   formatarData,
-  formatarDataHora,
   formatarDiaPorExtenso,
   formatarDiaSemana,
-  formatarDuracao,
   formatarHora,
   formatarHoraOuData,
+  formatarQuando,
   hojeISO,
   somarDias,
 } from '../../lib/formato'
+import { mensagemAmigavel, textoDuracao } from '../../lib/mensagens'
 import { useRecurso } from '../../lib/useRecurso'
 import type { CicloCalendario, CotaSecullum, FechamentoAdmin, TipoCiclo } from '../../types/api'
 import { ComEmpresa } from '../admin/AdminLayout'
 import { ModalGatilho, type CicloParaAjuste } from '../admin/ModalGatilho'
 import { DetalheFechamento, TextoReprocessar } from './DetalheFechamento'
-import { estaAtrasado, NOME_TIPO, SITUACOES, situacaoDo, type Situacao } from './fechamentos-util'
+import {
+  aguardandoRetomada,
+  estaAtrasado,
+  inicioExecucao,
+  NOME_TIPO,
+  pausadoPorCota,
+  SITUACOES,
+  situacaoDo,
+  type Situacao,
+} from './fechamentos-util'
+import { SituacaoFechamento } from './SituacaoFechamento'
 import '../dashboard.css'
 import './fechamentos.css'
 
@@ -33,6 +42,8 @@ import './fechamentos.css'
    RH e gestores acompanham; as ações (reprocessar, publicar, ajustar gatilho) são da equipe Scale IA. */
 
 const INTERVALO_ATUALIZACAO_MS = 10_000
+/** Só esperando a cota voltar: confere de minuto em minuto. */
+const INTERVALO_PAUSA_MS = 60_000
 const LIMITE = 1000
 /** Ciclos que já abrem expandidos na lista. */
 const CICLOS_ABERTOS = 2
@@ -73,7 +84,10 @@ function agruparPorCiclo(fechamentos: FechamentoAdmin[]): Ciclo[] {
   }
   const nome = (f: FechamentoAdmin) => f.unidade.nome
   return [...ciclos.values()]
-    .map((ciclo) => ({ ...ciclo, fechamentos: ciclo.fechamentos.sort((a, b) => nome(a).localeCompare(nome(b), 'pt-BR')) }))
+    .map((ciclo) => ({
+      ...ciclo,
+      fechamentos: ciclo.fechamentos.sort((a, b) => nome(a).localeCompare(nome(b), 'pt-BR')),
+    }))
     .sort((a, b) => b.data_referencia.localeCompare(a.data_referencia))
 }
 
@@ -119,27 +133,40 @@ function PainelFechamentos() {
   const de = somarDias(hojeISO(), -31 * meses)
 
   const lista = useRecurso(
-    (signal) => api<FechamentoAdmin[]>('/admin/fechamentos', { signal, query: { ...query, de, limite: LIMITE } }),
+    (signal) =>
+      api<FechamentoAdmin[]>('/admin/fechamentos', {
+        signal,
+        query: { ...query, de, limite: LIMITE },
+      }),
     `fechamentos-${empresaId}-${de}`,
   )
   const cota = useRecurso((signal) => api<CotaSecullum>('/admin/cota-secullum', { signal, query }), `cota-${empresaId}`)
   const calendario = useRecurso(
-    (signal) => api<CicloCalendario[]>('/admin/calendario', { signal, query: { ...query, meses: 2 } }),
+    (signal) =>
+      api<CicloCalendario[]>('/admin/calendario', {
+        signal,
+        query: { ...query, meses: 2 },
+      }),
     `calendario-${empresaId}`,
   )
 
-  // enquanto houver extração andando (ou atrasada), a tela se atualiza sozinha
+  // enquanto houver extração andando, atrasada ou pausada pela cota, a tela se atualiza sozinha
   const { recarregar: recarregarLista } = lista
   const { recarregar: recarregarCota } = cota
-  const ativo = (lista.dados ?? []).some((f) => f.status === 'processando' || estaAtrasado(f))
+  const rodando = (lista.dados ?? []).some((f) => f.status === 'processando' || estaAtrasado(f))
+  const pausado = (lista.dados ?? []).some(aguardandoRetomada)
+  const ativo = rodando || pausado
   useEffect(() => {
     if (!ativo) return
-    const timer = window.setInterval(() => {
-      recarregarLista()
-      recarregarCota()
-    }, INTERVALO_ATUALIZACAO_MS)
+    const timer = window.setInterval(
+      () => {
+        recarregarLista()
+        recarregarCota()
+      },
+      rodando ? INTERVALO_ATUALIZACAO_MS : INTERVALO_PAUSA_MS,
+    )
     return () => window.clearInterval(timer)
-  }, [ativo, recarregarLista, recarregarCota])
+  }, [ativo, rodando, recarregarLista, recarregarCota])
 
   const todos = useMemo(() => lista.dados ?? [], [lista.dados])
   const ciclos = useMemo(() => agruparPorCiclo(todos), [todos])
@@ -185,7 +212,7 @@ function PainelFechamentos() {
         <TituloPagina>Fechamentos</TituloPagina>
         <p className="pagina-sub">
           Extração das horas da FriPonto por unidade, a cada semana e no fechamento do mês.
-          {ativo && ' Atualizando sozinha enquanto há extração em andamento.'}
+          {ativo && ' A lista se atualiza sozinha enquanto há extração em andamento.'}
         </p>
       </header>
 
@@ -315,9 +342,7 @@ function PainelFechamentos() {
               </EstadoVazio>
             ) : (
               <EstadoVazio titulo="Nenhum fechamento no período">
-                <p>
-                  As extrações aparecem aqui a partir do primeiro gatilho do calendário. Veja ao lado quando será o próximo.
-                </p>
+                <p>As extrações aparecem aqui a partir do primeiro gatilho do calendário. Veja ao lado quando será o próximo.</p>
               </EstadoVazio>
             )
           ) : (
@@ -350,8 +375,8 @@ function PainelFechamentos() {
       </div>
 
       <p className="rodape-nota">
-        Cada extração publicada vira a fotografia que o Dashboard e Colaboradores mostram para aquela unidade; ela fica
-        congelada até um novo fechamento ser publicado.
+        Cada extração publicada vira a fotografia que o Dashboard e Colaboradores mostram para aquela unidade; ela fica congelada
+        até um novo fechamento ser publicado.
       </p>
 
       {reprocessando && (
@@ -361,7 +386,10 @@ function PainelFechamentos() {
           motivo="opcional"
           onFechar={() => setReprocessando(null)}
           onConfirmar={async (motivo) => {
-            await api(`/admin/fechamentos/${reprocessando.id}/reprocessar`, { method: 'POST', json: { motivo } })
+            await api(`/admin/fechamentos/${reprocessando.id}/reprocessar`, {
+              method: 'POST',
+              json: { motivo },
+            })
             setReprocessando(null)
             alertarSucesso('Fechamento enviado para a fila de reprocessamento.')
             lista.recarregar()
@@ -511,6 +539,12 @@ function BlocoCiclo({ ciclo, aberto, ehAdmin, origemLink, onReprocessar }: Bloco
   const comFalha = fechamentos.filter((f) => f.status === 'falhou').length
   const atrasados = fechamentos.filter(estaAtrasado).length
   const andamento = fechamentos.filter((f) => f.status === 'processando').length
+  const pausados = fechamentos.filter(pausadoPorCota)
+  // a primeira unidade pausada a voltar (todas usam a mesma cota da empresa)
+  const retomaEm = pausados
+    .map((f) => f.proxima_tentativa_em as string)
+    .sort()
+    .at(0)
   const pct = total ? Math.round((publicados / total) * 100) : 0
   const [agora] = useState(() => Date.now())
   const futuro = new Date(ciclo.gatilho_em).getTime() > agora
@@ -527,7 +561,8 @@ function BlocoCiclo({ ciclo, aberto, ehAdmin, origemLink, onReprocessar }: Bloco
           <span className="fech-ciclo-sub">
             {formatarData(ciclo.periodo_inicio, { ano: false })} a {formatarData(ciclo.data_referencia, { ano: false })}
             {' · '}
-            {futuro ? 'extração prevista' : 'extraído'} {formatarDiaSemana(ciclo.gatilho_em)}
+            {futuro ? 'coleta prevista para' : publicados === total ? 'coletado' : 'coleta iniciada'}{' '}
+            {formatarDiaSemana(ciclo.gatilho_em)}
             {ciclo.gatilho_ajustado && ' (ajustado)'}
           </span>
         </span>
@@ -535,6 +570,14 @@ function BlocoCiclo({ ciclo, aberto, ehAdmin, origemLink, onReprocessar }: Bloco
         <span className="fech-ciclo-placar">
           <span className="fech-ciclo-contas">
             {andamento > 0 && <span className="fech-conta conta-andamento">{andamento} em andamento</span>}
+            {pausados.length > 0 && retomaEm && (
+              <span
+                className="fech-conta conta-pausa"
+                title="A cota de cálculos da FriPonto (100 por hora) acabou; a coleta continua sozinha"
+              >
+                {plural(pausados.length, 'pausada', 'pausadas')} · retoma {formatarQuando(retomaEm)}
+              </span>
+            )}
             {comFalha > 0 && <span className="fech-conta conta-falha">{plural(comFalha, 'falha', 'falhas')}</span>}
             {atrasados > 0 && <span className="fech-conta conta-falha">{plural(atrasados, 'atrasada', 'atrasadas')}</span>}
           </span>
@@ -584,10 +627,12 @@ function BlocoCiclo({ ciclo, aberto, ehAdmin, origemLink, onReprocessar }: Bloco
                     <Link to={String(f.id)} state={origemLink}>
                       {f.unidade.nome}
                     </Link>
-                    {f.publicado_em && <span className="celula-sub">Publicado {formatarHoraOuData(f.publicado_em, { comData: true })}</span>}
+                    {f.publicado_em && (
+                      <span className="celula-sub">Publicado {formatarHoraOuData(f.publicado_em, { comData: true })}</span>
+                    )}
                   </th>
                   <td>
-                    <PilulaStatus status={f.status} atrasado={estaAtrasado(f)} />
+                    <SituacaoFechamento fechamento={f} />
                     <Motivo fechamento={f} />
                   </td>
                   <td>
@@ -620,7 +665,7 @@ function BlocoCiclo({ ciclo, aberto, ehAdmin, origemLink, onReprocessar }: Bloco
               <Link to={String(f.id)} state={origemLink} className="fech-cartao-nome">
                 {f.unidade.nome}
               </Link>
-              <PilulaStatus status={f.status} atrasado={estaAtrasado(f)} />
+              <SituacaoFechamento fechamento={f} />
             </div>
             <Motivo fechamento={f} />
             {f.ultima_execucao && <Progresso fechamento={f} />}
@@ -667,25 +712,26 @@ function UltimaExecucao({ fechamento }: { fechamento: FechamentoAdmin }) {
   const execucao = fechamento.ultima_execucao
   if (!execucao) {
     return fechamento.proxima_tentativa_em && fechamento.status === 'pendente' ? (
-      <span className="celula-sub">Próxima tentativa {formatarDataHora(fechamento.proxima_tentativa_em)}</span>
+      <span className="celula-sub">Próxima tentativa {formatarQuando(fechamento.proxima_tentativa_em)}</span>
     ) : (
       <span className="texto-suave">—</span>
     )
   }
   return (
     <>
-      {formatarDataHora(execucao.iniciado_em)}
+      {inicioExecucao(execucao)}
       <span className="celula-sub">
-        {formatarDuracao(execucao.iniciado_em, execucao.finalizado_em)}
-        {execucao.disparo === 'manual' && ` · manual${execucao.disparado_por ? ` (${execucao.disparado_por.nome})` : ''}`}
+        {textoDuracao(execucao)}
+        {execucao.disparo === 'manual' && ` · manual${execucao.disparado_por ? ` por ${execucao.disparado_por.nome}` : ''}`}
       </span>
     </>
   )
 }
 
 function Motivo({ fechamento }: { fechamento: FechamentoAdmin }) {
-  const mensagem = fechamento.status === 'falhou' ? fechamento.ultima_execucao?.mensagem_erro : null
-  if (!mensagem) return null
+  const bruta = fechamento.status === 'falhou' ? fechamento.ultima_execucao?.mensagem_erro : null
+  if (!bruta) return null
+  const mensagem = mensagemAmigavel(bruta)
   return <span className="celula-motivo">{mensagem.length > 160 ? `${mensagem.slice(0, 160)}…` : mensagem}</span>
 }
 
@@ -764,8 +810,7 @@ function CartaoCalendario({ dados, carregando, erro, onTentarDeNovo, onAjustar }
       )}
 
       <p className="fech-calendario-nota">
-        Na semana do fechamento da folha (dia 25/26) a extração espera o ajuste final do RH, por isso pode cair em outro
-        dia.
+        Na semana do fechamento da folha (dia 25/26) a extração espera o ajuste final do RH, por isso pode cair em outro dia.
       </p>
     </section>
   )

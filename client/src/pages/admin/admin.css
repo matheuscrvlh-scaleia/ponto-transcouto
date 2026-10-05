@@ -234,6 +234,13 @@
   border-color: var(--aviso-border);
 }
 
+/* extração parada esperando a cota da FriPonto: não é erro, retoma sozinha */
+.pilula-pausada {
+  color: var(--accent);
+  background: var(--accent-suave);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
 .pilula-cancelado,
 .pilula-inativo {
   color: var(--text);
@@ -255,6 +262,15 @@
 .celula-motivo {
   font-size: 12px;
   color: var(--danger);
+  max-width: 340px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* mensagem que não é erro (ex.: pausa pela cota) */
+.celula-nota {
+  font-size: 12px;
+  color: var(--text);
   max-width: 340px;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -666,6 +682,296 @@ tr.linha-inativa > * {
 @media (prefers-reduced-motion: reduce) {
   .modo-opcao {
     transition: none;
+  }
+}
+
+/* ---------- Configuração → Alertas e horas pagas ---------- */
+
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* cada assunto num cartão (fieldset sem a borda padrão) */
+.config-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--app-borda);
+  border-radius: var(--raio-card);
+  box-shadow: var(--sombra-suave);
+}
+
+.config-bloco-topo {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.config-bloco-icone {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.config-bloco-titulo {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.config-bloco-sub {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.config-teto {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.config-rotulo {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+/* Semana | Mês */
+.config-segmentos {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px;
+  gap: 4px;
+  background: var(--muted);
+  border-radius: 999px;
+}
+
+.config-segmento {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.config-segmento input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.config-segmento.ativo {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.config-segmento.bloqueado {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.config-segmento:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.config-exemplo {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-h);
+  background: var(--muted);
+  border-radius: 12px;
+}
+
+.config-exemplo svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+/* régua: abaixo | dentro | acima da curva */
+.curva-regua {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.curva-faixa {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.curva-faixa strong {
+  font-size: 13px;
+}
+
+.curva-neg {
+  background: var(--negativo-bg);
+}
+
+.curva-neg strong {
+  color: var(--negativo);
+}
+
+.curva-meio {
+  align-items: center;
+  text-align: center;
+  background: var(--surface);
+  border-left: 1px dashed var(--border);
+  border-right: 1px dashed var(--border);
+}
+
+.curva-meio strong {
+  color: var(--text-h);
+}
+
+.curva-pos {
+  align-items: flex-end;
+  text-align: right;
+  background: var(--positivo-bg);
+}
+
+.curva-pos strong {
+  color: var(--positivo);
+}
+
+/* campo HH:MM com o sinal fixo à esquerda */
+.config-com-sinal {
+  position: relative;
+  display: block;
+}
+
+.config-sinal {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  font-size: 16px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.config-com-sinal.negativo .config-sinal {
+  color: var(--negativo);
+}
+
+.config-com-sinal.positivo .config-sinal {
+  color: var(--positivo);
+}
+
+.admin-content .config-com-sinal input {
+  width: 100%;
+  padding-left: 28px;
+}
+
+/* barra de salvar: gruda no rodapé enquanto houver alteração */
+.config-rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.card .config-rodape {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.config-rodape-texto {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.config-rodape-texto::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sucesso);
+}
+
+.config-rodape.alterado {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.config-form .config-rodape:not(.alterado) {
+  padding: 0 4px;
+}
+
+.config-rodape.alterado .config-rodape-texto {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.config-rodape.alterado .config-rodape-texto::before {
+  background: var(--aviso);
+}
+
+@media (max-width: 640px) {
+  .config-bloco {
+    padding: 18px 16px;
+  }
+
+  .curva-regua {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .curva-meio,
+  .curva-pos {
+    align-items: flex-start;
+    text-align: left;
+    border: none;
+  }
+
+  .config-rodape .form-acoes {
+    width: 100%;
   }
 }
 

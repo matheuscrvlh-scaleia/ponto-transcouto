@@ -20,7 +20,8 @@ const ROTULO_ALCANCE = { empresa: 'Toda a empresa', unidades: 'Unidades vinculad
 
 /* Grupos de permissão da empresa: cada grupo libera um conjunto de telas e define se os
    usuários veem a empresa toda ou só as unidades vinculadas. RH e Gestor são os grupos
-   padrão (editáveis, não excluíveis). A equipe Scale IA tem acesso total e fica fora. */
+   padrão (editáveis, não excluíveis). A equipe Scale IA tem acesso total e fica fora
+   (o cartão e a coluna dela só aparecem para a própria equipe). */
 export function Permissoes() {
   const { perfil } = useAuth()
   const { empresaId, query } = useEmpresaSelecionada()
@@ -61,22 +62,23 @@ export function Permissoes() {
       ) : (
         <>
           <ul className="perm-perfis">
-            <li className="perm-perfil perm-perfil-admin">
-              <div className="perm-perfil-topo">
-                <span className="perm-perfil-icone" aria-hidden="true">
-                  <IconeEscudo tamanho={20} />
-                </span>
-                <h2>Equipe Scale IA</h2>
-              </div>
-              <p>Time da Scale IA: acesso total a todas as empresas, à Configuração e à Administração. Não muda por grupo.</p>
-              {ehEquipe && (
+            {/* só a própria equipe vê o cartão dela; para o cliente a Scale IA não aparece aqui */}
+            {ehEquipe && (
+              <li className="perm-perfil perm-perfil-admin">
+                <div className="perm-perfil-topo">
+                  <span className="perm-perfil-icone" aria-hidden="true">
+                    <IconeEscudo tamanho={20} />
+                  </span>
+                  <h2>Equipe Scale IA</h2>
+                </div>
+                <p>Time da Scale IA: acesso total a todas as empresas, à Configuração e à Administração. Não muda por grupo.</p>
                 <Link to="/admin/equipe" className="perm-perfil-link">
                   <IconeUsuarios tamanho={16} />
                   Ver equipe
                   <span aria-hidden="true">→</span>
                 </Link>
-              )}
-            </li>
+              </li>
+            )}
 
             {lista.map((grupo) => (
               <li key={grupo.id} className="perm-perfil">
@@ -134,7 +136,7 @@ export function Permissoes() {
                 <thead>
                   <tr>
                     <th scope="col">Tela</th>
-                    <th scope="col">Equipe Scale IA</th>
+                    {ehEquipe && <th scope="col">Equipe Scale IA</th>}
                     {lista.map((grupo) => (
                       <th key={grupo.id} scope="col">
                         {grupo.nome}
@@ -145,7 +147,7 @@ export function Permissoes() {
                 {SECOES_TELAS.map((secao) => (
                   <tbody key={secao}>
                     <tr className="perm-grupo">
-                      <th scope="rowgroup" colSpan={lista.length + 2}>
+                      <th scope="rowgroup" colSpan={lista.length + (ehEquipe ? 2 : 1)}>
                         {secao}
                       </th>
                     </tr>
@@ -155,9 +157,11 @@ export function Permissoes() {
                           <span className="perm-area">{tela.rotulo}</span>
                           <span className="perm-area-desc">{tela.descricao}</span>
                         </th>
-                        <td data-perfil="Equipe Scale IA">
-                          <Marca liberada total />
-                        </td>
+                        {ehEquipe && (
+                          <td data-perfil="Equipe Scale IA">
+                            <Marca liberada total />
+                          </td>
+                        )}
                         {lista.map((grupo) => (
                           <td key={grupo.id} data-perfil={grupo.nome}>
                             <Marca liberada={grupo.telas.includes(tela.id)} />

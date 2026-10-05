@@ -528,6 +528,10 @@ export interface AtividadeIntegracao {
   worker_online: boolean
   /** Só para RH e equipe; vazio para o gestor. */
   erros: { chave: string; origem: string; empresa: string; mensagem: string; em: DataHoraISO }[]
+  /** Colaboradores do lote em extração (barra do indicador); null sem lote ou sem empresa em foco. */
+  progresso: { total: number; feitos: number } | null
+  /** Extração parada esperando a cota da FriPonto (ou nova tentativa): quando volta. */
+  retoma_em: DataHoraISO | null
 }
 
 /** POST /integracao/sincronizar (Atualização dos dados → Forçar sincronização). */

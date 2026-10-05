@@ -8,16 +8,27 @@ import { TituloPagina } from '../../components/TituloPagina'
 import { useEmpresaAdmin } from '../../context/EmpresaAdminContext'
 import { alertarSucesso } from '../../lib/alertas'
 import { api } from '../../lib/api'
-import { dataDoInstante, formatarData, formatarDataHora, formatarDiaSemana, formatarDuracao, formatarHora } from '../../lib/formato'
+import {
+  dataDoInstante,
+  formatarData,
+  formatarDataHora,
+  formatarDiaSemana,
+  formatarHora,
+  formatarQuando,
+} from '../../lib/formato'
+import { mensagemAmigavel, pausaPorCota, textoDuracao } from '../../lib/mensagens'
 import { useRecurso } from '../../lib/useRecurso'
 import type { ErroExecucao, FechamentoAdmin, FechamentoDetalhe } from '../../types/api'
 import { ModalGatilho } from '../admin/ModalGatilho'
-import { estaAtrasado, NOME_TIPO } from './fechamentos-util'
+import { aguardandoRetomada, estaAtrasado, inicioExecucao, NOME_TIPO, pausadoPorCota } from './fechamentos-util'
+import { SituacaoFechamento } from './SituacaoFechamento'
 import '../admin/admin.css'
 import '../dashboard.css'
 import './fechamentos.css'
 
 const INTERVALO_ATUALIZACAO_MS = 10_000
+/** Só esperando a cota voltar: confere de minuto em minuto. */
+const INTERVALO_PAUSA_MS = 60_000
 
 type Acao = 'reprocessar' | 'publicar' | 'gatilho' | null
 
@@ -25,13 +36,13 @@ export function TextoReprocessar({ fechamento }: { fechamento: FechamentoAdmin }
   return (
     <>
       <p>
-        O fechamento de <strong>{fechamento.unidade.nome}</strong> (dados até {formatarData(fechamento.data_referencia)})
-        volta para a fila e será extraído de novo da FriPonto assim que houver cota.
+        O fechamento de <strong>{fechamento.unidade.nome}</strong> (dados até {formatarData(fechamento.data_referencia)}) volta
+        para a fila e será extraído de novo da FriPonto assim que houver cota.
       </p>
       {fechamento.status === 'sucesso' && (
         <p>
-          <strong>Atenção:</strong> este fechamento já está publicado; o reprocessamento substitui os números que os
-          gestores estão vendo.
+          <strong>Atenção:</strong> este fechamento já está publicado; o reprocessamento substitui os números que os gestores
+          estão vendo.
         </p>
       )}
     </>
@@ -50,12 +61,13 @@ export function DetalheFechamento() {
   // volta para a lista com os filtros que estavam abertos
   const voltarPara = (location.state as { de?: string } | null)?.de ?? '/fechamentos'
 
-  const emAndamento = dados?.status === 'processando' || (dados ? estaAtrasado(dados) : false)
+  const rodando = dados?.status === 'processando' || (dados ? estaAtrasado(dados) : false)
+  const emAndamento = rodando || (dados ? aguardandoRetomada(dados) : false)
   useEffect(() => {
     if (!emAndamento) return
-    const timer = window.setInterval(recarregar, INTERVALO_ATUALIZACAO_MS)
+    const timer = window.setInterval(recarregar, rodando ? INTERVALO_ATUALIZACAO_MS : INTERVALO_PAUSA_MS)
     return () => window.clearInterval(timer)
-  }, [emAndamento, recarregar])
+  }, [emAndamento, rodando, recarregar])
 
   useEffect(() => {
     if (dados) document.title = `${dados.unidade.nome} ${formatarData(dados.data_referencia)} — Fechamentos`
@@ -87,12 +99,11 @@ export function DetalheFechamento() {
           <TituloPagina>{dados.unidade.nome}</TituloPagina>
           <div className="fech-detalhe-titulo">
             <h2>Dados até {formatarData(dados.data_referencia)}</h2>
-            <PilulaStatus status={dados.status} atrasado={estaAtrasado(dados)} />
+            <SituacaoFechamento fechamento={dados} comRetomada={false} />
             {dados.tipo === 'fechamento_mes' && <span className="badge badge-alerta">Fechamento do mês</span>}
           </div>
           <p className="pagina-sub">
-            {dados.empresa.nome} · período de {formatarData(dados.periodo_inicio)} a{' '}
-            {formatarData(dados.data_referencia)}
+            {dados.empresa.nome} · período de {formatarData(dados.periodo_inicio)} a {formatarData(dados.data_referencia)}
           </p>
         </div>
         {ehAdmin && (
@@ -119,7 +130,25 @@ export function DetalheFechamento() {
         )}
       </header>
 
-      {dados.status === 'falhou' && execucao?.mensagem_erro && <Aviso>Última falha: {execucao.mensagem_erro}</Aviso>}
+      {dados.status === 'falhou' && execucao?.mensagem_erro && (
+        <Aviso>Última falha: {mensagemAmigavel(execucao.mensagem_erro)}</Aviso>
+      )}
+      {aguardandoRetomada(dados) && dados.proxima_tentativa_em && (
+        <p className="fech-nota-pausa" role="status">
+          {pausadoPorCota(dados) ? (
+            <>
+              <strong>Coleta pausada pela cota.</strong> A FriPonto libera 100 cálculos por hora e eles acabaram. A coleta
+              continua sozinha <strong>{formatarQuando(dados.proxima_tentativa_em)}</strong>, de onde parou; não precisa fazer
+              nada.
+            </>
+          ) : (
+            <>
+              <strong>Nova tentativa agendada</strong> para {formatarQuando(dados.proxima_tentativa_em)}, só com os colaboradores
+              que ainda faltam.
+            </>
+          )}
+        </p>
+      )}
 
       <div className="dash-kpis">
         <div className="dash-kpi dash-kpi-destaque">
@@ -160,15 +189,17 @@ export function DetalheFechamento() {
         </div>
         <div className="dash-kpi">
           <p className="dash-kpi-rotulo">Publicado</p>
-          <p className="dash-kpi-valor">{dados.publicado_em ? formatarData(dataDoInstante(dados.publicado_em), { ano: false }) : '—'}</p>
+          <p className="dash-kpi-valor">
+            {dados.publicado_em ? formatarData(dataDoInstante(dados.publicado_em), { ano: false }) : '—'}
+          </p>
           <p className="dash-kpi-contexto">
             <span className="dash-kpi-contexto-icone" aria-hidden="true">
               <IconeCalendario tamanho={14} />
             </span>
             {dados.publicado_em
               ? `às ${formatarHora(dados.publicado_em)}`
-              : dados.proxima_tentativa_em
-                ? `Próxima tentativa ${formatarDataHora(dados.proxima_tentativa_em)}`
+              : dados.proxima_tentativa_em && dados.status === 'pendente'
+                ? `Retoma ${formatarQuando(dados.proxima_tentativa_em)}`
                 : 'Ainda não publicado'}
           </p>
         </div>
@@ -179,7 +210,7 @@ export function DetalheFechamento() {
           <div>
             <h2 id="titulo-execucoes">Execuções</h2>
             <p className="dash-card-sub">
-              {dados.tentativas} {dados.tentativas === 1 ? 'tentativa' : 'tentativas'}
+              {dados.execucoes.length} {dados.execucoes.length === 1 ? 'execução' : 'execuções'}
               {dados.gatilho_ajustado && ` · regra original: ${formatarDiaSemana(dados.gatilho_previsto_em)}`}
             </p>
           </div>
@@ -205,26 +236,31 @@ export function DetalheFechamento() {
                 </tr>
               </thead>
               <tbody>
-                {dados.execucoes.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      {formatarDataHora(item.iniciado_em)}
-                      <span className="celula-sub">{formatarDuracao(item.iniciado_em, item.finalizado_em)}</span>
-                    </td>
-                    <td>
-                      <PilulaStatus status={item.status} />
-                    </td>
-                    <td>
-                      {item.disparo === 'manual' ? 'Manual' : 'Automático'}
-                      {item.disparado_por && <span className="celula-sub">{item.disparado_por.nome}</span>}
-                    </td>
-                    <td className="num">
-                      {item.processados}/{item.total_colaboradores}
-                    </td>
-                    <td className="num">{item.com_erro}</td>
-                    <td className="celula-motivo">{item.mensagem_erro ?? '—'}</td>
-                  </tr>
-                ))}
+                {dados.execucoes.map((item) => {
+                  const pausa = item.status === 'interrompida' && pausaPorCota(item.mensagem_erro)
+                  return (
+                    <tr key={item.id}>
+                      <td>
+                        {inicioExecucao(item)}
+                        <span className="celula-sub">{textoDuracao(item)}</span>
+                      </td>
+                      <td>
+                        {pausa ? <span className="pilula pilula-pausada">Pausada</span> : <PilulaStatus status={item.status} />}
+                      </td>
+                      <td>
+                        {item.disparo === 'manual' ? 'Manual' : 'Automático'}
+                        {item.disparado_por && <span className="celula-sub">{item.disparado_por.nome}</span>}
+                      </td>
+                      <td className="num">
+                        {item.processados}/{item.total_colaboradores}
+                      </td>
+                      <td className="num">{item.com_erro}</td>
+                      <td className={pausa ? 'celula-nota' : 'celula-motivo'}>
+                        {item.mensagem_erro ? mensagemAmigavel(item.mensagem_erro) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -256,7 +292,10 @@ export function DetalheFechamento() {
           motivo="opcional"
           onFechar={() => setAcao(null)}
           onConfirmar={async (motivo) => {
-            await api(`/admin/fechamentos/${dados.id}/reprocessar`, { method: 'POST', json: { motivo } })
+            await api(`/admin/fechamentos/${dados.id}/reprocessar`, {
+              method: 'POST',
+              json: { motivo },
+            })
             concluir('Fechamento enviado para a fila de reprocessamento.')
           }}
         >
@@ -272,14 +311,17 @@ export function DetalheFechamento() {
           motivo="obrigatorio"
           onFechar={() => setAcao(null)}
           onConfirmar={async (motivo) => {
-            await api(`/admin/fechamentos/${dados.id}/publicar`, { method: 'POST', json: { motivo } })
+            await api(`/admin/fechamentos/${dados.id}/publicar`, {
+              method: 'POST',
+              json: { motivo },
+            })
             concluir('Fechamento publicado. Os gestores já veem estes números.')
           }}
         >
           <p>
             Publica os <strong>{dados.registros}</strong> registros extraídos
-            {dados.total_colaboradores ? ` de ${dados.total_colaboradores} colaboradores` : ''} mesmo com a extração
-            incompleta. Colaboradores sem registro ficam fora do painel desta semana.
+            {dados.total_colaboradores ? ` de ${dados.total_colaboradores} colaboradores` : ''} mesmo com a extração incompleta.
+            Colaboradores sem registro ficam fora do painel desta semana.
           </p>
         </ModalConfirmacao>
       )}

@@ -749,9 +749,18 @@
   color: var(--text);
 }
 
-.app-assinatura strong {
+/* link para o site da Scale IA (abre em outra aba) */
+.app-assinatura a {
   color: var(--text-h);
   font-weight: 700;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.app-assinatura a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ----- Avatar com iniciais (shell e dashboard) ----- */

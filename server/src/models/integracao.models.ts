@@ -36,6 +36,16 @@ export async function unidadesDoEscopo(ator: Ator, empresaId: number) {
     return rows
 }
 
+/** Ids das unidades da empresa que o usuário vê (com ou sem nome de exibição). */
+export async function idsUnidadesPermitidas(ator: Ator, empresaId: number) {
+    const { rows } = await db.query<{ id: number }>(
+        `SELECT un.id FROM unidades un
+          WHERE un.empresa_id = $2 AND un.id IN (SELECT ${unidadesPermitidasSql(ator)})`,
+        [ator.id, empresaId],
+    )
+    return rows.map(r => r.id)
+}
+
 export async function empresa(empresaId: number) {
     const { rows } = await db.query<{
         id: number
@@ -302,7 +312,13 @@ const empresasVisiveis = (ator: Ator) => `
 /** O que está sendo puxado da FriPonto agora (pedidos e fila), sem contar o rodízio contínuo do tempo real. */
 export async function atividade(ator: Ator, empresaId: number | null) {
     const permitidas = `SELECT ${unidadesPermitidasSql(ator)}`
-    const { rows } = await db.query<{ cadastros: number; fechamentos: number; tempo_real: number; batidas: number }>(
+    const { rows } = await db.query<{
+        cadastros: number
+        fechamentos: number
+        tempo_real: number
+        batidas: number
+        retoma_em: Date | null
+    }>(
         `WITH emp AS (${empresasVisiveis(ator)})
          SELECT (SELECT count(*) FROM emp
                   WHERE emp.sincronizacao_solicitada_em IS NOT NULL
@@ -318,7 +334,12 @@ export async function atividade(ator: Ator, empresaId: number | null) {
                   WHERE rt.empresa_id IN (SELECT id FROM emp) AND rt.unidade_id IN (${permitidas})
                     AND rt.tentado_em = ${FORCADO})::int AS tempo_real,
                 (SELECT count(*) FROM batidas_importacao bi
-                  WHERE bi.empresa_id IN (SELECT id FROM emp) AND bi.tentado_em = ${FORCADO})::int AS batidas`,
+                  WHERE bi.empresa_id IN (SELECT id FROM emp) AND bi.tentado_em = ${FORCADO})::int AS batidas,
+                -- extração parada esperando a cota da FriPonto (ou nova tentativa): quando volta
+                (SELECT min(f.proxima_tentativa_em) FROM fechamentos f JOIN ciclos c ON c.id = f.ciclo_id
+                  WHERE f.empresa_id IN (SELECT id FROM emp) AND f.unidade_id IN (${permitidas})
+                    AND c.gatilho_em <= now() AND f.status = 'pendente'
+                    AND f.proxima_tentativa_em > now() + interval '5 minutes') AS retoma_em`,
         [ator.id, empresaId],
     )
     return rows[0]

@@ -250,6 +250,16 @@ export function IconeSetaBaixo(props: Props) {
   )
 }
 
+/** Triângulo de atenção (mesmo desenho do Aviso). */
+export function IconeAlerta(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M12 3.5 21.5 20h-19L12 3.5Z" />
+      <path d="M12 10v4.2M12 17.2v.1" />
+    </Base>
+  )
+}
+
 export function IconeSincronizar(props: Props) {
   return (
     <Base {...props}>

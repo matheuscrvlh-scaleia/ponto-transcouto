@@ -489,3 +489,27 @@
     flex: 1;
   }
 }
+
+/* ----- Pausa pela cota da FriPonto (não é erro: retoma sozinha) ----- */
+
+.fech-situacao {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.conta-pausa {
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.fech-nota-pausa {
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  background: var(--accent-suave);
+  color: var(--text-h);
+  font-size: 14px;
+  line-height: 1.5;
+}

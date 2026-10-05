@@ -1,14 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
-import { Aviso, Carregando, ErroCarregamento } from '../../components/Estados'
-import { IconeCalendario, IconeUsuarios } from '../../components/Icones'
+import { useEmpresaAdmin, useEmpresaSelecionada } from '../../context/EmpresaAdminContext'
+import { Carregando, ErroCarregamento } from '../../components/Estados'
+import {
+  IconeAlerta,
+  IconeAtividade,
+  IconeCalendario,
+  IconeChave,
+  IconeCheck,
+  IconeRelogio,
+  IconeSincronizar,
+  IconeUsuarios,
+} from '../../components/Icones'
 import { ModalConfirmacao } from '../../components/ModalConfirmacao'
 import { PilulaStatus } from '../../components/PilulaStatus'
 import { alertarSucesso } from '../../lib/alertas'
 import { api } from '../../lib/api'
-import { formatarData, formatarDataHora, formatarDuracao, formatarHoraOuData, formatarIntervalo } from '../../lib/formato'
+import { formatarData, formatarDataHora, formatarHoraOuData, formatarIntervalo, formatarQuando } from '../../lib/formato'
+import { mensagemAmigavel, pausaPorCota, textoDuracao } from '../../lib/mensagens'
 import { NOME_PERFIL } from '../../lib/preferencias'
 import { avisarSincronizacaoPedida } from '../../lib/sincronizacao'
 import { useRecurso } from '../../lib/useRecurso'
@@ -128,7 +138,7 @@ export function IntegracaoFriPonto() {
 
       {dados && (
         <>
-          <AvisosStatus status={dados} ehAdmin={ehAdmin} linkFechamentos={linkFechamentos} />
+          <ResumoIntegracao status={dados} ehAdmin={ehAdmin} linkFechamentos={linkFechamentos} />
           <ProgressoExtracaoLote status={dados} linkFechamentos={linkFechamentos} />
           <CartoesStatus
             status={dados}
@@ -162,7 +172,17 @@ export function IntegracaoFriPonto() {
                   </p>
                 )}
                 {semCredenciais && <p className="integ-texto">{bloqueio}</p>}
-                <div className="integ-botoes">
+                <dl className="integ-fatos">
+                  <div>
+                    <dt>Última atualização</dt>
+                    <dd>{dados.empresa.sincronizado_em ? quandoMaiusculo(dados.empresa.sincronizado_em) : 'Nunca'}</dd>
+                  </div>
+                  <div>
+                    <dt>Situação</dt>
+                    <dd>{dados.empresa.sincronizacao_pendente ? 'Na fila' : 'Em dia'}</dd>
+                  </div>
+                </dl>
+                <div className="integ-botoes integ-botoes-rodape">
                   <button
                     type="button"
                     className="integ-botao"
@@ -369,14 +389,12 @@ function ProgressoExtracaoLote({ status, linkFechamentos }: { status: StatusInte
     <section className="integ-bloco integ-progresso" aria-labelledby="titulo-progresso">
       <div className="integ-bloco-cabecalho">
         <div>
-          <h2 id="titulo-progresso">Extração em andamento</h2>
+          {/* a situação (coletando / pausada) fica na faixa do topo; aqui, os números e cada unidade */}
+          <h2 id="titulo-progresso">Detalhes da coleta</h2>
           <p className="integ-bloco-sub">
             {ciclos.join(' · ')} · {fechamentos.length} {fechamentos.length === 1 ? 'unidade' : 'unidades'}
           </p>
         </div>
-        <span className={cotaEsgotada && restantes > 0 ? 'pilula pilula-pendente' : 'pilula pilula-processando'}>
-          {cotaEsgotada && restantes > 0 ? 'Aguardando cota' : 'Extraindo'}
-        </span>
       </div>
 
       <div className="integ-progresso-numeros">
@@ -459,7 +477,27 @@ function ProgressoExtracaoLote({ status, linkFechamentos }: { status: StatusInte
 
 /* ---------- Status ---------- */
 
-function AvisosStatus({
+/** "hoje às 11:58" → "Hoje às 11:58" (abre a frase ou o valor do cartão). */
+function quandoMaiusculo(iso: string) {
+  const texto = formatarQuando(iso)
+  return texto.charAt(0).toLocaleUpperCase('pt-BR') + texto.slice(1)
+}
+
+type TomResumo = 'ok' | 'ativo' | 'pausa' | 'aviso' | 'erro'
+
+const ICONE_RESUMO: Record<TomResumo, typeof IconeCheck> = {
+  ok: IconeCheck,
+  ativo: IconeSincronizar,
+  pausa: IconeRelogio,
+  aviso: IconeAlerta,
+  erro: IconeAlerta,
+}
+
+/**
+ * Faixa no topo que responde "está tudo certo?": a situação mais importante agora (sem credenciais,
+ * serviço offline, coleta andando ou pausada pela cota, cadastros na fila ou tudo em dia).
+ */
+function ResumoIntegracao({
   status,
   ehAdmin,
   linkFechamentos,
@@ -468,43 +506,116 @@ function AvisosStatus({
   ehAdmin: boolean
   linkFechamentos: string | null
 }) {
-  const { empresa, worker, fila } = status
-  if (empresa.credenciais_configuradas && worker.online && fila.falhas === 0) return null
+  const { empresa, worker, fila, progresso, cota } = status
+  const coletando = progresso && progresso.restantes > 0 ? progresso : null
+  const pct = coletando && coletando.total ? Math.floor((coletando.feitos / coletando.total) * 100) : null
+  const cotaEsgotada = cota.usadas_ultima_hora >= cota.limite_por_hora
 
+  let tom: TomResumo
+  let titulo: string
+  let texto: ReactNode
+  if (!empresa.credenciais_configuradas) {
+    tom = 'erro'
+    titulo = 'Integração não configurada'
+    texto = ehAdmin ? (
+      <>
+        Cadastre as credenciais da FriPonto de {empresa.nome} em <Link to="/admin/empresas">Administração → Empresas</Link> para
+        as coletas começarem.
+      </>
+    ) : (
+      'Faltam as credenciais da FriPonto, então nenhuma coleta roda. Fale com a equipe Scale IA.'
+    )
+  } else if (!worker.online) {
+    tom = 'aviso'
+    titulo = 'Serviço de extração offline'
+    texto = `Os pedidos continuam sendo aceitos e começam quando ele voltar${
+      worker.visto_em ? ` (último sinal ${formatarQuando(worker.visto_em)})` : ''
+    }.`
+  } else if (coletando && cotaEsgotada) {
+    tom = 'pausa'
+    titulo = cota.libera_em ? `Coleta pausada · retoma ${formatarQuando(cota.libera_em)}` : 'Coleta pausada pela cota'
+    texto = `A FriPonto libera ${cota.limite_por_hora} cálculos por hora e eles acabaram. A coleta continua sozinha de onde parou: ${coletando.feitos} de ${coletando.total} colaboradores já vieram.`
+  } else if (coletando) {
+    tom = 'ativo'
+    titulo = 'Coletando dados da FriPonto'
+    texto = `${coletando.feitos} de ${coletando.total} colaboradores já vieram${
+      coletando.previsao_fim ? `; término previsto ${formatarQuando(coletando.previsao_fim)}` : ''
+    }.`
+  } else if (empresa.sincronizacao_pendente) {
+    tom = 'ativo'
+    titulo = 'Atualizando cadastros'
+    texto = 'Unidades e colaboradores estão sendo buscados na FriPonto; leva até 1 minuto para começar.'
+  } else {
+    tom = 'ok'
+    titulo = 'Tudo em dia'
+    texto = empresa.sincronizado_em
+      ? `Nenhuma coleta na fila. Cadastros atualizados ${formatarQuando(empresa.sincronizado_em)}.`
+      : 'Nenhuma coleta na fila.'
+  }
+
+  const Icone = ICONE_RESUMO[tom]
   return (
-    <div className="integ-avisos">
-      {!empresa.credenciais_configuradas && (
-        <Aviso>
-          As credenciais do FriPonto de {empresa.nome} ainda não foram configuradas, então nenhuma extração roda.{' '}
-          {ehAdmin ? (
-            <>
-              Configure em <Link to="/admin/empresas">Administração → Empresas</Link>.
-            </>
-          ) : (
-            'A equipe Scale IA configura isso em Administração → Empresas; fale com ela.'
-          )}
-        </Aviso>
+    <section className={`integ-resumo integ-resumo-${tom}`} aria-label="Situação da integração" role="status">
+      <span className="integ-resumo-icone" aria-hidden="true">
+        <Icone tamanho={22} />
+      </span>
+      <div className="integ-resumo-corpo">
+        <h2>{titulo}</h2>
+        <p>{texto}</p>
+        {fila.falhas > 0 && (
+          <p className="integ-resumo-falhas">
+            {fila.falhas === 1 ? '1 fechamento falhou' : `${fila.falhas} fechamentos falharam`} nos últimos 60 dias.{' '}
+            {linkFechamentos ? <Link to={linkFechamentos}>Ver em Fechamentos</Link> : 'Fale com o RH.'}
+          </p>
+        )}
+      </div>
+      {pct !== null && (
+        <div className="integ-resumo-medida">
+          <span className="integ-resumo-pct">{pct}%</span>
+          <span className="integ-resumo-barra" aria-hidden="true">
+            <span style={{ width: `${Math.max(pct, 2)}%` }} />
+          </span>
+        </div>
       )}
-      {!worker.online && (
-        <Aviso>
-          O serviço de extração está offline
-          {worker.visto_em ? ` (último sinal em ${formatarDataHora(worker.visto_em)})` : ''}. Os pedidos continuam sendo
-          aceitos e ficam na fila até ele voltar.
-        </Aviso>
-      )}
-      {fila.falhas > 0 && (
-        <Aviso>
-          {fila.falhas === 1 ? '1 fechamento falhou' : `${fila.falhas} fechamentos falharam`} nos últimos 60 dias.{' '}
-          {linkFechamentos ? (
-            <>
-              Veja o motivo e reprocesse em <Link to={linkFechamentos}>Fechamentos</Link>.
-            </>
-          ) : (
-            'Fale com o RH ou com a equipe Scale IA.'
-          )}
-        </Aviso>
-      )}
-    </div>
+    </section>
+  )
+}
+
+/** Nome do estado do serviço de extração (o worker grava em inglês técnico/curto). */
+const ESTADO_WORKER: Record<string, string> = {
+  ocioso: 'esperando trabalho',
+  rodando: 'trabalhando',
+  extraindo: 'extraindo horas',
+  parado: 'parado',
+}
+
+type TomCartao = 'ok' | 'aviso' | 'erro' | 'neutro'
+
+function CartaoStatus({
+  icone: Icone,
+  rotulo,
+  tom,
+  valor,
+  children,
+}: {
+  icone: typeof IconeCheck
+  rotulo: string
+  /** Com tom, o valor ganha a bolinha de situação (verde, amarelo, vermelho ou cinza). */
+  tom?: TomCartao
+  valor: ReactNode
+  children?: ReactNode
+}) {
+  return (
+    <li className="integ-cartao">
+      <div className="integ-cartao-topo">
+        <span className="integ-cartao-icone" aria-hidden="true">
+          <Icone tamanho={18} />
+        </span>
+        <span className="integ-rotulo">{rotulo}</span>
+      </div>
+      <span className={tom ? `integ-estado integ-estado-${tom}` : 'integ-estado'}>{valor}</span>
+      {children}
+    </li>
   )
 }
 
@@ -519,81 +630,83 @@ function CartoesStatus({ status, podeConfigurar, podeAtualizarTempoReal, onAtual
   const { empresa, worker, cota } = status
   const limite = Math.max(cota.limite_por_hora, 1)
   const pctCota = Math.min(100, Math.round((cota.usadas_ultima_hora / limite) * 100))
-  const cotaEsgotada = cota.usadas_ultima_hora >= cota.limite_por_hora
+  const livres = Math.max(0, cota.limite_por_hora - cota.usadas_ultima_hora)
+  const cotaEsgotada = livres === 0
+  const estadoWorker = worker.status ? (ESTADO_WORKER[worker.status] ?? worker.status) : null
 
   return (
-    <ul className="integ-status" aria-label="Situação da integração">
-      <li className="integ-cartao">
-        <div className="integ-cartao-topo">
-          <span className="integ-rotulo">Conexão</span>
-          <span className={empresa.credenciais_configuradas ? 'pilula pilula-sucesso' : 'pilula pilula-falhou'}>
-            {empresa.credenciais_configuradas ? 'Configurada' : 'Sem credenciais'}
-          </span>
-        </div>
-        <span className="integ-valor integ-valor-menor">{empresa.nome}</span>
+    <ul className="integ-status" aria-label="Detalhes da integração">
+      <CartaoStatus
+        icone={IconeChave}
+        rotulo="Conexão"
+        tom={empresa.credenciais_configuradas ? 'ok' : 'erro'}
+        valor={empresa.credenciais_configuradas ? 'Conectada' : 'Sem credenciais'}
+      >
         <span className="integ-sub">
           {empresa.credenciais_configuradas
-            ? 'Credenciais do FriPonto cadastradas.'
-            : 'Sem credenciais, as extrações não rodam.'}
+            ? `Credenciais da FriPonto de ${empresa.nome}.`
+            : 'Sem credenciais, as coletas não rodam.'}
         </span>
-      </li>
+      </CartaoStatus>
 
-      <li className="integ-cartao">
-        <div className="integ-cartao-topo">
-          <span className="integ-rotulo">Cadastros</span>
-          {empresa.sincronizacao_pendente && <span className="pilula pilula-pendente">Na fila</span>}
-        </div>
-        <span className="integ-valor integ-valor-menor">
-          {empresa.sincronizado_em ? formatarDataHora(empresa.sincronizado_em) : 'Nunca sincronizado'}
-        </span>
+      <CartaoStatus
+        icone={IconeUsuarios}
+        rotulo="Cadastros"
+        tom={empresa.sincronizacao_pendente ? 'aviso' : undefined}
+        valor={
+          empresa.sincronizacao_pendente
+            ? 'Na fila'
+            : empresa.sincronizado_em
+              ? quandoMaiusculo(empresa.sincronizado_em)
+              : 'Nunca atualizados'
+        }
+      >
         <span className="integ-sub">
           {empresa.sincronizacao_pendente
-            ? `Sincronização pedida${
-                empresa.sincronizacao_solicitada_em ? ` em ${formatarDataHora(empresa.sincronizacao_solicitada_em)}` : ''
-              }, aguardando o serviço de extração.`
-            : 'Última sincronização de unidades e colaboradores.'}
+            ? `Atualização pedida${
+                empresa.sincronizacao_solicitada_em ? ` ${formatarQuando(empresa.sincronizacao_solicitada_em)}` : ''
+              }; começa em até 1 minuto.`
+            : 'Última atualização de unidades e colaboradores.'}
         </span>
-      </li>
+      </CartaoStatus>
 
-      <li className="integ-cartao">
-        <div className="integ-cartao-topo">
-          <span className="integ-rotulo">Serviço de extração</span>
-          <span className={worker.online ? 'pilula pilula-sucesso' : 'pilula pilula-falhou'}>
-            {worker.online ? 'Online' : 'Offline'}
-          </span>
-        </div>
-        <span className="integ-valor integ-valor-menor">{worker.visto_em ? formatarDataHora(worker.visto_em) : 'Nunca visto'}</span>
+      <CartaoStatus
+        icone={IconeAtividade}
+        rotulo="Serviço de extração"
+        tom={worker.online ? 'ok' : 'erro'}
+        valor={worker.online ? 'Online' : 'Offline'}
+      >
         <span className="integ-sub">
-          Último sinal do serviço{worker.status ? ` · ${worker.status}` : ''}
-          {!worker.online && '. Pedidos ficam na fila.'}
+          {worker.online
+            ? estadoWorker
+              ? `${estadoWorker.charAt(0).toLocaleUpperCase('pt-BR')}${estadoWorker.slice(1)}.`
+              : 'Pronto para coletar.'
+            : 'Pedidos ficam na fila até ele voltar.'}
+          {worker.visto_em && ` Último sinal ${formatarQuando(worker.visto_em)}.`}
         </span>
-      </li>
+      </CartaoStatus>
 
-      <li className="integ-cartao">
-        <div className="integ-cartao-topo">
-          <span className="integ-rotulo">Cota da FriPonto</span>
-          {cotaEsgotada && <span className="pilula pilula-pendente">Cheia</span>}
-        </div>
-        <span className="integ-valor">
-          {cota.usadas_ultima_hora}/{cota.limite_por_hora}
+      <CartaoStatus
+        icone={IconeRelogio}
+        rotulo="Cota da FriPonto"
+        tom={cotaEsgotada ? 'aviso' : 'ok'}
+        valor={cotaEsgotada ? 'Esgotada' : `${livres} ${livres === 1 ? 'cálculo livre' : 'cálculos livres'}`}
+      >
+        <span
+          className="integ-cota-barra"
+          role="progressbar"
+          aria-label="Uso da cota na última hora"
+          aria-valuemin={0}
+          aria-valuemax={cota.limite_por_hora}
+          aria-valuenow={cota.usadas_ultima_hora}
+        >
+          <span className={cotaEsgotada ? 'cheia' : undefined} style={{ width: `${pctCota}%` }} />
         </span>
-        <div className="progresso">
-          <div
-            className="progresso-barra"
-            role="progressbar"
-            aria-label="Uso da cota na última hora"
-            aria-valuemin={0}
-            aria-valuemax={cota.limite_por_hora}
-            aria-valuenow={cota.usadas_ultima_hora}
-          >
-            <span style={{ width: `${pctCota}%` }} />
-          </div>
-        </div>
         <span className="integ-sub">
-          Cálculos na FriPonto na última hora
-          {cotaEsgotada && cota.libera_em ? `; volta a liberar às ${formatarHoraOuData(cota.libera_em)}.` : '.'}
+          {cota.usadas_ultima_hora} de {cota.limite_por_hora} usados na última hora
+          {cotaEsgotada && cota.libera_em ? `; volta ${formatarQuando(cota.libera_em)}.` : '.'}
         </span>
-      </li>
+      </CartaoStatus>
 
       <CartaoTempoReal
         tempoReal={status.tempo_real}
@@ -616,62 +729,41 @@ interface CartaoTempoRealProps {
 function CartaoTempoReal({ tempoReal, podeConfigurar, podeAtualizar, onAtualizar }: CartaoTempoRealProps) {
   if (!tempoReal?.ativo) {
     return (
-      <li className="integ-cartao">
-        <div className="integ-cartao-topo">
-          <span className="integ-rotulo">Tempo real</span>
-          <span className="pilula pilula-inativo">Desligado</span>
-        </div>
-        <span className="integ-valor integ-valor-menor">Atualização semanal</span>
+      <CartaoStatus icone={IconeCalendario} rotulo="Atualização" tom="neutro" valor="Semanal">
         <span className="integ-sub">
           Os dados são puxados uma vez por semana.
           {podeConfigurar && (
             <>
               {' '}
-              Ativar em <Link to="/configuracao/atualizacao">Configuração → Atualização dos dados</Link>.
+              <Link to="/configuracao/atualizacao">Mudar dia, hora ou modo</Link>
             </>
           )}
         </span>
-      </li>
+      </CartaoStatus>
     )
   }
 
-  const { colaboradores, atualizados_ultima_hora, mais_antigo_em, mais_recente_em, minutos_por_rodada } = tempoReal
+  const { colaboradores, atualizados_ultima_hora, mais_recente_em, minutos_por_rodada } = tempoReal
   return (
-    <li className="integ-cartao">
-      <div className="integ-cartao-topo">
-        <span className="integ-rotulo">Tempo real</span>
-        <span className="pilula pilula-sucesso">Ativo</span>
-      </div>
-      <span className="integ-valor">
-        {atualizados_ultima_hora}/{colaboradores}
-      </span>
+    <CartaoStatus icone={IconeCalendario} rotulo="Atualização" tom="ok" valor="Tempo real">
       <span className="integ-sub">
-        Colaboradores atualizados na última hora.
-        {minutos_por_rodada != null && (
-          <>
-            {' '}
-            Cada um a cada <strong>~{formatarIntervalo(minutos_por_rodada)}</strong>.
-          </>
-        )}
+        {atualizados_ultima_hora} de {colaboradores} colaboradores atualizados na última hora
+        {minutos_por_rodada != null && <> (cada um a cada ~{formatarIntervalo(minutos_por_rodada)})</>}
+        {mais_recente_em && `; o mais recente ${formatarQuando(mais_recente_em)}`}.
       </span>
-      {(mais_antigo_em || mais_recente_em) && (
-        <span className="integ-sub">
-          {mais_antigo_em && <>Mais antigo: {formatarHoraOuData(mais_antigo_em)}</>}
-          {mais_antigo_em && mais_recente_em && ' · '}
-          {mais_recente_em && <>mais recente: {formatarHoraOuData(mais_recente_em)}</>}
-        </span>
-      )}
-      <span className="integ-sub">Sem fotografia semanal: só o fechamento do mês é gravado como registro oficial.</span>
       <button type="button" className="integ-botao integ-cartao-botao" onClick={onAtualizar} disabled={!podeAtualizar}>
         Atualizar todos agora
       </button>
-    </li>
+    </CartaoStatus>
   )
 }
 
 /* ---------- Execuções ---------- */
 
+/** Quem pediu: a etiqueta "Equipe Scale IA" × "Cliente" só aparece para a própria equipe. */
 function TagAtor({ ator }: { ator: AtorIntegracao }) {
+  const { ehAdmin } = useEmpresaAdmin()
+  if (!ehAdmin) return null
   return ator.tipo === 'equipe' ? (
     <span className="integ-tag integ-tag-equipe">{NOME_PERFIL.admin}</span>
   ) : (
@@ -727,20 +819,30 @@ function Erros({ execucao }: { execucao: ExecucaoIntegracao }) {
 function Horario({ execucao }: { execucao: ExecucaoIntegracao }) {
   return (
     <>
-      {formatarDataHora(execucao.iniciado_em)}
+      {quandoMaiusculo(execucao.iniciado_em)}
       <span className="celula-sub">
-        {execucao.finalizado_em
-          ? `Fim ${formatarDataHora(execucao.finalizado_em)} · ${formatarDuracao(execucao.iniciado_em, execucao.finalizado_em)}`
-          : 'Em andamento'}
+        {execucao.finalizado_em ? `Fim ${formatarHoraOuData(execucao.finalizado_em)} · ${textoDuracao(execucao)}` : 'Em andamento'}
       </span>
     </>
   )
 }
 
+/** Parou porque a cota da FriPonto acabou: não é erro, retoma sozinha. */
+const pausadaPorCota = (execucao: ExecucaoIntegracao) =>
+  execucao.status === 'interrompida' && pausaPorCota(execucao.mensagem_erro)
+
+function StatusExecucao({ execucao }: { execucao: ExecucaoIntegracao }) {
+  return pausadaPorCota(execucao) ? <span className="pilula pilula-pausada">Pausada</span> : <PilulaStatus status={execucao.status} />
+}
+
 function MensagemErro({ execucao }: { execucao: ExecucaoIntegracao }) {
-  const mensagem = execucao.mensagem_erro
-  if (!mensagem || execucao.status === 'sucesso') return null
-  return <span className="celula-motivo">{mensagem.length > 160 ? `${mensagem.slice(0, 160)}…` : mensagem}</span>
+  if (!execucao.mensagem_erro || execucao.status === 'sucesso') return null
+  const mensagem = mensagemAmigavel(execucao.mensagem_erro)
+  return (
+    <span className={pausadaPorCota(execucao) ? 'celula-nota' : 'celula-motivo'}>
+      {mensagem.length > 160 ? `${mensagem.slice(0, 160)}…` : mensagem}
+    </span>
+  )
 }
 
 interface TabelaExecucoesProps {
@@ -784,7 +886,7 @@ function TabelaExecucoes({ execucoes, linkFechamentos, tempoReal }: TabelaExecuc
                 </th>
                 <td>Até {formatarData(execucao.data_referencia)}</td>
                 <td>
-                  <PilulaStatus status={execucao.status} />
+                  <StatusExecucao execucao={execucao} />
                   <MensagemErro execucao={execucao} />
                 </td>
                 <td>
@@ -815,7 +917,7 @@ function TabelaExecucoes({ execucoes, linkFechamentos, tempoReal }: TabelaExecuc
                   {tempoReal ? 'Dados até' : 'Semana até'} {formatarData(execucao.data_referencia)}
                 </span>
               </span>
-              <PilulaStatus status={execucao.status} />
+              <StatusExecucao execucao={execucao} />
             </div>
             <MensagemErro execucao={execucao} />
             <Disparo execucao={execucao} />
@@ -856,7 +958,9 @@ function ListaHistorico({ registros }: { registros: RegistroHistoricoIntegracao[
         const motivo = motivoDe(registro)
         return (
           <li key={registro.id}>
-            <time dateTime={registro.criado_em}>{formatarDataHora(registro.criado_em)}</time>
+            <time dateTime={registro.criado_em} title={formatarDataHora(registro.criado_em)}>
+              {quandoMaiusculo(registro.criado_em)}
+            </time>
             <div className="integ-historico-corpo">
               <span className="integ-historico-descricao">{registro.descricao}</span>
               <span className="integ-historico-ator">

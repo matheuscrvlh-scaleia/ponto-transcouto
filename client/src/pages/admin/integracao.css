@@ -62,11 +62,137 @@
   color: var(--text);
 }
 
-/* ----- Status ----- */
+/* ----- Faixa de situação (topo) ----- */
+
+.integ-resumo {
+  --resumo-cor: var(--sucesso);
+  --resumo-fundo: var(--sucesso-bg);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid color-mix(in srgb, var(--resumo-cor) 28%, transparent);
+  border-radius: var(--raio-card);
+  background: linear-gradient(120deg, var(--resumo-fundo), var(--surface) 75%);
+  box-shadow: var(--sombra-suave);
+}
+
+.integ-resumo-ativo,
+.integ-resumo-pausa {
+  --resumo-cor: var(--accent);
+  --resumo-fundo: var(--accent-suave);
+}
+
+.integ-resumo-aviso {
+  --resumo-cor: var(--aviso);
+  --resumo-fundo: var(--aviso-bg);
+}
+
+.integ-resumo-erro {
+  --resumo-cor: var(--danger);
+  --resumo-fundo: var(--danger-bg);
+}
+
+.integ-resumo-icone {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: var(--resumo-cor);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--resumo-cor) 30%, transparent);
+}
+
+/* coletando: o ícone de sincronizar gira devagar */
+.integ-resumo-ativo .integ-resumo-icone svg {
+  animation: integ-girar 2.4s linear infinite;
+}
+
+.integ-resumo-corpo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.integ-resumo-corpo h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-h);
+}
+
+.integ-resumo-corpo p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.integ-resumo-corpo a {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.integ-resumo-falhas {
+  color: var(--danger) !important;
+  font-size: 13px !important;
+}
+
+.integ-resumo-medida {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: 170px;
+}
+
+.integ-resumo-pct {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.integ-resumo-barra {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.integ-resumo-barra span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--destaque-de), var(--destaque-ate));
+  transition: width 0.6s ease;
+}
+
+.integ-resumo-pausa .integ-resumo-barra span {
+  background: color-mix(in srgb, var(--accent) 45%, var(--muted));
+}
+
+@keyframes integ-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ----- Cartões de detalhe ----- */
 
 .integ-status {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
   margin: 0;
   padding: 0;
@@ -76,38 +202,100 @@
 .integ-cartao {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 18px 20px;
+  gap: 8px;
+  padding: 18px;
 }
 
 .integ-cartao-topo {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.integ-cartao-icone {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-suave);
 }
 
 .integ-rotulo {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
 }
 
-.integ-valor {
-  font-size: 22px;
-  line-height: 1.2;
+/* valor do cartão; com tom ganha a bolinha de situação */
+.integ-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 18px;
+  line-height: 1.25;
   font-weight: 700;
-  letter-spacing: -0.3px;
   color: var(--text-h);
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
 }
 
-.integ-valor-menor {
-  font-size: 16px;
-  letter-spacing: 0;
+.integ-estado-ok::before,
+.integ-estado-aviso::before,
+.integ-estado-erro::before,
+.integ-estado-neutro::before {
+  content: '';
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.integ-estado-ok::before {
+  background: var(--sucesso);
+  box-shadow: 0 0 0 3px var(--sucesso-bg);
+}
+
+.integ-estado-aviso::before {
+  background: var(--aviso);
+  box-shadow: 0 0 0 3px var(--aviso-bg);
+}
+
+.integ-estado-erro::before {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-bg);
+}
+
+.integ-estado-neutro::before {
+  background: var(--text);
+  box-shadow: 0 0 0 3px var(--muted);
+}
+
+.integ-cota-barra {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.integ-cota-barra span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.integ-cota-barra span.cheia {
+  background: var(--aviso);
 }
 
 .integ-sub {
@@ -120,24 +308,43 @@
   color: var(--text-h);
 }
 
-.integ-avisos {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.integ-avisos .aviso a {
-  font-weight: 600;
-  color: inherit;
-}
-
 /* ----- Ações ----- */
 
+/* os dois blocos com a mesma altura; o botão do menor desce para o rodapé */
 .integ-acoes {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.integ-botoes-rodape {
+  margin-top: auto;
+}
+
+.integ-fatos {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.integ-fatos > div {
+  padding: 10px 14px;
+  background: var(--muted);
+  border-radius: 14px;
+}
+
+.integ-fatos dt {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.integ-fatos dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
 }
 
 .integ-acoes.integ-acoes-unica {
@@ -571,9 +778,40 @@
 
 /* ----- Responsivo ----- */
 
+@media (max-width: 1320px) {
+  .integ-status {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .integ-acoes {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .integ-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* percentual desce para baixo do texto */
+  .integ-resumo {
+    flex-wrap: wrap;
+  }
+
+  .integ-resumo-medida {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .integ-resumo-pct {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .integ-resumo-ativo .integ-resumo-icone svg {
+    animation: none;
   }
 }
 
@@ -600,8 +838,18 @@
     padding: 14px 16px;
   }
 
-  .integ-valor {
-    font-size: 18px;
+  .integ-estado {
+    font-size: 16px;
+  }
+
+  .integ-resumo {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .integ-resumo-icone {
+    width: 40px;
+    height: 40px;
   }
 
   .integ-botoes .integ-botao {

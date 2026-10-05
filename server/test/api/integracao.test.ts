@@ -237,4 +237,29 @@ describe('integração FriPonto', () => {
         const parado = (await como('admin', 'GET', `/integracao/atividade?empresa_id=${ctx.empresaId}`)).json()
         expect(parado.tarefas).toMatchObject({ cadastros: 0, batidas: 0 })
     })
+
+    it('atividade: progresso do lote e quando volta a extração pausada pela cota', async () => {
+        const { rows: [ciclo] } = await db.query(
+            `INSERT INTO ciclos (empresa_id, periodo_inicio, data_referencia, gatilho_previsto_em, gatilho_em)
+             VALUES ($1, '2031-01-01', '2031-01-07', now() - interval '1 day', now() - interval '1 day') RETURNING id`,
+            [ctx.empresaId],
+        )
+        const { rows: [retoma] } = await db.query(
+            `INSERT INTO fechamentos (ciclo_id, empresa_id, unidade_id, status, proxima_tentativa_em)
+             VALUES ($1, $2, $3, 'pendente', now() + interval '40 minutes') RETURNING proxima_tentativa_em`,
+            [ciclo.id, ctx.empresaId, ctx.unidades.GDR],
+        )
+
+        const res = await como('admin', 'GET', `/integracao/atividade?empresa_id=${ctx.empresaId}`)
+        expect(res.statusCode, res.body).toBe(200)
+        const atividade = res.json()
+        expect(new Date(atividade.retoma_em).getTime()).toBe(new Date(retoma.proxima_tentativa_em).getTime())
+        expect(atividade.progresso.total).toBeGreaterThan(0)
+        expect(atividade.progresso.feitos).toBeLessThan(atividade.progresso.total)
+
+        // equipe em "todas as empresas": sem barra (o lote é por empresa), mas sabe quando retoma
+        const todas = (await como('admin', 'GET', '/integracao/atividade')).json()
+        expect(todas.progresso).toBeNull()
+        expect(todas.retoma_em).not.toBeNull()
+    })
 })
