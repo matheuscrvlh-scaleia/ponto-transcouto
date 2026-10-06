@@ -102,7 +102,7 @@ function prepararCliente(ctx: Contexto, credenciais: NonNullable<Awaited<ReturnT
 
 async function calcularColaborador(
     ctx: Contexto, cliente: ClienteSecullum, col: ColaboradorElegivel,
-): Promise<{ dados: TotaisSecullum } | { comErro: true } | { desfecho: Desfecho }> {
+): Promise<{ dados: TotaisSecullum } | { comErro: true } | { demitido: true } | { desfecho: Desfecho }> {
     try {
         const dados = await calcularTotais(cliente, {
             cpf: col.cpf,
@@ -128,6 +128,12 @@ async function calcularColaborador(
         if (err.tipo === 'formato') {
             await erro(ctx, 'mapeamento', err.message, col.id)
             return { desfecho: { tipo: 'abortado', fatal: true, mensagem: err.message } }
+        }
+        // a FriPonto não calcula colaborador desligado: vira aviso com a data de demissão, não erro
+        if (col.demitido_em && err.status === 400 && /não encontrado/i.test(err.message)) {
+            const mensagem = `Demitido em ${col.demitido_em}. A FriPonto não calcula colaborador desligado, então ele fica fora deste fechamento.`
+            await erro(ctx, 'demitido', mensagem, col.id, err.status)
+            return { demitido: true }
         }
         await erro(ctx, 'calcular', err.message, col.id, err.status)
         return { comErro: true }
@@ -165,6 +171,10 @@ async function extrairColaboradores(ctx: Contexto, pendentes: ColaboradorElegive
         if ('desfecho' in chamada) return chamada.desfecho
         if ('comErro' in chamada) {
             await somarProgresso(ctx.execucaoId, 0, 1, ex)
+            continue
+        }
+        if ('demitido' in chamada) {
+            await somarProgresso(ctx.execucaoId, 1, 0, ex)
             continue
         }
 

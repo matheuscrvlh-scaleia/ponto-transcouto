@@ -27,9 +27,11 @@ export type ColaboradorElegivel = {
     id: number
     cpf: string
     feito: boolean
+    /** DD/MM/AAAA quando o colaborador está desligado */
+    demitido_em: string | null
 }
 
-export type EtapaErro = 'autenticacao' | 'sincronizacao' | 'calcular' | 'mapeamento' | 'gravacao'
+export type EtapaErro = 'autenticacao' | 'sincronizacao' | 'calcular' | 'mapeamento' | 'gravacao' | 'demitido'
 
 export type Posse = Pick<FechamentoReivindicado, 'id' | 'tentativas'>
 
@@ -188,7 +190,8 @@ export const SQL_ELEGIVEL = `(col.ativo OR col.data_demissao >= c.periodo_inicio
 
 /**
  * Já resolvido no fechamento: tem registro. A FriPonto não calcula demitidos ("Funcionário não
- * encontrado" pelo CPF): o demitido que recebeu essa resposta também conta, senão a unidade nunca publicaria.
+ * encontrado" pelo CPF, gravado com etapa 'demitido'): o demitido que recebeu essa resposta também
+ * conta, senão a unidade nunca publicaria.
  */
 export const SQL_FEITO = `(EXISTS (SELECT 1 FROM registros_horas r
                          WHERE r.fechamento_id = f.id AND r.colaborador_id = col.id)
@@ -196,11 +199,13 @@ export const SQL_FEITO = `(EXISTS (SELECT 1 FROM registros_horas r
                         SELECT 1 FROM execucao_erros er
                           JOIN execucoes_extracao ex ON ex.id = er.execucao_id
                          WHERE ex.fechamento_id = f.id AND er.colaborador_id = col.id
-                           AND er.http_status = 400 AND er.mensagem ILIKE '%não encontrado%')))`
+                           AND (er.etapa = 'demitido'
+                                OR (er.http_status = 400 AND er.mensagem ILIKE '%não encontrado%')))))`
 
 export async function colaboradoresElegiveis(fechamentoId: number, ex: Executor = db) {
     const result = await ex.query<ColaboradorElegivel>(
-        `SELECT col.id, col.cpf, ${SQL_FEITO} AS feito
+        `SELECT col.id, col.cpf, ${SQL_FEITO} AS feito,
+                CASE WHEN NOT col.ativo THEN to_char(col.data_demissao, 'DD/MM/YYYY') END AS demitido_em
            FROM fechamentos f
            JOIN ciclos c ON c.id = f.ciclo_id
            JOIN colaboradores col ON col.unidade_id = f.unidade_id

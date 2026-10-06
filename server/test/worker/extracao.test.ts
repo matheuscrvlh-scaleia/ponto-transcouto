@@ -189,13 +189,18 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
             'SELECT status, total_colaboradores FROM fechamentos WHERE id = $1', [mensal.id],
         )
         expect(f).toEqual({ status: 'sucesso', total_colaboradores: 3 })
-        const erro = await um<{ http_status: number, mensagem: string }>(
-            `SELECT er.http_status, er.mensagem FROM execucao_erros er
+        const erro = await um<{ etapa: string, http_status: number, mensagem: string }>(
+            `SELECT er.etapa, er.http_status, er.mensagem FROM execucao_erros er
                JOIN execucoes_extracao ex ON ex.id = er.execucao_id
                JOIN colaboradores c ON c.id = er.colaborador_id
               WHERE ex.fechamento_id = $1 AND c.cpf = $2`, [mensal.id, CPF_DEMITIDO],
         )
-        expect(erro.http_status).toBe(400)
+        expect(erro).toMatchObject({ etapa: 'demitido', http_status: 400 })
+        expect(erro.mensagem).toMatch(/^Demitido em 10\/09\/2026\./)
+        const exec = await um<{ processados: number, com_erro: number }>(
+            'SELECT processados, com_erro FROM execucoes_extracao WHERE fechamento_id = $1', [mensal.id],
+        )
+        expect(exec).toEqual({ processados: 3, com_erro: 0 })
         expect(chamadasCalcular()).toHaveLength(3)
     })
 

@@ -81,6 +81,9 @@ export function DetalheFechamento() {
   const execucao = dados.ultima_execucao
   const totalExecucao = execucao ? execucao.total_colaboradores || dados.total_colaboradores || 0 : 0
   const pct = execucao && totalExecucao ? Math.round((execucao.processados / totalExecucao) * 100) : 0
+  // demitido que a FriPonto não calcula é aviso, não erro
+  const erros = dados.erros.filter((item) => item.etapa !== 'demitido')
+  const demitidos = dados.erros.filter((item) => item.etapa === 'demitido')
 
   function concluir(mensagem: string) {
     setAcao(null)
@@ -272,18 +275,39 @@ export function DetalheFechamento() {
           <div>
             <h2 id="titulo-erros">Erros</h2>
             <p className="dash-card-sub">
-              {dados.erros.length === 0 ? 'Nenhum erro registrado' : `${dados.erros.length} registrados nas execuções`}
+              {erros.length === 0 ? 'Nenhum erro registrado' : `${erros.length} registrados nas execuções`}
             </p>
           </div>
         </div>
-        {dados.erros.length > 0 && (
+        {erros.length > 0 && (
           <ul className="lista-erros">
-            {dados.erros.map((item) => (
+            {erros.map((item) => (
               <ItemErro key={item.id} erro={item} />
             ))}
           </ul>
         )}
       </section>
+
+      {demitidos.length > 0 && (
+        <section className="dash-card" aria-labelledby="titulo-demitidos">
+          <div className="dash-card-topo">
+            <div>
+              <h2 id="titulo-demitidos">Demitidos fora do fechamento</h2>
+              <p className="dash-card-sub">
+                A FriPonto não calcula colaborador desligado. Eles não contam como erro e não travam a publicação.
+              </p>
+            </div>
+          </div>
+          <ul className="lista-erros">
+            {demitidos.map((item) => (
+              <li key={item.id}>
+                <strong>{item.colaborador?.nome ?? 'Colaborador'}</strong>
+                <span className="celula-sub">{item.mensagem}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {acao === 'reprocessar' && (
         <ModalConfirmacao
