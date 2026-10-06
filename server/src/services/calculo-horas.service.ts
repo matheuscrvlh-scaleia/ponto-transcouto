@@ -45,7 +45,6 @@ export type ValoresRegistro = {
 
 export type ErroMapeamento = {
     colunasNaoMapeadas: string[]
-    colunasAusentes: string[]
     mensagens: string[]
 }
 
@@ -61,10 +60,8 @@ export function validarMapeamento(dados: TotaisSecullum, mapeamento: ItemMapeame
     const mapeadas = new Map(mapeamento.map(m => [chave(m.coluna_secullum), m]))
     const recebidasChaves = new Set(recebidas.map(chave))
 
+    // coluna mapeada que não veio conta como zero: unidades da mesma empresa podem ter cálculos com colunas diferentes
     const colunasNaoMapeadas = recebidas.filter(c => !mapeadas.has(chave(c)))
-    const colunasAusentes = mapeamento
-        .filter(m => m.campo !== 'ignorar' && !recebidasChaves.has(chave(m.coluna_secullum)))
-        .map(m => m.coluna_secullum)
 
     const mensagens: string[] = []
     const temCampo = (campo: CampoMapeado) => mapeamento.some(m => m.campo === campo && recebidasChaves.has(chave(m.coluna_secullum)))
@@ -73,8 +70,8 @@ export function validarMapeamento(dados: TotaisSecullum, mapeamento: ItemMapeame
         mensagens.push('origem_horas_pagas = coluna_secullum, mas nenhuma coluna está mapeada como "pagas".')
     }
 
-    if (colunasNaoMapeadas.length === 0 && colunasAusentes.length === 0 && mensagens.length === 0) return null
-    return { colunasNaoMapeadas, colunasAusentes, mensagens }
+    if (colunasNaoMapeadas.length === 0 && mensagens.length === 0) return null
+    return { colunasNaoMapeadas, mensagens }
 }
 
 export function somarPorCampo(dados: TotaisSecullum, mapeamento: ItemMapeamento[]) {
@@ -143,7 +140,6 @@ export function calcularHoras(entrada: EntradaCalculoHoras): ResultadoCalculoHor
 export function mensagensErroMapeamento(erro: ErroMapeamento) {
     return [
         ...erro.colunasNaoMapeadas.map(c => `${PREFIXO_NAO_MAPEADA}${c}`),
-        ...erro.colunasAusentes.map(c => `Coluna mapeada ausente na resposta: ${c}`),
         ...erro.mensagens,
     ]
 }

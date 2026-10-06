@@ -116,7 +116,7 @@ describe('calcularHoras', () => {
         expect(v.saldo_banco_total).toBe(-300 + 120 - 60)
     })
 
-    it('sinaliza coluna nova não mapeada e coluna mapeada ausente', () => {
+    it('sinaliza coluna nova não mapeada', () => {
         const resultado = calcularHoras({
             dados: { colunas: ['Data', 'Normais', 'Ex50%', 'ExNot', 'Faltas', 'Atras.'], totais: ['', '', '', '', '', ''] },
             mapeamento,
@@ -127,8 +127,15 @@ describe('calcularHoras', () => {
         expect(resultado.ok).toBe(false)
         if (resultado.ok) return
         expect(resultado.erro.colunasNaoMapeadas).toEqual(['ExNot'])
-        expect(resultado.erro.colunasAusentes).toEqual(['Ex100%'])
         expect(mensagensErroMapeamento(resultado.erro)).toContain('Coluna não mapeada: ExNot')
+    })
+
+    it('coluna mapeada ausente conta como zero (unidade com extras numa coluna só)', () => {
+        const v = calcular({
+            mapeamento: [...mapeamento, { coluna_secullum: 'Extras', campo: 'extra' }],
+            dados: { colunas: ['Data', 'Normais', 'Extras', 'Faltas', 'Atras.'], totais: ['', '176:00', '03:30', '01:00', ''] },
+        })
+        expect(v).toMatchObject({ extra_periodo: 210, negativa_periodo: 60 })
     })
 
     it('sem mapeamento nenhum, todas as colunas de horas são sinalizadas', () => {
