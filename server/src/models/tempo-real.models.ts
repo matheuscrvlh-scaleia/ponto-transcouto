@@ -121,7 +121,8 @@ export async function gravar(alvo: Alvo, valores: ValoresRegistro, dados: Totais
             valores.banco_periodo,
             valores.saldo_banco_total,
             valores.base_semana_registro_id,
-            dados,
+            // as linhas por dia ficam em horas_dia
+            { colunas: dados.colunas, totais: dados.totais },
         ],
     )
     // histórico diário: a última atualização do dia é o valor do dia

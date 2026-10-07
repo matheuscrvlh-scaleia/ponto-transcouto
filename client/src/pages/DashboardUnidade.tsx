@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
 import { Aviso, Carregando, ErroCarregamento, EstadoVazio } from '../components/Estados'
+import { CartaoKpi, ItemResumo } from '../components/CartoesPainel'
+import { FiltroPeriodo } from '../components/FiltroPeriodo'
 import { GraficoFaixas } from '../components/GraficoFaixas'
 import { Horas } from '../components/Horas'
 import {
+  IconeAlerta,
   IconeAtividade,
   IconeBanco,
   IconeCalendario,
@@ -22,6 +25,7 @@ import { MedidorCurva, type GrupoCurva } from '../components/MedidorCurva'
 import { ModalColaboradores } from '../components/ModalColaboradores'
 import { SeloTempoReal } from '../components/SeloTempoReal'
 import { formatarData, formatarDataHora, formatarDiaSemana, formatarMinutos, iniciais } from '../lib/formato'
+import { textoAlemDosDados, textoDoIntervalo, useHorasNoIntervalo } from '../lib/intervalo'
 import {
   caminhoColaboradores,
   ORDEM_PADRAO,
@@ -32,7 +36,8 @@ import {
   type LinhaPainel as Linha,
 } from '../lib/painel'
 import { caminhoFechamentos } from './admin/navegacao'
-import type { FiltroDashboard, Minutos } from '../types/api'
+import { PainelIntervalo } from './PainelIntervalo'
+import type { FiltroDashboard } from '../types/api'
 import './dashboard.css'
 import { TituloPagina } from '../components/TituloPagina'
 
@@ -59,6 +64,9 @@ export function DashboardUnidade() {
     ordem: 'asc' | 'desc'
   } | null>(null)
   const { dados, erro, carregando, recarregar } = usePainel(unidadeId)
+  // intervalo de datas: com ele o painel mostra só aquele intervalo (PainelIntervalo)
+  const intervalo = useHorasNoIntervalo(unidadeId, dados?.colaboradores)
+  const { escolhido, porColaborador } = intervalo
 
   useEffect(() => {
     const nome = dados ? (dados.unidade?.nome ?? 'Todas as unidades') : null
@@ -66,21 +74,26 @@ export function DashboardUnidade() {
   }, [dados])
 
   /** Atalho dos cards: abre a tela de Colaboradores já com o filtro e a ordem. */
-  function abrirLista(filtro: FiltroDashboard, ordem: string = ORDEM_PADRAO) {
-    navigate(caminhoColaboradores(unidadeId, { filtro, ordem }))
+  function abrirLista(filtro: FiltroDashboard | 'limite', ordem: string = ORDEM_PADRAO) {
+    navigate(caminhoColaboradores(unidadeId, { filtro, ordem, intervalo: escolhido }))
   }
 
   const somas = useMemo(() => {
     const lista = dados?.colaboradores ?? []
     return lista.reduce(
-      (soma, linha) => ({
-        saldo: soma.saldo + linha.saldo_min,
-        extra: soma.extra + linha.extra_min,
-        negativa: soma.negativa + linha.negativa_min,
-      }),
-      { saldo: 0, extra: 0, negativa: 0 },
+      (soma, linha) => {
+        const doIntervalo = porColaborador.get(linha.id)
+        const acimaNoDia = (doIntervalo?.dias_extra_acima ?? 0) + (doIntervalo?.dias_negativa_acima ?? 0) > 0
+        return {
+          saldo: soma.saldo + linha.saldo_min,
+          extra: soma.extra + linha.extra_min,
+          negativa: soma.negativa + linha.negativa_min,
+          acimaDoLimiteDiario: soma.acimaDoLimiteDiario + (acimaNoDia ? 1 : 0),
+        }
+      },
+      { saldo: 0, extra: 0, negativa: 0, acimaDoLimiteDiario: 0 },
     )
-  }, [dados])
+  }, [dados, porColaborador])
 
   const emAtencao = useMemo(
     () =>
@@ -180,6 +193,104 @@ export function DashboardUnidade() {
       : 'Próximo fechamento do mês'
   const previsto = rotuloProxima.startsWith('Próximo ') ? 'previsto' : 'prevista'
   const nenhumColaborador = aoVivo || !fechamento ? 'Nenhum colaborador com dados' : 'Nenhum colaborador neste fechamento'
+  const textoIntervalo = escolhido ? textoDoIntervalo(escolhido) : null
+
+  const cardUnidades = consolidado ? (
+    <article className="dash-card dash-area-atualizacao" aria-labelledby="titulo-unidades">
+      <h2 id="titulo-unidades">Unidades</h2>
+      <p className="dash-card-sub">Dados de cada unidade · clique para ver só ela</p>
+      <ul className="dash-unidades">
+        {unidadesPainel.map((item) => (
+          <li key={item.id}>
+            <Link to={`/unidades/${item.id}`} className="dash-unidade">
+              <span className="dash-unidade-nome">{item.nome}</span>
+              <span className="dash-unidade-info">{infoUnidade(item)}</span>
+              <IconeSetaDiagonal tamanho={16} className="dash-unidade-seta" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {dados.proximo_fechamento_previsto && (
+        <p className="dash-unidades-proxima">
+          <IconeRelogio tamanho={14} />
+          {rotuloProxima}: {formatarDiaSemana(dados.proximo_fechamento_previsto)}
+        </p>
+      )}
+    </article>
+  ) : (
+    <article className="dash-card dash-area-atualizacao" aria-labelledby="titulo-atualizacao">
+      <div className="dash-card-topo dash-atualizacao-topo">
+        <h2 id="titulo-atualizacao">Atualização dos dados</h2>
+        {tempoReal.ativo && <SeloTempoReal />}
+      </div>
+      <p className="dash-destaque-texto">
+        {aoVivo ? `Dados até ${dadosAte}` : `Dados até ${formatarData(fechamento?.data_referencia)}`}
+      </p>
+      <ul className="dash-info">
+        {aoVivo && atualizados && (
+          <li>
+            <IconeAtividade tamanho={16} />
+            <span>{maiuscula(atualizados)}</span>
+          </li>
+        )}
+        {aoVivo && (
+          <li>
+            <IconeUsuarios tamanho={16} />
+            <span>
+              {totalAguardando > 0
+                ? `${tempoReal.colaboradores_ao_vivo} de ${todos.length} colaboradores já atualizados ao vivo; os demais mostram ${nomeFotografia}`
+                : 'Todos os colaboradores atualizados ao vivo'}
+            </span>
+          </li>
+        )}
+        {tempoReal.ativo && !aoVivo && (
+          <li>
+            <IconeAtividade tamanho={16} />
+            <span>Tempo real ligado: aguardando a primeira atualização ao vivo.</span>
+          </li>
+        )}
+        {periodo && fechamento && (
+          <li>
+            <IconeCalendario tamanho={16} />
+            <span>
+              {!aoVivo
+                ? `Período de ${periodo}`
+                : fechamento.semana_fechamento_mes
+                  ? `Último fechamento do mês: ${periodo}`
+                  : `Última fotografia: ${periodo}`}
+              {fechamento.semana_fechamento_mes && !aoVivo && <span className="dash-etiqueta">Fechamento do mês</span>}
+            </span>
+          </li>
+        )}
+        {fechamento && (
+          <li>
+            <IconeRelogio tamanho={16} />
+            <span>
+              {!aoVivo
+                ? 'Publicado em'
+                : fechamento.semana_fechamento_mes
+                  ? 'Fechamento do mês publicado em'
+                  : 'Fotografia publicada em'}{' '}
+              {formatarDataHora(fechamento.publicado_em)}
+            </span>
+          </li>
+        )}
+        {dados.proximo_fechamento_previsto && (
+          <li>
+            <IconeSetaDiagonal tamanho={16} />
+            <span>
+              {rotuloProxima}: {formatarDiaSemana(dados.proximo_fechamento_previsto)}
+            </span>
+          </li>
+        )}
+      </ul>
+      {linkFechamentos && (
+        <Link to={linkFechamentos} className="dash-botao dash-botao-primario">
+          Ver painel de fechamentos
+        </Link>
+      )}
+    </article>
+  )
 
   return (
     <section className="pagina dash">
@@ -202,6 +313,16 @@ export function DashboardUnidade() {
           <p className="dash-ao-vivo">
             <SeloTempoReal titulo="Os dados de cada colaborador são atualizados continuamente" />
             <span>{[`dados até ${dadosAte}`, atualizados].filter(Boolean).join(' · ')}</span>
+          </p>
+        )}
+        <div className="dash-filtro-periodo">
+          <FiltroPeriodo escolhido={escolhido} de={intervalo.deParam} ate={intervalo.ateParam} onMudar={intervalo.mudar} />
+        </div>
+        {textoIntervalo && (
+          <p className="colab-intervalo-nota">
+            Extras e negativas de <strong>{textoIntervalo}</strong>, somando os dias. Saldo, limites e distribuição são
+            do banco de horas atual.
+            {intervalo.alemDosDados && textoAlemDosDados(intervalo.horasAte)}
           </p>
         )}
       </header>
@@ -234,6 +355,21 @@ export function DashboardUnidade() {
             </Link>
           )}
         </EstadoVazio>
+      ) : textoIntervalo ? (
+        <>
+          <PainelIntervalo
+            linhas={todos}
+            porColaborador={porColaborador}
+            intervalo={textoIntervalo}
+            cardUnidades={cardUnidades}
+            incompleto={incompleto}
+            abrirLista={abrirLista}
+            linkColaborador={linkColaborador}
+            complemento={complemento}
+            origem={origem}
+          />
+          <p className="rodape-nota">Somente leitura. Ajustes de ponto são feitos pelo RH na FriPonto.</p>
+        </>
       ) : (
         <>
           <div className="dash-kpis">
@@ -319,102 +455,7 @@ export function DashboardUnidade() {
               )}
             </article>
 
-            {consolidado ? (
-              <article className="dash-card dash-area-atualizacao" aria-labelledby="titulo-unidades">
-                <h2 id="titulo-unidades">Unidades</h2>
-                <p className="dash-card-sub">Dados de cada unidade · clique para ver só ela</p>
-                <ul className="dash-unidades">
-                  {unidadesPainel.map((item) => (
-                    <li key={item.id}>
-                      <Link to={`/unidades/${item.id}`} className="dash-unidade">
-                        <span className="dash-unidade-nome">{item.nome}</span>
-                        <span className="dash-unidade-info">{infoUnidade(item)}</span>
-                        <IconeSetaDiagonal tamanho={16} className="dash-unidade-seta" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-                {dados.proximo_fechamento_previsto && (
-                  <p className="dash-unidades-proxima">
-                    <IconeRelogio tamanho={14} />
-                    {rotuloProxima}: {formatarDiaSemana(dados.proximo_fechamento_previsto)}
-                  </p>
-                )}
-              </article>
-            ) : (
-              <article className="dash-card dash-area-atualizacao" aria-labelledby="titulo-atualizacao">
-                <div className="dash-card-topo dash-atualizacao-topo">
-                  <h2 id="titulo-atualizacao">Atualização dos dados</h2>
-                  {tempoReal.ativo && <SeloTempoReal />}
-                </div>
-                <p className="dash-destaque-texto">
-                  {aoVivo ? `Dados até ${dadosAte}` : `Dados até ${formatarData(fechamento?.data_referencia)}`}
-                </p>
-                <ul className="dash-info">
-                  {aoVivo && atualizados && (
-                    <li>
-                      <IconeAtividade tamanho={16} />
-                      <span>{maiuscula(atualizados)}</span>
-                    </li>
-                  )}
-                  {aoVivo && (
-                    <li>
-                      <IconeUsuarios tamanho={16} />
-                      <span>
-                        {totalAguardando > 0
-                          ? `${tempoReal.colaboradores_ao_vivo} de ${todos.length} colaboradores já atualizados ao vivo; os demais mostram ${nomeFotografia}`
-                          : 'Todos os colaboradores atualizados ao vivo'}
-                      </span>
-                    </li>
-                  )}
-                  {tempoReal.ativo && !aoVivo && (
-                    <li>
-                      <IconeAtividade tamanho={16} />
-                      <span>Tempo real ligado: aguardando a primeira atualização ao vivo.</span>
-                    </li>
-                  )}
-                  {periodo && fechamento && (
-                    <li>
-                      <IconeCalendario tamanho={16} />
-                      <span>
-                        {!aoVivo
-                          ? `Período de ${periodo}`
-                          : fechamento.semana_fechamento_mes
-                            ? `Último fechamento do mês: ${periodo}`
-                            : `Última fotografia: ${periodo}`}
-                        {fechamento.semana_fechamento_mes && !aoVivo && <span className="dash-etiqueta">Fechamento do mês</span>}
-                      </span>
-                    </li>
-                  )}
-                  {fechamento && (
-                    <li>
-                      <IconeRelogio tamanho={16} />
-                      <span>
-                        {!aoVivo
-                          ? 'Publicado em'
-                          : fechamento.semana_fechamento_mes
-                            ? 'Fechamento do mês publicado em'
-                            : 'Fotografia publicada em'}{' '}
-                        {formatarDataHora(fechamento.publicado_em)}
-                      </span>
-                    </li>
-                  )}
-                  {dados.proximo_fechamento_previsto && (
-                    <li>
-                      <IconeSetaDiagonal tamanho={16} />
-                      <span>
-                        {rotuloProxima}: {formatarDiaSemana(dados.proximo_fechamento_previsto)}
-                      </span>
-                    </li>
-                  )}
-                </ul>
-                {linkFechamentos && (
-                  <Link to={linkFechamentos} className="dash-botao dash-botao-primario">
-                    Ver painel de fechamentos
-                  </Link>
-                )}
-              </article>
-            )}
+            {cardUnidades}
 
             <article className="dash-card dash-area-resumo" aria-labelledby="titulo-resumo">
               <h2 id="titulo-resumo">Resumo de horas</h2>
@@ -436,6 +477,17 @@ export function DashboardUnidade() {
                   />
                 )}
               </ul>
+              {somas.acimaDoLimiteDiario > 0 && (
+                <button type="button" className="dash-limite-diario" onClick={() => abrirLista('limite')}>
+                  <IconeAlerta tamanho={16} />
+                  <span>
+                    <strong>{somas.acimaDoLimiteDiario}</strong>{' '}
+                    {somas.acimaDoLimiteDiario === 1 ? 'colaborador passou' : 'colaboradores passaram'} do limite diário
+                    no período
+                  </span>
+                  <IconeSetaDiagonal tamanho={14} />
+                </button>
+              )}
             </article>
 
             <article className="dash-card dash-area-atencao" aria-labelledby="titulo-atencao">
@@ -512,63 +564,5 @@ export function DashboardUnidade() {
         />
       )}
     </section>
-  )
-}
-
-interface CartaoKpiProps {
-  rotulo: string
-  valor: ReactNode
-  contexto: string
-  icone: ReactNode
-  acao: string
-  onAcao: () => void
-  destaque?: boolean
-  classeValor?: string
-}
-
-function CartaoKpi({ rotulo, valor, contexto, icone, acao, onAcao, destaque = false, classeValor = '' }: CartaoKpiProps) {
-  return (
-    <div className={destaque ? 'dash-kpi dash-kpi-destaque' : 'dash-kpi'}>
-      <div className="dash-kpi-topo">
-        <p className="dash-kpi-rotulo">{rotulo}</p>
-        <button type="button" className="dash-kpi-acao" onClick={onAcao} aria-label={acao} title={acao}>
-          <IconeSetaDiagonal tamanho={18} />
-        </button>
-      </div>
-      <p className={`dash-kpi-valor ${classeValor}`}>{valor}</p>
-      <p className="dash-kpi-contexto">
-        <span className="dash-kpi-contexto-icone" aria-hidden="true">
-          {icone}
-        </span>
-        {contexto}
-      </p>
-    </div>
-  )
-}
-
-function ItemResumo({
-  icone,
-  rotulo,
-  detalhe,
-  minutos,
-  sinal = false,
-}: {
-  icone: ReactNode
-  rotulo: string
-  detalhe: string
-  minutos: Minutos
-  sinal?: boolean
-}) {
-  return (
-    <li>
-      <span className="dash-resumo-icone" aria-hidden="true">
-        {icone}
-      </span>
-      <span className="dash-resumo-texto">
-        <span className="dash-resumo-rotulo">{rotulo}</span>
-        <span className="dash-resumo-detalhe">{detalhe}</span>
-      </span>
-      <Horas minutos={minutos} sinal={sinal} destacar={sinal} className="dash-resumo-valor" />
-    </li>
   )
 }

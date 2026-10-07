@@ -68,7 +68,7 @@ docker compose up -d
   - `usuarios` = equipe Scale IA (perfil `admin`, sem empresa): Administração (empresas, integração, fechamentos, calendário, equipe) e acesso a tudo.
   - `clientes` = usuários das empresas atendidas: `rh` (Gestão + Configuração da própria empresa) e `gestor` (Gestão das unidades vinculadas em `cliente_unidades`).
   - Escopo aplicado no SQL por `unidades_permitidas(tipo, id)`; o token leva o tipo (`equipe`/`cliente`).
-- Extração: `/Calcular/SomenteTotais` da Secullum, um colaborador por chamada, limitado por `configuracoes.cota_calcular_por_hora` (padrão 90/h).
+- Extração: `/Calcular` da Secullum, um colaborador por chamada, limitado por `configuracoes.cota_calcular_por_hora` (padrão 90/h). A resposta traz os totais do período e uma linha por dia: os totais vão para o fechamento e os dias para `horas_dia` (extras, negativas e marcações de cada dia, regravados a cada coleta). Os dias alimentam o filtro de datas do Dashboard e de Colaboradores, a linha expansível de Colaboradores e o limite diário (Configuração → Alertas e horas pagas).
 - Modo de atualização por empresa (`configuracoes.modo_extracao`, o cliente escolhe em Configuração → Atualização dos dados):
   - `semanal`: só as fotografias semanais (ciclos/fechamentos) no dia e hora escolhidos.
   - `tempo_real`: as fotografias semanais continuam (histórico oficial, teto semanal) e o worker (`jobs/tempo-real.job.ts`) mantém em `registros_tempo_real` o período atual até hoje de cada colaborador, em rodízio. Fechamentos na fila têm prioridade e 10 chamadas/h ficam de reserva; com N colaboradores, cada um é atualizado a cada ~N/(cota−10) horas. O painel mostra, por colaborador, o dado mais recente entre o ao vivo e a última fotografia.

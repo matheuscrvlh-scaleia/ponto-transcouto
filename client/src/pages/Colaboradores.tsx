@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
@@ -7,9 +7,12 @@ import { Horas } from '../components/Horas'
 import { IconeRelogio } from '../components/Icones'
 import { IndicadorCurva } from '../components/IndicadorCurva'
 import { SeloTempoReal } from '../components/SeloTempoReal'
+import { DiasColaborador } from './DiasColaborador'
 import { RelatorioColaboradores } from './RelatorioColaboradores'
 import { baixarCsv, imprimirComoPdf, minutosCsv, paraNomeArquivo, type CelulaCsv } from '../lib/exportar'
+import { FiltroPeriodo } from '../components/FiltroPeriodo'
 import { formatarData, formatarDataHora, hojeISO, iniciais, normalizarBusca } from '../lib/formato'
+import { textoAlemDosDados, textoDoIntervalo, useHorasNoIntervalo } from '../lib/intervalo'
 import {
   caminhoColaboradores,
   ORDEM_PADRAO,
@@ -19,7 +22,7 @@ import {
   usePainel,
   type LinhaPainel as Linha,
 } from '../lib/painel'
-import type { FiltroDashboard, LinhaDashboard } from '../types/api'
+import type { FiltroDashboard } from '../types/api'
 import './dashboard.css'
 import { TituloPagina } from '../components/TituloPagina'
 
@@ -33,12 +36,31 @@ const COLUNAS: { campo: CampoOrdem; rotulo: string }[] = [
   { campo: 'pagas_min', rotulo: 'Pagas' },
 ]
 
-const FILTROS: { valor: FiltroDashboard; rotulo: string }[] = [
+// 'limite': passou do limite diário em algum dia do intervalo (só nesta tela)
+type Filtro = FiltroDashboard | 'limite'
+
+const FILTROS: { valor: Filtro; rotulo: string }[] = [
   { valor: 'todos', rotulo: 'Todos' },
   { valor: 'extra', rotulo: 'Com extras' },
   { valor: 'negativa', rotulo: 'Com negativas' },
   { valor: 'fora', rotulo: 'Fora da curva' },
+  { valor: 'limite', rotulo: 'Limite diário' },
 ]
+
+/** Linha da tela: no intervalo de datas, extras e negativas viram a soma dos dias; `dias_acima` conta os dias além do limite diário. */
+type LinhaTela = Linha & { dias_extra_acima: number; dias_negativa_acima: number }
+
+function textoDiasAcima(linha: LinhaTela) {
+  const partes = [
+    linha.dias_extra_acima ? `${linha.dias_extra_acima} com extras` : null,
+    linha.dias_negativa_acima ? `${linha.dias_negativa_acima} com negativas` : null,
+  ].filter(Boolean)
+  const total = linha.dias_extra_acima + linha.dias_negativa_acima
+  return {
+    curto: `${total} ${total === 1 ? 'dia' : 'dias'} acima do limite`,
+    longo: `Acima do limite diário: ${partes.join(' e ')}`,
+  }
+}
 
 const ORDENS_MOBILE: { valor: string; rotulo: string }[] = [
   { valor: 'saldo_min.desc', rotulo: 'Maior saldo' },
@@ -56,19 +78,20 @@ function lerOrdem(valor: string | null): { campo: CampoOrdem; direcao: Direcao }
   return { campo: campo as CampoOrdem, direcao: direcao === 'asc' ? 'asc' : 'desc' }
 }
 
-function lerFiltro(valor: string | null): FiltroDashboard {
-  return FILTROS.some((filtro) => filtro.valor === valor) ? (valor as FiltroDashboard) : 'todos'
+function lerFiltro(valor: string | null): Filtro {
+  return FILTROS.some((filtro) => filtro.valor === valor) ? (valor as Filtro) : 'todos'
 }
 
-function passaNoFiltro(linha: LinhaDashboard, filtro: FiltroDashboard) {
+function passaNoFiltro(linha: LinhaTela, filtro: Filtro) {
   if (filtro === 'extra') return linha.extra_min > 0
   if (filtro === 'negativa') return linha.negativa_min > 0
   if (filtro === 'fora') return linha.fora_da_curva !== null
+  if (filtro === 'limite') return linha.dias_extra_acima + linha.dias_negativa_acima > 0
   return true
 }
 
 /** Filtro e busca atuais, em texto (cabeçalho da planilha e do PDF). */
-function descricaoFiltro(filtro: FiltroDashboard, busca: string) {
+function descricaoFiltro(filtro: Filtro, busca: string) {
   const rotulo = FILTROS.find((item) => item.valor === filtro)?.rotulo ?? 'Todos'
   return busca.trim() ? `${rotulo} · busca “${busca.trim()}”` : rotulo
 }
@@ -83,15 +106,34 @@ function descricaoOrdem(ordem: { campo: CampoOrdem; direcao: Direcao }) {
 }
 
 /** Planilha da lista como está na tela (mesmo filtro, busca e ordem). */
-function linhasPlanilha(linhas: Linha[], nomePainel: string, consolidado: boolean, filtro: string): CelulaCsv[][] {
+function linhasPlanilha(
+  linhas: LinhaTela[],
+  nomePainel: string,
+  consolidado: boolean,
+  filtro: string,
+  periodo: string | null,
+): CelulaCsv[][] {
+  // com intervalo de datas, as pagas (que só existem por período) saem
+  const semPagas = periodo !== null
   const curva = (linha: Linha) =>
     linha.fora_da_curva === 'positivo' ? 'Acima do limite' : linha.fora_da_curva === 'negativo' ? 'Abaixo do limite' : ''
   return [
     ['Colaboradores', nomePainel],
     ['Filtro', filtro],
+    ...(periodo ? [['Período', periodo]] : []),
     ['Exportado em', formatarDataHora(new Date().toISOString())],
     [],
-    ['Nome', ...(consolidado ? ['Unidade'] : []), 'Função', 'Saldo banco', 'Extras', 'Negativas', 'Pagas', 'Fora da curva'],
+    [
+      'Nome',
+      ...(consolidado ? ['Unidade'] : []),
+      'Função',
+      'Saldo banco',
+      'Extras',
+      'Negativas',
+      ...(semPagas ? [] : ['Pagas']),
+      'Fora da curva',
+      'Dias acima do limite diário',
+    ],
     ...linhas.map((linha) => [
       linha.nome,
       ...(consolidado ? [linha.unidade_nome] : []),
@@ -99,8 +141,9 @@ function linhasPlanilha(linhas: Linha[], nomePainel: string, consolidado: boolea
       minutosCsv(linha.saldo_min),
       minutosCsv(linha.extra_min),
       minutosCsv(linha.negativa_min),
-      minutosCsv(linha.pagas_min),
+      ...(semPagas ? [] : [minutosCsv(linha.pagas_min)]),
       curva(linha),
+      linha.dias_extra_acima + linha.dias_negativa_acima,
     ]),
   ]
 }
@@ -119,6 +162,17 @@ export function Colaboradores() {
   const busca = params.get('busca') ?? ''
   const filtro = lerFiltro(params.get('filtro'))
   const ordem = lerOrdem(params.get('ordem'))
+  // intervalo de datas da URL e as horas somadas nele (sem intervalo: o período atual, para o limite diário)
+  const intervalo = useHorasNoIntervalo(unidadeId, dados?.colaboradores)
+  const intervaloEscolhido = intervalo.escolhido
+  const [abertos, setAbertos] = useState<Set<number>>(() => new Set())
+  const alternarDias = (id: number) =>
+    setAbertos((atual) => {
+      const proximo = new Set(atual)
+      if (proximo.has(id)) proximo.delete(id)
+      else proximo.add(id)
+      return proximo
+    })
 
   useEffect(() => {
     const nome = dados ? (dados.unidade?.nome ?? 'Todas as unidades') : null
@@ -143,17 +197,35 @@ export function Colaboradores() {
     atualizarParam('ordem', `${campo}.${direcao}`, ORDEM_PADRAO)
   }
 
+  const { porColaborador } = intervalo
+  const comIntervalo = intervaloEscolhido !== null
+
+  // com intervalo escolhido, extras e negativas são a soma dos dias; sem ele, os números do período
+  const todasLinhas = useMemo<LinhaTela[]>(
+    () =>
+      (dados?.colaboradores ?? []).map((linha) => {
+        const doIntervalo = porColaborador.get(linha.id)
+        return {
+          ...linha,
+          ...(comIntervalo && { extra_min: doIntervalo?.extra_min ?? 0, negativa_min: doIntervalo?.negativa_min ?? 0 }),
+          dias_extra_acima: doIntervalo?.dias_extra_acima ?? 0,
+          dias_negativa_acima: doIntervalo?.dias_negativa_acima ?? 0,
+        }
+      }),
+    [dados, porColaborador, comIntervalo],
+  )
+
   const linhas = useMemo(() => {
     const termo = normalizarBusca(busca)
     const fator = ordem.direcao === 'asc' ? 1 : -1
-    return (dados?.colaboradores ?? [])
+    return todasLinhas
       .filter((linha) => passaNoFiltro(linha, filtro) && normalizarBusca(linha.nome).includes(termo))
       .sort((a, b) =>
         ordem.campo === 'nome'
           ? fator * a.nome.localeCompare(b.nome, 'pt-BR')
           : fator * (a[ordem.campo] - b[ordem.campo]) || a.nome.localeCompare(b.nome, 'pt-BR'),
       )
-  }, [dados, busca, filtro, ordem.campo, ordem.direcao])
+  }, [todasLinhas, busca, filtro, ordem.campo, ordem.direcao])
 
   // com uma unidade só, "todas" é a própria unidade
   if (consolidado && unidadesSessao.length === 1) {
@@ -198,6 +270,11 @@ export function Colaboradores() {
         ? (linha.alerta_neg ?? limites.alerta_neg)
         : undefined
 
+  const colunasVisiveis = comIntervalo ? COLUNAS.filter((coluna) => coluna.campo !== 'pagas_min') : COLUNAS
+  const textoIntervalo = intervaloEscolhido ? textoDoIntervalo(intervaloEscolhido) : null
+  // período de cada linha aberta: o intervalo escolhido ou o período dos números dela
+  const diasDe = (linha: Linha) => intervaloEscolhido ?? { de: linha.periodo_inicio, ate: linha.dados_ate }
+
   const complemento = (linha: Linha) => [consolidado ? linha.unidade_nome : null, linha.funcao].filter(Boolean).join(' · ')
   const nenhumColaborador = aoVivo || !fechamento ? 'Nenhum colaborador com dados' : 'Nenhum colaborador neste fechamento'
   const filtroAtual = descricaoFiltro(filtro, busca)
@@ -216,7 +293,7 @@ export function Colaboradores() {
   function baixarPlanilha() {
     baixarCsv(
       `colaboradores-${paraNomeArquivo(nomePainel)}-${hojeISO()}.csv`,
-      linhasPlanilha(linhas, nomePainel, consolidado, filtroAtual),
+      linhasPlanilha(linhas, nomePainel, consolidado, filtroAtual, textoIntervalo),
     )
   }
 
@@ -231,7 +308,10 @@ export function Colaboradores() {
         totalGeral={todos.length}
         filtro={filtroAtual}
         ordem={descricaoOrdem(ordem)}
-        dados={[subtitulo, textoDados].filter(Boolean).join(' · ')}
+        dados={[subtitulo, textoIntervalo ? `extras e negativas de ${textoIntervalo}` : textoDados]
+          .filter(Boolean)
+          .join(' · ')}
+        semPagas={comIntervalo}
       />
 
       <header className="dash-header nao-imprimir">
@@ -327,6 +407,12 @@ export function Colaboradores() {
                   </button>
                 ))}
               </div>
+              <FiltroPeriodo
+                escolhido={intervaloEscolhido}
+                de={intervalo.deParam}
+                ate={intervalo.ateParam}
+                onMudar={intervalo.mudar}
+              />
               <div className="ordem-mobile">
                 <label htmlFor="ordem-mobile">Ordenar por</label>
                 <select
@@ -345,6 +431,14 @@ export function Colaboradores() {
                 </select>
               </div>
             </div>
+
+            {textoIntervalo && (
+              <p className="colab-intervalo-nota">
+                Extras e negativas de <strong>{textoIntervalo}</strong>, somando os dias. O saldo do banco é o atual e
+                as pagas só existem por período, então saem da lista.
+                {intervalo.alemDosDados && textoAlemDosDados(intervalo.horasAte)}
+              </p>
+            )}
 
             <p className="sr-only" aria-live="polite">
               {linhas.length} de {todos.length} colaboradores exibidos
@@ -372,7 +466,7 @@ export function Colaboradores() {
                       <thead>
                         <tr>
                           <CabecalhoOrdenavel campo="nome" rotulo="Nome" ordem={ordem} onClick={alternarOrdem} />
-                          {COLUNAS.map((coluna) => (
+                          {colunasVisiveis.map((coluna) => (
                             <CabecalhoOrdenavel
                               key={coluna.campo}
                               campo={coluna.campo}
@@ -388,73 +482,136 @@ export function Colaboradores() {
                         </tr>
                       </thead>
                       <tbody>
-                        {linhas.map((linha) => (
-                          <tr key={linha.id} className={linha.fora_da_curva ? `linha-${linha.fora_da_curva}` : undefined}>
-                            <th scope="row" className="celula-nome">
-                              <span className="celula-pessoa">
-                                <span className="avatar avatar-pequeno" aria-hidden="true">
-                                  {iniciais(linha.nome)}
-                                </span>
-                                <span>
-                                  <Link to={linkColaborador(linha)} state={origem}>
-                                    {linha.nome}
-                                  </Link>
-                                  {aguardandoAoVivo(linha) && <MarcaFotografia texto={textoAguardando} />}
-                                  {complemento(linha) && <span className="celula-funcao">{complemento(linha)}</span>}
-                                </span>
-                              </span>
-                            </th>
-                            <td className="num">
-                              <Horas minutos={linha.saldo_min} sinal destacar className="forte" />
-                            </td>
-                            <td className="num">
-                              <Horas minutos={linha.extra_min} />
-                            </td>
-                            <td className="num">
-                              <Horas minutos={linha.negativa_min} />
-                            </td>
-                            <td className="num">
-                              <Horas minutos={linha.pagas_min} />
-                            </td>
-                            <td>
-                              <IndicadorCurva valor={linha.fora_da_curva} limite={limiteDe(linha)} pilula />
-                            </td>
-                          </tr>
-                        ))}
+                        {linhas.map((linha) => {
+                          const aberto = abertos.has(linha.id)
+                          const acima =
+                            linha.dias_extra_acima + linha.dias_negativa_acima > 0 ? textoDiasAcima(linha) : null
+                          return (
+                            <Fragment key={linha.id}>
+                              <tr className={linha.fora_da_curva ? `linha-${linha.fora_da_curva}` : undefined}>
+                                <th scope="row" className="celula-nome">
+                                  <span className="celula-pessoa">
+                                    <button
+                                      type="button"
+                                      className={aberto ? 'btn-dias aberto' : 'btn-dias'}
+                                      aria-expanded={aberto}
+                                      aria-controls={`dias-${linha.id}`}
+                                      onClick={() => alternarDias(linha.id)}
+                                      title={aberto ? 'Fechar os dias' : 'Ver em que dias foram as horas'}
+                                    >
+                                      <span aria-hidden="true">›</span>
+                                      <span className="sr-only">Dias de {linha.nome}</span>
+                                    </button>
+                                    <span className="avatar avatar-pequeno" aria-hidden="true">
+                                      {iniciais(linha.nome)}
+                                    </span>
+                                    <span>
+                                      <Link to={linkColaborador(linha)} state={origem}>
+                                        {linha.nome}
+                                      </Link>
+                                      {aguardandoAoVivo(linha) && <MarcaFotografia texto={textoAguardando} />}
+                                      {complemento(linha) && (
+                                        <span className="celula-funcao">{complemento(linha)}</span>
+                                      )}
+                                      {acima && (
+                                        <button
+                                          type="button"
+                                          className="selo-limite-dia"
+                                          title={acima.longo}
+                                          onClick={() => alternarDias(linha.id)}
+                                        >
+                                          {acima.curto}
+                                        </button>
+                                      )}
+                                    </span>
+                                  </span>
+                                </th>
+                                <td className="num">
+                                  <Horas minutos={linha.saldo_min} sinal destacar className="forte" />
+                                </td>
+                                <td className="num">
+                                  <Horas minutos={linha.extra_min} />
+                                </td>
+                                <td className="num">
+                                  <Horas minutos={linha.negativa_min} />
+                                </td>
+                                {!comIntervalo && (
+                                  <td className="num">
+                                    <Horas minutos={linha.pagas_min} />
+                                  </td>
+                                )}
+                                <td>
+                                  <IndicadorCurva valor={linha.fora_da_curva} limite={limiteDe(linha)} pilula />
+                                </td>
+                              </tr>
+                              {aberto && (
+                                <tr className="linha-dias" id={`dias-${linha.id}`}>
+                                  <td colSpan={colunasVisiveis.length + 2}>
+                                    <DiasColaborador colaboradorId={linha.id} {...diasDe(linha)} />
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
                 <ul className="lista-cartoes">
-                  {linhas.map((linha) => (
-                    <li key={linha.id}>
-                      <Link
-                        to={linkColaborador(linha)}
-                        state={origem}
-                        className={linha.fora_da_curva ? `cartao-colab linha-${linha.fora_da_curva}` : 'cartao-colab'}
-                      >
-                        <span className="cartao-colab-topo">
-                          <span className="avatar avatar-pequeno" aria-hidden="true">
-                            {iniciais(linha.nome)}
+                  {linhas.map((linha) => {
+                    const aberto = abertos.has(linha.id)
+                    const acima = linha.dias_extra_acima + linha.dias_negativa_acima > 0 ? textoDiasAcima(linha) : null
+                    return (
+                      <li key={linha.id}>
+                        <Link
+                          to={linkColaborador(linha)}
+                          state={origem}
+                          className={linha.fora_da_curva ? `cartao-colab linha-${linha.fora_da_curva}` : 'cartao-colab'}
+                        >
+                          <span className="cartao-colab-topo">
+                            <span className="avatar avatar-pequeno" aria-hidden="true">
+                              {iniciais(linha.nome)}
+                            </span>
+                            <span className="cartao-colab-nome">
+                              {linha.nome}
+                              {aguardandoAoVivo(linha) && <MarcaFotografia texto={textoAguardando} />}
+                            </span>
+                            <span className="cartao-colab-saldo">
+                              <Horas minutos={linha.saldo_min} sinal destacar />
+                              <IndicadorCurva valor={linha.fora_da_curva} limite={limiteDe(linha)} compacto />
+                            </span>
                           </span>
-                          <span className="cartao-colab-nome">
-                            {linha.nome}
-                            {aguardandoAoVivo(linha) && <MarcaFotografia texto={textoAguardando} />}
+                          <span className="cartao-colab-detalhe">
+                            {consolidado && linha.unidade_nome && `${linha.unidade_nome} · `}
+                            Extras <Horas minutos={linha.extra_min} /> · Neg. <Horas minutos={linha.negativa_min} />
+                            {!comIntervalo && (
+                              <>
+                                {' · Pagas '}
+                                <Horas minutos={linha.pagas_min} />
+                              </>
+                            )}
                           </span>
-                          <span className="cartao-colab-saldo">
-                            <Horas minutos={linha.saldo_min} sinal destacar />
-                            <IndicadorCurva valor={linha.fora_da_curva} limite={limiteDe(linha)} compacto />
-                          </span>
-                        </span>
-                        <span className="cartao-colab-detalhe">
-                          {consolidado && linha.unidade_nome && `${linha.unidade_nome} · `}
-                          Extras <Horas minutos={linha.extra_min} /> · Neg. <Horas minutos={linha.negativa_min} /> · Pagas{' '}
-                          <Horas minutos={linha.pagas_min} />
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
+                        </Link>
+                        <button
+                          type="button"
+                          className="cartao-colab-dias"
+                          aria-expanded={aberto}
+                          aria-controls={`dias-cartao-${linha.id}`}
+                          onClick={() => alternarDias(linha.id)}
+                        >
+                          {aberto ? 'Fechar os dias' : 'Ver os dias'}
+                          {acima && <span className="selo-limite-dia">{acima.curto}</span>}
+                        </button>
+                        {aberto && (
+                          <div id={`dias-cartao-${linha.id}`}>
+                            <DiasColaborador colaboradorId={linha.id} {...diasDe(linha)} />
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </>
             )}

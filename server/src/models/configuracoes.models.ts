@@ -8,6 +8,7 @@ const selecao = `
            c.dia_fechamento_mes, c.dias_apos_fechamento_mes, c.origem_horas_pagas,
            c.teto_horas_pagas_minutos, c.teto_periodicidade,
            c.alerta_saldo_positivo_minutos, c.alerta_saldo_negativo_minutos,
+           c.alerta_extra_dia_minutos, c.alerta_negativa_dia_minutos,
            c.fuso_horario, c.cota_calcular_por_hora, c.modo_extracao, c.atualizado_em,
            CASE WHEN u.id IS NOT NULL THEN json_build_object('id', u.id, 'nome', u.nome)
                 WHEN cl.id IS NOT NULL THEN json_build_object('id', cl.id, 'nome', cl.nome) END AS atualizado_por

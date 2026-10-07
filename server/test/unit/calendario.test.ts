@@ -18,16 +18,46 @@ function ciclosEntre(cfg: ConfigCalendario, inicio: string, fim: string) {
 }
 
 describe('proximosCiclos', () => {
-    it('gera a régua de outubro/2026 (fechamento no domingo 25/10)', () => {
+    it('gera a régua de outubro/2026 (fechamento no domingo 25/10): a quarta segue toda semana', () => {
         const ciclos = ciclosEntre(config, '2026-09-27T09:00:00Z', '2026-11-12T00:00:00Z')
         expect(ciclos.map(resumo)).toEqual([
             'fechamento_mes 2026-08-26 2026-09-25 2026-09-27T09:00:00.000Z',
+            'semanal 2026-09-26 2026-09-29 2026-09-30T09:00:00.000Z',
             'semanal 2026-09-26 2026-10-06 2026-10-07T09:00:00.000Z',
             'semanal 2026-09-26 2026-10-13 2026-10-14T09:00:00.000Z',
             'semanal 2026-09-26 2026-10-20 2026-10-21T09:00:00.000Z',
             'fechamento_mes 2026-09-26 2026-10-25 2026-10-27T09:00:00.000Z',
+            'semanal 2026-10-26 2026-10-27 2026-10-28T09:00:00.000Z',
             'semanal 2026-10-26 2026-11-03 2026-11-04T09:00:00.000Z',
             'semanal 2026-10-26 2026-11-10 2026-11-11T09:00:00.000Z',
+        ])
+    })
+
+    it('coleta do mês no dia 26 (1 dia após o fechamento) além das quartas', () => {
+        const ciclos = ciclosEntre({ ...config, dias_apos_fechamento_mes: 1 }, '2026-10-15T00:00:00Z', '2026-11-05T00:00:00Z')
+        expect(ciclos.map(resumo)).toEqual([
+            'semanal 2026-09-26 2026-10-20 2026-10-21T09:00:00.000Z',
+            'fechamento_mes 2026-09-26 2026-10-25 2026-10-26T09:00:00.000Z',
+            'semanal 2026-10-26 2026-10-27 2026-10-28T09:00:00.000Z',
+            'semanal 2026-10-26 2026-11-03 2026-11-04T09:00:00.000Z',
+        ])
+    })
+
+    it('a quarta do período novo que rodaria antes do fechamento do anterior sai da régua', () => {
+        // 25/09 sexta + 6 dias = quinta 01/10: a quarta 30/09 herdaria o saldo sem o mês fechado
+        const ciclos = ciclosEntre({ ...config, dias_apos_fechamento_mes: 6 }, '2026-09-20T00:00:00Z', '2026-10-08T00:00:00Z')
+        expect(ciclos.map(resumo)).toEqual([
+            'semanal 2026-08-26 2026-09-22 2026-09-23T09:00:00.000Z',
+            'fechamento_mes 2026-08-26 2026-09-25 2026-10-01T09:00:00.000Z',
+            'semanal 2026-09-26 2026-10-06 2026-10-07T09:00:00.000Z',
+        ])
+    })
+
+    it('fechamento e quarta no mesmo horário: o fechamento vem antes', () => {
+        const ciclos = ciclosEntre(config, '2027-01-25T00:00:00Z', '2027-01-28T00:00:00Z')
+        expect(ciclos.map(resumo)).toEqual([
+            'fechamento_mes 2026-12-26 2027-01-25 2027-01-27T09:00:00.000Z',
+            'semanal 2027-01-26 2027-01-26 2027-01-27T09:00:00.000Z',
         ])
     })
 
@@ -38,7 +68,7 @@ describe('proximosCiclos', () => {
         expect(proximosCiclos(config, new Date(), 0)).toEqual([])
     })
 
-    it('dia 25 numa terça (ago/2026): a quarta 26/08 vira fechamento em 27/08', () => {
+    it('dia 25 numa terça (ago/2026): a quarta 26/08 repetiria a referência do fechamento e sai da régua', () => {
         const ciclos = ciclosEntre(config, '2026-08-15T00:00:00Z', '2026-09-03T00:00:00Z')
         expect(ciclos.map(resumo)).toEqual([
             'semanal 2026-07-26 2026-08-18 2026-08-19T09:00:00.000Z',
@@ -52,15 +82,17 @@ describe('proximosCiclos', () => {
         expect(ciclos.map(resumo)).toEqual([
             'semanal 2026-10-26 2026-11-24 2026-11-25T09:00:00.000Z',
             'fechamento_mes 2026-10-26 2026-11-25 2026-11-27T09:00:00.000Z',
+            'semanal 2026-11-26 2026-12-01 2026-12-02T09:00:00.000Z',
             'semanal 2026-11-26 2026-12-08 2026-12-09T09:00:00.000Z',
         ])
     })
 
-    it('dia 25 numa sexta (set/2026): quarta 23/09 normal, quarta 30/09 vira fechamento no domingo 27/09', () => {
+    it('dia 25 numa sexta (set/2026): fechamento no domingo 27/09 e a quarta 30/09 já no período novo', () => {
         const ciclos = ciclosEntre(config, '2026-09-20T00:00:00Z', '2026-10-01T00:00:00Z')
         expect(ciclos.map(resumo)).toEqual([
             'semanal 2026-08-26 2026-09-22 2026-09-23T09:00:00.000Z',
             'fechamento_mes 2026-08-26 2026-09-25 2026-09-27T09:00:00.000Z',
+            'semanal 2026-09-26 2026-09-29 2026-09-30T09:00:00.000Z',
         ])
     })
 
@@ -69,10 +101,12 @@ describe('proximosCiclos', () => {
         expect(ciclos.map(resumo)).toEqual([
             'semanal 2026-11-26 2026-12-22 2026-12-23T09:00:00.000Z',
             'fechamento_mes 2026-11-26 2026-12-25 2026-12-27T09:00:00.000Z',
+            'semanal 2026-12-26 2026-12-29 2026-12-30T09:00:00.000Z',
             'semanal 2026-12-26 2027-01-05 2027-01-06T09:00:00.000Z',
             'semanal 2026-12-26 2027-01-12 2027-01-13T09:00:00.000Z',
             'semanal 2026-12-26 2027-01-19 2027-01-20T09:00:00.000Z',
             'fechamento_mes 2026-12-26 2027-01-25 2027-01-27T09:00:00.000Z',
+            'semanal 2027-01-26 2027-01-26 2027-01-27T09:00:00.000Z',
         ])
     })
 
@@ -96,9 +130,18 @@ describe('proximosCiclos', () => {
                 expect(c.gatilho_em.getUTCDay()).toBe(3)
                 expect(c.gatilho_em.getUTCHours()).toBe(9)
                 expect(diasEntre(c.data_referencia, c.gatilho_em.toISOString().slice(0, 10))).toBe(1)
-                const dia = Number(c.data_referencia.slice(8))
-                expect(dia >= 25 && dia <= 31).toBe(false)
+                // a semanal nunca repete a referência do fechamento
+                expect(c.data_referencia.slice(8)).not.toBe('25')
             }
+        }
+
+        // toda quarta tem coleta, menos quando a véspera é o próprio dia 25 (terça)
+        const semanais = ciclos.filter(c => c.tipo === 'semanal')
+        for (let i = 1; i < semanais.length; i++) {
+            const anterior = semanais[i - 1].data_referencia
+            const intervalo = diasEntre(anterior, semanais[i].data_referencia)
+            const pulada = new Date(Date.parse(anterior) + 7 * 86400000).toISOString().slice(0, 10)
+            expect(intervalo === 7 || (intervalo === 14 && pulada.slice(8) === '25')).toBe(true)
         }
 
         const referencias = ciclos.map(c => c.data_referencia)
@@ -112,6 +155,7 @@ describe('proximosCiclos', () => {
         expect(ciclos.map(resumo)).toEqual([
             'semanal 2027-01-29 2027-02-23 2027-02-24T09:00:00.000Z',
             'fechamento_mes 2027-01-29 2027-02-28 2027-02-28T09:00:00.000Z',
+            'semanal 2027-03-01 2027-03-02 2027-03-03T09:00:00.000Z',
             'semanal 2027-03-01 2027-03-09 2027-03-10T09:00:00.000Z',
         ])
     })

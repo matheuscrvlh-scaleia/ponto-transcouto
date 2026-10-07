@@ -1,9 +1,11 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import * as colaboradoresModel from '../models/colaboradores.models'
 import * as configuracoesModel from '../models/configuracoes.models'
+import * as horasDiaModel from '../models/horas-dia.models'
 import { foraDaCurva, LIMITES_PADRAO } from '../services/dashboard.service'
 import { historicoDiarioQuerySchema, historicoQuerySchema } from '../types/colaboradores.types'
 import { idParamSchema } from '../types/comum.types'
+import { diasColaboradorQuerySchema } from '../types/horas-dia.types'
 import { naoEncontrado } from '../utils/errors'
 
 async function buscarColaborador(req: FastifyRequest) {
@@ -50,4 +52,20 @@ export async function historicoDiario(req: FastifyRequest, res: FastifyReply) {
     const { dias } = historicoDiarioQuerySchema.parse(req.query)
     const colaborador = await buscarColaborador(req)
     res.send(await colaboradoresModel.historicoDiario(req.usuario, colaborador.id, dias))
+}
+
+/** Horas de cada dia no intervalo (extras, negativas, marcações) e os limites diários da empresa. */
+export async function dias(req: FastifyRequest, res: FastifyReply) {
+    const { de, ate } = diasColaboradorQuerySchema.parse(req.query)
+    const colaborador = await buscarColaborador(req)
+    const [config, lista] = await Promise.all([
+        configuracoesModel.buscar(colaborador.empresa_id),
+        horasDiaModel.diasDoColaborador(colaborador.id, de, ate),
+    ])
+    res.send({
+        de,
+        ate,
+        limites: { extra_dia: config?.alerta_extra_dia_minutos ?? 0, negativa_dia: config?.alerta_negativa_dia_minutos ?? 0 },
+        dias: lista,
+    })
 }

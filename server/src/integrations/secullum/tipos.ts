@@ -41,6 +41,13 @@ export type FuncionarioSecullum = {
 export type TotaisSecullum = {
     colunas: string[]
     totais: string[]
+    /** Linhas por dia (rota Calcular completa), alinhadas com `colunas`; a SomenteTotais não traz. */
+    dias?: DiaSecullum[]
+}
+
+export type DiaSecullum = {
+    dia: string
+    valores: string[]
 }
 
 export type FiltroCalculo = {

@@ -53,11 +53,25 @@ export function usePainel(unidadeId: string | undefined) {
 /** Tela de Colaboradores da unidade (ou de todas), já com filtro e ordem. */
 export function caminhoColaboradores(
   unidadeId?: number | string | null,
-  { filtro = 'todos', ordem = ORDEM_PADRAO }: { filtro?: FiltroDashboard; ordem?: string } = {},
+  {
+    filtro = 'todos',
+    ordem = ORDEM_PADRAO,
+    intervalo,
+  }: {
+    /** 'limite': passou do limite diário (filtro só da tela de Colaboradores) */
+    filtro?: FiltroDashboard | 'limite'
+    ordem?: string
+    /** intervalo de datas escolhido no Dashboard: a lista abre com o mesmo */
+    intervalo?: { de: DataISO; ate: DataISO } | null
+  } = {},
 ) {
   const params = new URLSearchParams()
   if (filtro !== 'todos') params.set('filtro', filtro)
   if (ordem !== ORDEM_PADRAO) params.set('ordem', ordem)
+  if (intervalo) {
+    params.set('de', intervalo.de)
+    params.set('ate', intervalo.ate)
+  }
   const base = unidadeId ? `/unidades/${unidadeId}/colaboradores` : '/colaboradores'
   return params.size ? `${base}?${params}` : base
 }

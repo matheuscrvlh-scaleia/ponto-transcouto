@@ -208,6 +208,33 @@ export function somarDias(data: DataISO, dias: number): DataISO {
   return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10)
 }
 
+export type PeriodoRapido = 'hoje' | 'ontem' | 'semana' | 'mes'
+
+export const PERIODOS_RAPIDOS: { valor: PeriodoRapido; rotulo: string }[] = [
+  { valor: 'hoje', rotulo: 'Hoje' },
+  { valor: 'ontem', rotulo: 'Ontem' },
+  { valor: 'semana', rotulo: 'Esta semana' },
+  { valor: 'mes', rotulo: 'Este mês' },
+]
+
+/** Datas de uma seleção rápida; a semana começa na segunda-feira. */
+export function datasDoPeriodo(periodo: PeriodoRapido, hoje: DataISO = hojeISO()): { de: DataISO; ate: DataISO } {
+  if (periodo === 'hoje') return { de: hoje, ate: hoje }
+  if (periodo === 'ontem') return { de: somarDias(hoje, -1), ate: somarDias(hoje, -1) }
+  if (periodo === 'mes') return { de: `${hoje.slice(0, 8)}01`, ate: hoje }
+  const [a, m, d] = hoje.split('-').map(Number)
+  const diaSemana = new Date(Date.UTC(a, m - 1, d)).getUTCDay()
+  return { de: somarDias(hoje, -((diaSemana + 6) % 7)), ate: hoje }
+}
+
+/** Qual seleção rápida corresponde a um intervalo (ou null, se for um intervalo livre). */
+export function periodoRapidoDe(de: DataISO | undefined, ate: DataISO | undefined, hoje: DataISO = hojeISO()) {
+  return PERIODOS_RAPIDOS.find(({ valor }) => {
+    const datas = datasDoPeriodo(valor, hoje)
+    return datas.de === de && datas.ate === ate
+  })?.valor ?? null
+}
+
 /** Dias corridos entre duas datas 'YYYY-MM-DD' (fim − início). */
 export function diasEntre(inicio: DataISO, fim: DataISO): number {
   const utc = (data: DataISO) => {

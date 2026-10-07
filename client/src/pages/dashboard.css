@@ -1170,3 +1170,335 @@
 .medidor-legenda-botao strong {
   margin-left: auto;
 }
+
+/* ---------- Colaboradores: intervalo de datas e dias ---------- */
+
+.colab-periodo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 10px;
+}
+
+.colab-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.colab-campo select,
+.colab-campo input {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--muted);
+  color: var(--text-h);
+  color-scheme: light dark;
+}
+
+.colab-campo select:focus,
+.colab-campo input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.colab-intervalo-nota {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--accent-suave);
+  color: var(--text-h);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.btn-dias {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.btn-dias:hover {
+  background: var(--muted);
+  color: var(--text-h);
+}
+
+.btn-dias:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn-dias.aberto {
+  transform: rotate(90deg);
+}
+
+.selo-limite-dia {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 4px;
+  padding: 2px 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--aviso);
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.celula-pessoa .selo-limite-dia {
+  display: flex;
+}
+
+span.selo-limite-dia {
+  cursor: default;
+}
+
+.linha-dias > td {
+  padding: 4px 16px 16px 52px;
+  background: var(--muted);
+}
+
+.dias-colab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.dias-colab-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.dias-colab-nota {
+  margin: 0;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.dias-colab-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.dias-colab-tabela th,
+.dias-colab-tabela td {
+  padding: 7px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-weight: 400;
+}
+
+.dias-colab-tabela thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dias-colab-tabela tbody th {
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
+.dias-colab-tabela .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dias-colab-tabela .forte {
+  font-weight: 700;
+  color: var(--aviso);
+}
+
+.dias-colab-tabela tr.dia-acima {
+  background: var(--aviso-bg);
+}
+
+.dias-colab-tabela tr.dia-acima .selo-limite-dia {
+  margin: 0 0 0 8px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.dias-colab-tabela tfoot th,
+.dias-colab-tabela tfoot td {
+  font-weight: 700;
+  color: var(--text-h);
+  border-bottom: none;
+}
+
+.dias-colab-semana {
+  display: inline-block;
+  min-width: 28px;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+.dias-colab-marcacoes {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dias-colab-zero {
+  color: var(--border);
+}
+
+.cartao-colab-dias {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 4px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.cartao-colab-dias .selo-limite-dia {
+  margin-top: 0;
+}
+
+@media (max-width: 640px) {
+  .colab-periodo {
+    width: 100%;
+  }
+
+  .colab-campo {
+    flex: 1 1 140px;
+  }
+
+  .colab-campo select,
+  .colab-campo input {
+    width: 100%;
+  }
+
+  /* no celular as marcações ficam de fora: dia, extras e negativas cabem na largura */
+  .dias-colab-tabela th:nth-child(2),
+  .dias-colab-tabela td.dias-colab-marcacoes {
+    display: none;
+  }
+}
+
+/* ---------- Dashboard: intervalo de datas ---------- */
+
+.dash-filtro-periodo {
+  margin-top: 14px;
+}
+
+.dash-header .colab-intervalo-nota {
+  margin-top: 10px;
+}
+
+.dash-limite-diario {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--aviso);
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.dash-limite-diario span {
+  flex: 1;
+}
+
+.dash-limite-diario:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Dashboard com intervalo: listas de quem fez extras / ficou devendo ---------- */
+
+.dash-kpi-valor.texto-aviso {
+  color: var(--aviso);
+}
+
+.dash .avatar-aviso {
+  color: var(--aviso);
+  background: var(--aviso-bg);
+}
+
+.dash-pessoa-valor {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-h);
+}
+
+.dash-barra {
+  display: block;
+  width: 96px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.dash-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--destaque-de), var(--destaque-ate));
+}
+
+.dash-pessoa-valor .selo-limite-dia {
+  margin-top: 0;
+  cursor: inherit;
+}
+
+@media (max-width: 640px) {
+  .dash-barra {
+    width: 64px;
+  }
+}

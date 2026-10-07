@@ -31,9 +31,24 @@ describe('lerTotais', () => {
         expect(camel).toEqual(pascal)
     })
 
-    it('ignora Linhas e converte nulos em vazio', () => {
-        const dados = lerTotais({ Colunas: ['Data', ' BSaldo '], Linhas: [{ Key: 'x', Value: [] }], Totais: [null, '-10:00'] })
+    it('converte nulos em vazio', () => {
+        const dados = lerTotais({ Colunas: ['Data', ' BSaldo '], Totais: [null, '-10:00'] })
         expect(dados).toEqual({ colunas: ['Data', 'BSaldo'], totais: ['', '-10:00'] })
+    })
+
+    it('lê as Linhas da Calcular completa como dias', () => {
+        const dados = lerTotais({
+            Colunas: ['Data', 'Entrada 1', 'Saída 1', 'Extras'],
+            Linhas: [{ Key: '2026-09-28T00:00:00', Value: ['28/09/2026 - Seg', '09:33', null, '02:04'] }],
+            Totais: ['', '', '', '02:04'],
+        })
+        expect(dados.dias).toEqual([{ dia: '2026-09-28', valores: ['28/09/2026 - Seg', '09:33', '', '02:04'] }])
+    })
+
+    it('recusa linha de dia sem data ou com colunas a menos', () => {
+        const base = { Colunas: ['Data', 'Extras'], Totais: ['', '00:00'] }
+        expect(() => lerTotais({ ...base, Linhas: [{ Key: 'x', Value: ['', ''] }] })).toThrow(SecullumError)
+        expect(() => lerTotais({ ...base, Linhas: [{ Key: '2026-09-28', Value: [] }] })).toThrow(SecullumError)
     })
 
     it('recusa resposta sem Totais ou com tamanhos diferentes', () => {

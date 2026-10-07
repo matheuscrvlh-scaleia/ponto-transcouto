@@ -4,7 +4,18 @@ import { useAuth } from '../context/AuthContext'
 import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
 import { Carregando, ErroCarregamento, EstadoVazio } from '../components/Estados'
 import { api } from '../lib/api'
-import { dataDoInstante, formatarData, formatarDiaPorExtenso, formatarHoraOuData, hojeISO, iniciais } from '../lib/formato'
+import {
+  dataDoInstante,
+  datasDoPeriodo,
+  formatarData,
+  formatarDiaPorExtenso,
+  formatarHoraOuData,
+  hojeISO,
+  iniciais,
+  PERIODOS_RAPIDOS,
+  periodoRapidoDe,
+  type PeriodoRapido,
+} from '../lib/formato'
 import { useRecurso } from '../lib/useRecurso'
 import type { Batida, BatidasResposta, FiltroTipoBatida } from '../types/api'
 import './dashboard.css'
@@ -235,6 +246,26 @@ export function Batidas() {
             </label>
           )}
 
+          <label className="batidas-campo">
+            <span>Período</span>
+            <select
+              value={periodoRapidoDe(de, ate, hoje) ?? (de || ate ? 'livre' : '')}
+              onChange={(event) => {
+                const valor = event.target.value
+                if (valor === '') atualizar({ de: undefined, ate: undefined })
+                else if (valor !== 'livre') atualizar(datasDoPeriodo(valor as PeriodoRapido, hoje))
+              }}
+            >
+              <option value="">Qualquer data</option>
+              {PERIODOS_RAPIDOS.map((item) => (
+                <option key={item.valor} value={item.valor}>
+                  {item.rotulo}
+                </option>
+              ))}
+              {/* datas escolhidas à mão: só aparece enquanto não batem com nenhuma seleção rápida */}
+              {periodoRapidoDe(de, ate, hoje) === null && (de || ate) && <option value="livre">Personalizado</option>}
+            </select>
+          </label>
           <label className="batidas-campo">
             <span>De</span>
             <input type="date" value={de ?? ''} max={ate ?? hoje} onChange={(event) => atualizar({ de: event.target.value })} />

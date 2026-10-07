@@ -3,12 +3,16 @@ import { obterToken } from './auth'
 import { requisitar } from './http'
 import { SecullumError, type CredenciaisSecullum, type OpcoesCliente } from './tipos'
 
-export const ROTA_TOTAIS = 'Calcular/SomenteTotais'
-const ROTAS_POST_SOMENTE_LEITURA = new Set(['Calcular', ROTA_TOTAIS])
+// a Calcular completa traz os totais e as linhas por dia; a SomenteTotais (usada antes) só os totais
+export const ROTA_CALCULO = 'Calcular'
+const ROTA_TOTAIS = 'Calcular/SomenteTotais'
+/** As duas gastam a mesma cota da Secullum (100/h por banco): a contagem soma as duas. */
+export const ROTAS_DA_COTA = [ROTA_CALCULO, ROTA_TOTAIS]
+const ROTAS_POST_SOMENTE_LEITURA = new Set(ROTAS_DA_COTA)
 
 export type ClienteSecullum = {
     get(rota: string, query?: Record<string, string>): Promise<unknown>
-    calcular(rota: 'Calcular' | typeof ROTA_TOTAIS, corpo: Record<string, unknown>): Promise<unknown>
+    calcular(rota: typeof ROTA_CALCULO | typeof ROTA_TOTAIS, corpo: Record<string, unknown>): Promise<unknown>
 }
 
 export function criarClienteSecullum(credenciais: CredenciaisSecullum, opcoes: OpcoesCliente = {}): ClienteSecullum {

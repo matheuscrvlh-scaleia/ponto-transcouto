@@ -1,6 +1,6 @@
 import { db, withTransaction, type Executor } from '../db/database'
-import { calcularTotais } from '../integrations/secullum/calculo'
-import { ROTA_TOTAIS, type ClienteSecullum } from '../integrations/secullum/cliente'
+import { calcularPeriodo } from '../integrations/secullum/calculo'
+import { ROTA_CALCULO, type ClienteSecullum } from '../integrations/secullum/cliente'
 import { SecullumError, type OpcoesCliente } from '../integrations/secullum/tipos'
 import {
     buscarMapeamento,
@@ -10,6 +10,7 @@ import {
     saldoPeriodosAnteriores,
     travarEmpresa,
 } from '../models/extracao.models'
+import { gravarDias } from '../models/horas-dia.models'
 import { buscarCredenciais, registrarChamadaApi } from '../models/sincronizacao.models'
 import {
     empresasTempoReal,
@@ -23,6 +24,7 @@ import {
 } from '../models/tempo-real.models'
 import { periodoDeHoje } from '../services/calendario.service'
 import { calcularHoras, mensagensErroMapeamento, type RegraPagas } from '../services/calculo-horas.service'
+import { diasOuNada } from '../services/horas-dia.service'
 import { clienteDaEmpresa } from './cliente-empresa'
 import type { Log } from './log'
 
@@ -68,16 +70,16 @@ function prepararCliente(empresa: EmpresaTempoReal, credenciais: NonNullable<Awa
         ...op.opcoesCliente,
         ganchos: {
             antes: async rota => {
-                if (rota !== ROTA_TOTAIS) return
+                if (rota !== ROTA_CALCULO) return
                 reserva = await withTransaction(async client => {
                     await travarEmpresa(empresa.empresa_id, client)
-                    const uso = await chamadasNaUltimaHora(empresa.empresa_id, ROTA_TOTAIS, client)
+                    const uso = await chamadasNaUltimaHora(empresa.empresa_id, client)
                     if (cotaDisponivel(empresa.cota_calcular_por_hora, uso.total) <= 0) throw new SemCota()
-                    return reservarChamadaTempoReal(empresa.empresa_id, ROTA_TOTAIS, client)
+                    return reservarChamadaTempoReal(empresa.empresa_id, ROTA_CALCULO, client)
                 }, ex)
             },
             depois: async (rota, status, duracaoMs) => {
-                if (rota === ROTA_TOTAIS && reserva) {
+                if (rota === ROTA_CALCULO && reserva) {
                     await concluirChamada(reserva, status, duracaoMs, ex)
                     reserva = null
                 } else {
@@ -94,7 +96,7 @@ async function atualizarEmpresa(empresa: EmpresaTempoReal, op: OpcoesTempoReal, 
 
     if (await temFechamentoNaFila(empresa.empresa_id, ex)) return 0
 
-    const uso = await chamadasNaUltimaHora(empresa.empresa_id, ROTA_TOTAIS, ex)
+    const uso = await chamadasNaUltimaHora(empresa.empresa_id, ex)
     const disponivel = Math.min(cotaDisponivel(empresa.cota_calcular_por_hora, uso.total), MAXIMO_POR_RODADA)
     if (disponivel <= 0) return 0
 
@@ -125,7 +127,7 @@ async function atualizarEmpresa(empresa: EmpresaTempoReal, op: OpcoesTempoReal, 
 
         let dados
         try {
-            dados = await calcularTotais(cliente, { cpf: col.cpf, dataInicial: periodoInicio, dataFinal: hoje })
+            dados = await calcularPeriodo(cliente, { cpf: col.cpf, dataInicial: periodoInicio, dataFinal: hoje })
         } catch (err) {
             if (err instanceof SemCota) break
             if (err instanceof SecullumError && ['rate_limit', 'auth', 'nao_encontrado', 'formato'].includes(err.tipo)) {
@@ -154,7 +156,13 @@ async function atualizarEmpresa(empresa: EmpresaTempoReal, op: OpcoesTempoReal, 
             break
         }
 
-        await gravar(alvo, resultado.valores, dados, ex)
+        const dias = diasOuNada(dados, mapeamento, (mensagem) => op.log.erro(`tempo real: colaborador ${col.id}: ${mensagem}`))
+        const valores = resultado.valores
+        const lidos = dados
+        await withTransaction(async client => {
+            await gravar(alvo, valores, lidos, client)
+            await gravarDias({ ...alvo, de: periodoInicio, ate: hoje }, dias, client)
+        }, ex)
         atualizados++
     }
     return atualizados

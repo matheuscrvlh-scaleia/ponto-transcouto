@@ -91,7 +91,7 @@ const fontePainel = `
           FROM (
                 SELECT rt.colaborador_id, rt.extra_periodo, rt.negativa_periodo, rt.pagas_periodo,
                        rt.banco_periodo, rt.saldo_banco_total,
-                       'tempo_real'::text AS fonte, rt.extraido_em AS atualizado_em, rt.dados_ate,
+                       'tempo_real'::text AS fonte, rt.extraido_em AS atualizado_em, rt.dados_ate, rt.periodo_inicio,
                        lim.pos, lim.neg, lim.unidade_id, lim.unidade_nome
                   FROM lim
                   JOIN registros_tempo_real rt ON rt.unidade_id = lim.unidade_id AND lim.tempo_real
@@ -99,7 +99,7 @@ const fontePainel = `
                 UNION ALL
                 SELECT rh.colaborador_id, rh.extra_periodo, rh.negativa_periodo, rh.pagas_periodo,
                        rh.banco_periodo, rh.saldo_banco_total,
-                       'fechamento'::text, NULL::timestamptz, c.data_referencia,
+                       'fechamento'::text, NULL::timestamptz, c.data_referencia, c.periodo_inicio,
                        lim.pos, lim.neg, lim.unidade_id, lim.unidade_nome
                   FROM lim
                   JOIN registros_horas rh ON rh.fechamento_id = lim.fechamento_id
@@ -180,6 +180,7 @@ export async function linhasPainel(unidades: UnidadePainel[], q: DashboardQuery)
                 ${foraDaCurvaSql('r.saldo_banco_total', 'r.pos', 'r.neg')} AS fora_da_curva,
                 r.unidade_id, r.unidade_nome, r.pos AS alerta_pos, r.neg AS alerta_neg,
                 r.fonte, r.atualizado_em,
+                r.periodo_inicio::text AS periodo_inicio, r.dados_ate::text AS dados_ate,
                 count(*) OVER ()::int AS total
            FROM r
            JOIN colaboradores col ON col.id = r.colaborador_id

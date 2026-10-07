@@ -40,7 +40,15 @@ export type SecaoConfiguracoes = 'alertas' | 'atualizacao' | 'calendario'
 
 const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
 
-const CAMPOS_HORAS = ['teto_horas_pagas_minutos', 'alerta_saldo_positivo_minutos', 'alerta_saldo_negativo_minutos'] as const
+const CAMPOS_HORAS = [
+  'teto_horas_pagas_minutos',
+  'alerta_saldo_positivo_minutos',
+  'alerta_saldo_negativo_minutos',
+  'alerta_extra_dia_minutos',
+  'alerta_negativa_dia_minutos',
+] as const
+// limites diários: zero desliga o alerta e não passam de um dia
+const CAMPOS_DIA = new Set<string>(['alerta_extra_dia_minutos', 'alerta_negativa_dia_minutos'])
 const CAMPOS_CALENDARIO = ['dia_fechamento_mes', 'dias_apos_fechamento_mes', 'cota_calcular_por_hora'] as const
 
 const LIMITES_CALENDARIO: Record<(typeof CAMPOS_CALENDARIO)[number], [number, number]> = {
@@ -119,6 +127,22 @@ function quandoExtrai(dia: number, hora: string) {
   return `${artigo} ${nome} às ${hora.slice(0, 5)}`
 }
 
+/* A coleta do mês fechado é guardada como "dias após o fechamento" (0 a 10) e mostrada como dia do mês:
+   fechamento 25 + 1 = "Dia 26". Depois do dia 28 o dia muda conforme o mês, então aparece em dias. */
+const DIAS_APOS_MAX = LIMITES_CALENDARIO.dias_apos_fechamento_mes[1]
+
+function rotuloDiaColetaMes(diaFechamento: number, diasApos: number) {
+  if (diasApos === 0) return `Dia ${diaFechamento} (o próprio dia do fechamento)`
+  const dia = diaFechamento + diasApos
+  return dia <= 28 ? `Dia ${dia}` : `${diasApos} dias após o dia ${diaFechamento}`
+}
+
+/** "todo dia 26" / "3 dias após o dia 27". */
+function quandoColetaMes(diaFechamento: number, diasApos: number) {
+  const dia = diaFechamento + diasApos
+  return diasApos > 0 && dia <= 28 ? `todo dia ${dia}` : `${diasApos} dias após o dia ${diaFechamento}`
+}
+
 function nomeFuso(fuso: string) {
   return fuso === 'America/Sao_Paulo' ? 'Horário de Brasília.' : `Fuso ${fuso}.`
 }
@@ -136,6 +160,8 @@ function paraFormulario(config: Config): Formulario {
     teto_horas_pagas_minutos: minutosParaEntrada(config.teto_horas_pagas_minutos),
     alerta_saldo_positivo_minutos: minutosParaEntrada(config.alerta_saldo_positivo_minutos),
     alerta_saldo_negativo_minutos: minutosParaEntrada(config.alerta_saldo_negativo_minutos),
+    alerta_extra_dia_minutos: minutosParaEntrada(config.alerta_extra_dia_minutos),
+    alerta_negativa_dia_minutos: minutosParaEntrada(config.alerta_negativa_dia_minutos),
     teto_periodicidade: config.teto_periodicidade,
     origem_horas_pagas: config.origem_horas_pagas,
     modo_extracao: config.modo_extracao,
@@ -160,7 +186,9 @@ function validar(form: Formulario, original: Config, secao: SecaoConfiguracoes) 
     for (const campo of CAMPOS_HORAS) {
       const minutos = entradaParaMinutos(form[campo])
       if (minutos === null || minutos > 999 * 60 + 59) erros[campo] = 'Use o formato HH:MM (ex.: 10:30).'
-      else if (campo !== 'teto_horas_pagas_minutos' && minutos < 1) erros[campo] = 'Informe um limite maior que zero.'
+      else if (CAMPOS_DIA.has(campo) && minutos > 24 * 60) erros[campo] = 'Um dia tem no máximo 24:00.'
+      else if (campo !== 'teto_horas_pagas_minutos' && !CAMPOS_DIA.has(campo) && minutos < 1)
+        erros[campo] = 'Informe um limite maior que zero.'
       else if (minutos !== original[campo]) alteracoes[campo] = minutos
     }
     if (form.teto_periodicidade !== original.teto_periodicidade) alteracoes.teto_periodicidade = form.teto_periodicidade
@@ -175,6 +203,10 @@ function validar(form: Formulario, original: Config, secao: SecaoConfiguracoes) 
     }
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.hora_extracao)) erros.hora_extracao = 'Use HH:MM.'
     else if (form.hora_extracao !== original.hora_extracao.slice(0, 5)) alteracoes.hora_extracao = form.hora_extracao
+    const diasApos = Number(form.dias_apos_fechamento_mes)
+    if (!Number.isInteger(diasApos) || diasApos < 0 || diasApos > DIAS_APOS_MAX)
+      erros.dias_apos_fechamento_mes = 'Escolha um dia.'
+    else if (diasApos !== original.dias_apos_fechamento_mes) alteracoes.dias_apos_fechamento_mes = diasApos
   } else {
     for (const campo of CAMPOS_CALENDARIO) {
       const valor = Number(form[campo])
@@ -194,12 +226,15 @@ function usaTetoSemanal(config: Pick<Config, 'origem_horas_pagas' | 'teto_period
 
 function mensagemSalvo(secao: SecaoConfiguracoes, salva: Config, anterior: Config) {
   if (secao !== 'atualizacao') return TEXTOS[secao].salvo
+  const mes = quandoColetaMes(salva.dia_fechamento_mes, salva.dias_apos_fechamento_mes)
   if (salva.modo_extracao === 'tempo_real') {
     const descartadas =
-      anterior.modo_extracao !== 'tempo_real' ? ' As fotografias semanais que ainda não tinham começado foram descartadas.' : ''
-    return `Salvo. Tempo real ativo: os colaboradores são atualizados continuamente e o fechamento do mês (dia ${salva.dia_fechamento_mes}) é gravado às ${salva.hora_extracao.slice(0, 5)}.${descartadas}`
+      anterior.modo_extracao !== 'tempo_real'
+        ? ' As fotografias semanais que ainda não tinham começado foram descartadas.'
+        : ''
+    return `Salvo. Tempo real ativo: os colaboradores são atualizados continuamente e o fechamento do mês (dia ${salva.dia_fechamento_mes}) é gravado ${mes} às ${salva.hora_extracao.slice(0, 5)}.${descartadas}`
   }
-  return `Salvo. Os dados serão atualizados ${quandoExtrai(salva.dia_semana_extracao, salva.hora_extracao)}.`
+  return `Salvo. Os dados serão atualizados ${quandoExtrai(salva.dia_semana_extracao, salva.hora_extracao)} e o mês fechado é puxado ${mes}.`
 }
 
 export function Configuracoes({ secao }: { secao: SecaoConfiguracoes }) {
@@ -432,6 +467,50 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
           {campoHoras('alerta_saldo_positivo_minutos', 'Acima do limite a partir de', 'Horas sobrando no banco.', '+')}
         </div>
       </fieldset>
+
+      <fieldset className="config-bloco">
+        <legend className="sr-only">Limite diário</legend>
+        <div className="config-bloco-topo">
+          <span className="config-bloco-icone" aria-hidden="true">
+            <IconeRelogio tamanho={20} />
+          </span>
+          <div>
+            <h2 className="config-bloco-titulo">Limite diário</h2>
+            <p className="config-bloco-sub">
+              Alerta por colaborador quando, num mesmo dia, ele passar de tantas horas extras ou de tantas horas
+              negativas. Aparece em Colaboradores, com os dias marcados.
+            </p>
+          </div>
+        </div>
+
+        <div className="campos-grade">
+          {campoHoras('alerta_extra_dia_minutos', 'Extras no dia acima de', 'Formato HH:MM. 00:00 = sem alerta.', '+')}
+          {campoHoras(
+            'alerta_negativa_dia_minutos',
+            'Negativas no dia acima de',
+            'Faltas e atrasos. 00:00 = sem alerta.',
+            '−',
+          )}
+        </div>
+        {(() => {
+          const extraDia = entradaParaMinutos(form.alerta_extra_dia_minutos)
+          const negativaDia = entradaParaMinutos(form.alerta_negativa_dia_minutos)
+          const partes = [
+            extraDia ? `mais de ${formatarMinutos(extraDia)} extras` : null,
+            negativaDia ? `mais de ${formatarMinutos(negativaDia)} negativas` : null,
+          ].filter(Boolean)
+          return (
+            <p className="config-exemplo">
+              <IconeAlerta tamanho={18} />
+              <span>
+                {partes.length
+                  ? `Exemplo: o colaborador que fizer ${partes.join(' ou ')} num dia é alertado, com os dias em que isso aconteceu.`
+                  : 'Sem limite diário: nenhum dia é alertado.'}
+              </span>
+            </p>
+          )
+        })()}
+      </fieldset>
     </>
   )
 
@@ -475,8 +554,9 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
                 <span className="modo-opcao-desc">{descricao}</span>
                 {valor === 'tempo_real' && tetoSemanalBloqueia && (
                   <span className="modo-opcao-alerta">
-                    O teto de horas pagas está semanal, e ele depende da fotografia semanal. Antes de ativar o tempo real, mude
-                    a periodicidade do teto para mensal em <Link to="/configuracao/alertas">Alertas e horas pagas</Link>.
+                    O teto de horas pagas está semanal, e ele depende da fotografia semanal. Antes de ativar o tempo
+                    real, mude a periodicidade do teto para mensal em{' '}
+                    <Link to="/configuracao/alertas">Alertas e horas pagas</Link>.
                   </span>
                 )}
               </span>
@@ -492,11 +572,11 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
       </fieldset>
 
       <fieldset className="form-secao">
-        <legend>{tempoReal ? 'Fechamento do mês' : 'Dia e hora da atualização'}</legend>
+        <legend>{tempoReal ? 'Fechamento do mês' : 'Dias e hora da atualização'}</legend>
         <p className="form-nota">
           {tempoReal
-            ? `Sem fotografia semanal: os números são atualizados continuamente e o histórico passa a ser por dia. O fechamento do mês (dia ${config.dia_fechamento_mes}) continua sendo gravado como registro oficial.`
-            : 'Neste dia e hora os dados são puxados da FriPonto e publicados no painel. Deixe tempo para o RH ajustar o ponto antes.'}
+            ? `Sem fotografia semanal: os números são atualizados continuamente e o histórico passa a ser por dia. O fechamento do mês (dia ${config.dia_fechamento_mes}) continua sendo gravado como registro oficial, no dia do mês escolhido abaixo.`
+            : `Toda semana, no dia escolhido, os dados são puxados da FriPonto e publicados no painel. E uma vez por mês, no dia do mês escolhido, é puxado o mês fechado (até o dia ${config.dia_fechamento_mes}). Deixe tempo para o RH ajustar o ponto antes.`}
         </p>
         <div className="campos-grade">
           {!tempoReal && (
@@ -512,6 +592,25 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
               )}
             </Campo>
           )}
+          <Campo
+            rotulo="Dia do mês"
+            erro={erros.dias_apos_fechamento_mes}
+            ajuda={`Coleta do mês fechado no dia ${config.dia_fechamento_mes}.`}
+          >
+            {(props) => (
+              <select
+                {...props}
+                value={form.dias_apos_fechamento_mes}
+                onChange={(event) => alterar('dias_apos_fechamento_mes', event.target.value)}
+              >
+                {Array.from({ length: DIAS_APOS_MAX + 1 }, (_, diasApos) => (
+                  <option key={diasApos} value={diasApos}>
+                    {rotuloDiaColetaMes(config.dia_fechamento_mes, diasApos)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Campo>
           <Campo
             rotulo={tempoReal ? 'Horário da extração do fechamento do mês' : 'Hora'}
             erro={erros.hora_extracao}
@@ -532,9 +631,9 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
             <span>
               {estimativa.minutos_por_rodada != null ? (
                 <>
-                  Cada colaborador é atualizado a cada <strong>~{formatarIntervalo(estimativa.minutos_por_rodada)}</strong> (
-                  {estimativa.colaboradores} {estimativa.colaboradores === 1 ? 'colaborador' : 'colaboradores'}, cota da
-                  FriPonto).
+                  Cada colaborador é atualizado a cada{' '}
+                  <strong>~{formatarIntervalo(estimativa.minutos_por_rodada)}</strong> ({estimativa.colaboradores}{' '}
+                  {estimativa.colaboradores === 1 ? 'colaborador' : 'colaboradores'}, cota da FriPonto).
                 </>
               ) : (
                 'Ainda não há colaboradores cadastrados para estimar de quanto em quanto tempo cada um é atualizado.'
@@ -554,12 +653,12 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
     <fieldset className="form-secao">
       <legend>Régua de extração</legend>
       <p className="form-nota">
-        O modo de atualização (semanal ou tempo real) e o dia e a hora da extração ficam em{' '}
+        O modo de atualização (semanal ou tempo real), o dia da semana, o dia do mês e a hora da extração ficam em{' '}
         <Link to="/configuracao/atualizacao">Configuração → Atualização dos dados</Link>. Hoje:{' '}
         {config.modo_extracao === 'tempo_real'
           ? `tempo real, sem fotografia semanal (só o fechamento do mês, extraído às ${config.hora_extracao.slice(0, 5)})`
           : `semanal, com extração ${quandoExtrai(config.dia_semana_extracao, config.hora_extracao)}`}
-        .
+        {`, e o mês fechado é puxado ${quandoColetaMes(config.dia_fechamento_mes, config.dias_apos_fechamento_mes)}`}.
       </p>
       <div className="campos-grade">
         <Campo rotulo="Fuso horário" ajuda="Usado para o dia e a hora da extração.">

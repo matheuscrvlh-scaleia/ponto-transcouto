@@ -83,50 +83,73 @@ function lerHora(hora: string) {
 }
 
 /*
- * Régua: gatilho semanal em dia_semana_extracao/hora_extracao (fuso da config) com data_referencia = véspera do gatilho.
- * Se a semana de referência [gatilho−7, gatilho−1] contém o dia de fechamento, o ciclo vira 'fechamento_mes':
- * data_referencia = dia de fechamento, gatilho = fechamento + dias_apos_fechamento_mes. periodo_inicio = fechamento anterior + 1.
+ * Régua: duas coletas independentes.
+ * - Semanal: toda semana em dia_semana_extracao/hora_extracao (fuso da config), data_referencia = véspera do gatilho.
+ * - Fechamento do mês: data_referencia = dia de fechamento, gatilho = fechamento + dias_apos_fechamento_mes.
+ * periodo_inicio = fechamento anterior + 1. A semanal sai da régua quando repete a referência do fechamento ou quando
+ * já é do período novo mas rodaria antes do fechamento do período anterior (o saldo herdado ainda não estaria gravado).
  */
-export function cicloDaSemana(config: ConfigCalendario, diaGatilho: number): CicloPrevisto {
+function cicloSemanal(config: ConfigCalendario, diaGatilho: number): CicloPrevisto | null {
     const { hora, minuto } = lerHora(config.hora_extracao)
-    const fuso = config.fuso_horario
-    const referenciaSemanal = diaGatilho - 1
-    const fechamento = ultimoFechamentoAte(referenciaSemanal, config.dia_fechamento_mes)
+    const referencia = diaGatilho - 1
+    const inicio = inicioDoPeriodo(referencia, config.dia_fechamento_mes)
+    const fechamentoAnterior = inicio - 1
 
-    if (fechamento >= diaGatilho - 7) {
-        return {
-            tipo: 'fechamento_mes',
-            periodo_inicio: diaParaIso(inicioDoPeriodo(fechamento, config.dia_fechamento_mes)),
-            data_referencia: diaParaIso(fechamento),
-            gatilho_em: instanteLocal(fechamento + config.dias_apos_fechamento_mes, hora, minuto, fuso),
-        }
-    }
+    if (ultimoFechamentoAte(referencia, config.dia_fechamento_mes) === referencia) return null
+    if (diaGatilho < fechamentoAnterior + config.dias_apos_fechamento_mes) return null
 
     return {
         tipo: 'semanal',
-        periodo_inicio: diaParaIso(inicioDoPeriodo(referenciaSemanal, config.dia_fechamento_mes)),
-        data_referencia: diaParaIso(referenciaSemanal),
-        gatilho_em: instanteLocal(diaGatilho, hora, minuto, fuso),
+        periodo_inicio: diaParaIso(inicio),
+        data_referencia: diaParaIso(referencia),
+        gatilho_em: instanteLocal(diaGatilho, hora, minuto, config.fuso_horario),
+    }
+}
+
+function cicloDoFechamento(config: ConfigCalendario, fechamento: number): CicloPrevisto {
+    const { hora, minuto } = lerHora(config.hora_extracao)
+    return {
+        tipo: 'fechamento_mes',
+        periodo_inicio: diaParaIso(inicioDoPeriodo(fechamento, config.dia_fechamento_mes)),
+        data_referencia: diaParaIso(fechamento),
+        gatilho_em: instanteLocal(fechamento + config.dias_apos_fechamento_mes, hora, minuto, config.fuso_horario),
     }
 }
 
 export function proximosCiclos(config: ConfigCalendario, aPartirDe: Date, quantidade: number): CicloPrevisto[] {
     if (quantidade <= 0) return []
 
+    const ciclos: CicloPrevisto[] = []
+
+    // semanais até ter `quantidade` a partir de aPartirDe (mais as que caem fora por coincidir com o fechamento)
     let gatilho = dataLocal(aPartirDe, config.fuso_horario) - 14
     while (diaDaSemana(gatilho) !== config.dia_semana_extracao) gatilho++
-
-    const ciclos: CicloPrevisto[] = []
-    // O gatilho do fechamento pode passar do semanal seguinte (dias_apos grande): gera 2 semanas a mais e ordena.
-    let semanasExtras = 0
-    while (semanasExtras < 2) {
-        const ciclo = cicloDaSemana(config, gatilho)
-        if (ciclo.gatilho_em.getTime() >= aPartirDe.getTime()) ciclos.push(ciclo)
-        if (ciclos.length >= quantidade) semanasExtras++
+    let semanais = 0
+    let ultimoGatilho = gatilho
+    while (semanais < quantidade) {
+        const ciclo = cicloSemanal(config, gatilho)
+        if (ciclo && ciclo.gatilho_em.getTime() >= aPartirDe.getTime()) {
+            ciclos.push(ciclo)
+            semanais++
+        }
+        ultimoGatilho = gatilho
         gatilho += 7
     }
 
-    return ciclos.sort((a, b) => a.gatilho_em.getTime() - b.gatilho_em.getTime()).slice(0, quantidade)
+    // fechamentos que disparam até a última semanal gerada: cobrem tudo o que pode entrar nos `quantidade` primeiros
+    const inicio = dataLocal(aPartirDe, config.fuso_horario) - 15
+    let fechamento = ultimoFechamentoAte(inicio, config.dia_fechamento_mes)
+    while (fechamento + config.dias_apos_fechamento_mes <= ultimoGatilho) {
+        const ciclo = cicloDoFechamento(config, fechamento)
+        if (ciclo.gatilho_em.getTime() >= aPartirDe.getTime()) ciclos.push(ciclo)
+        const { ano, mes } = partes(fechamento)
+        fechamento = dia(ano, mes + 1, config.dia_fechamento_mes)
+    }
+
+    // mesmo horário: a referência mais antiga primeiro (o fechamento antes da semanal do período novo)
+    return ciclos
+        .sort((a, b) => a.gatilho_em.getTime() - b.gatilho_em.getTime() || a.data_referencia.localeCompare(b.data_referencia))
+        .slice(0, quantidade)
 }
 
 // Para telas: fuso inválido no banco não derruba a resposta, só deixa a previsão vazia.

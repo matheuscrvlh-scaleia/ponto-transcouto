@@ -29,8 +29,18 @@ let chamadas: Chamada[]
 let totaisPorCpf: Map<string, Array<{ status: number, corpo?: unknown }>>
 
 const colunas = ['Data', 'Normais', 'Ex50%', 'Ex100%', 'Faltas', 'Atras.', 'BSaldo']
-const resposta = (ex50: string, ex100: string, faltas: string, atrasos: string) =>
-    ({ status: 200, corpo: { Colunas: colunas, Totais: ['', '176:00', ex50, ex100, faltas, atrasos, '99:00'] } })
+// Calcular completa: os totais e as linhas por dia (aqui tudo cai em 01/09, mais um dia vazio)
+const resposta = (ex50: string, ex100: string, faltas: string, atrasos: string) => ({
+    status: 200,
+    corpo: {
+        Colunas: colunas,
+        Linhas: [
+            { Key: '2026-09-01T00:00:00', Value: ['01/09/2026 - Ter', '08:00', ex50, ex100, faltas, atrasos, null] },
+            { Key: '2026-09-02T00:00:00', Value: ['02/09/2026 - Qua', '08:00', '', '', '', '', null] },
+        ],
+        Totais: ['', '176:00', ex50, ex100, faltas, atrasos, '99:00'],
+    },
+})
 
 function json(status: number, corpo?: unknown) {
     return new Response(corpo === undefined ? null : JSON.stringify(corpo), {
@@ -61,7 +71,7 @@ async function fetchFalso(entrada: string | URL | Request, init?: RequestInit) {
             { Id: 13, Nome: 'Demitido', Cpf: '153.509.460-56', EmpresaCnpjCpf: '12345678000190', Admissao: '2019-01-01', Demissao: '2026-01-10T00:00:00' },
         ])
     }
-    if (metodo === 'POST' && url.endsWith('/IntegracaoExterna/Calcular/SomenteTotais')) {
+    if (metodo === 'POST' && url.endsWith('/IntegracaoExterna/Calcular')) {
         const cpf = (corpo as { FuncionarioCpf: string }).FuncionarioCpf
         const fila = totaisPorCpf.get(cpf) ?? []
         const proxima = fila.length > 1 ? fila.shift()! : fila[0]
@@ -87,7 +97,7 @@ async function criarCiclo(tipo: string, periodoInicio: string, dataReferencia: s
 }
 
 const processar = () => processarProximoFechamento({ log: logSilencioso, ex: client, opcoesCliente: { backoffMs: 1 } })
-const chamadasCalcular = () => chamadas.filter(c => c.url.endsWith('Calcular/SomenteTotais'))
+const chamadasCalcular = () => chamadas.filter(c => c.url.endsWith('/Calcular'))
 
 /** Sincroniza e deixa a unidade B fora do painel (desativada): os cenários usam só a unidade A. */
 async function sincronizarSoUnidadeA() {
@@ -230,13 +240,23 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
         })
         expect(ana1.dados_brutos).toEqual({ colunas, totais: ['', '176:00', '12:30', '02:00', '08:00', '00:45', '99:00'] })
 
+        // horas por dia pelo mesmo mapeamento: a soma dos dias bate com o período
+        const diasAna = (await client.query(
+            `SELECT hd.dia::text, hd.extra_min, hd.negativa_min FROM horas_dia hd
+               JOIN colaboradores c ON c.id = hd.colaborador_id WHERE c.cpf = $1 ORDER BY hd.dia`, [CPF_ANA],
+        )).rows
+        expect(diasAna).toEqual([
+            { dia: '2026-09-01', extra_min: 870, negativa_min: 525 },
+            { dia: '2026-09-02', extra_min: 0, negativa_min: 0 },
+        ])
+
         const calc = chamadasCalcular()
         expect(calc).toHaveLength(3)
         expect(calc[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-08-26', DataFinal: '2026-09-15' })
         expect(calc[0].headers).toMatchObject({ Authorization: 'Bearer token-falso', secullumidbancoselecionado: bancoId })
 
         const cota = (await client.query(
-            `SELECT http_status FROM chamadas_api WHERE empresa_id = $1 AND rota = 'Calcular/SomenteTotais' ORDER BY id`,
+            `SELECT http_status FROM chamadas_api WHERE empresa_id = $1 AND rota = 'Calcular' ORDER BY id`,
             [empresaId],
         )).rows.map(r => r.http_status)
         expect(cota).toEqual([200, 503, 200])
@@ -348,7 +368,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
         const esperados = proximosCiclos(config, new Date(agora.getTime() - 2 * 86400000), 6)
             .filter(c => c.gatilho_em.getTime() <= agora.getTime() + 14 * 86400000)
         expect(ciclosCriados).toBeGreaterThanOrEqual(esperados.length)
-        expect(esperados.map(c => c.data_referencia)).toEqual(['2026-10-06', '2026-10-13'])
+        expect(esperados.map(c => c.data_referencia)).toEqual(['2026-09-29', '2026-10-06', '2026-10-13'])
 
         const linhas = (await client.query(
             `SELECT c.tipo, c.data_referencia::text, count(f.id)::int AS fechamentos
@@ -356,6 +376,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
               WHERE c.empresa_id = $1 GROUP BY c.id ORDER BY c.data_referencia`, [empresaId],
         )).rows
         expect(linhas).toEqual([
+            { tipo: 'semanal', data_referencia: '2026-09-29', fechamentos: 1 },
             { tipo: 'semanal', data_referencia: '2026-10-06', fechamentos: 1 },
             { tipo: 'semanal', data_referencia: '2026-10-13', fechamentos: 1 },
         ])
@@ -492,7 +513,7 @@ describe('tempo real (transação desfeita)', () => {
         // a chamada conta na cota da empresa, sem execução vinculada
         const cota = await um<{ total: number }>(
             `SELECT count(*)::int AS total FROM chamadas_api
-              WHERE empresa_id = $1 AND rota = 'Calcular/SomenteTotais' AND execucao_id IS NULL`,
+              WHERE empresa_id = $1 AND rota = 'Calcular' AND execucao_id IS NULL`,
             [empresaId],
         )
         expect(cota.total).toBe(2)

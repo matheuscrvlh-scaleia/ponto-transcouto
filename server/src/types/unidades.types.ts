@@ -68,6 +68,9 @@ export type LinhaDashboardGeral = LinhaDashboard & {
     /** de onde veio o número: valor ao vivo ou o último fechamento publicado */
     fonte: 'tempo_real' | 'fechamento'
     atualizado_em: Date | null
+    /** período dos números da linha: os dias de horas_dia nesse intervalo somam o mesmo */
+    periodo_inicio: string
+    dados_ate: string
 }
 
 export type ResumoDashboard = {

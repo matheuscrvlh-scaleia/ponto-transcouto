@@ -1,6 +1,7 @@
 import { db, type Executor } from '../db/database'
 import type { CicloPrevisto, ConfigCalendario } from '../services/calendario.service'
 import type { ItemMapeamento, RegistroBase, ValoresRegistro } from '../services/calculo-horas.service'
+import { ROTAS_DA_COTA } from '../integrations/secullum/cliente'
 import type { TotaisSecullum } from '../integrations/secullum/tipos'
 
 export type EmpresaRegua = ConfigCalendario & { empresa_id: number; modo_extracao: 'semanal' | 'tempo_real' }
@@ -229,12 +230,12 @@ export async function travarEmpresa(empresaId: number, ex: Executor) {
     await ex.query('SELECT id FROM empresas WHERE id = $1 FOR UPDATE', [empresaId])
 }
 
-export async function chamadasNaUltimaHora(empresaId: number, rota: string, ex: Executor = db) {
+export async function chamadasNaUltimaHora(empresaId: number, ex: Executor = db) {
     const result = await ex.query<{ total: number, mais_antiga: Date | null }>(
         `SELECT count(*)::int AS total, min(feita_em) AS mais_antiga
            FROM chamadas_api
-          WHERE empresa_id = $1 AND rota = $2 AND feita_em > now() - interval '1 hour'`,
-        [empresaId, rota],
+          WHERE empresa_id = $1 AND rota = ANY($2::text[]) AND feita_em > now() - interval '1 hour'`,
+        [empresaId, ROTAS_DA_COTA],
     )
     return result.rows[0]
 }

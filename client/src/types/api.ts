@@ -134,6 +134,42 @@ export interface LinhaDashboard {
   fonte: FonteDados
   /** Hora da atualização ao vivo (com fonte 'tempo_real'). */
   atualizado_em: DataHoraISO | null
+  /** Período dos números da linha: os dias desse intervalo somam o mesmo. */
+  periodo_inicio: DataISO
+  dados_ate: DataISO
+}
+
+/** Resposta de GET /horas-dia: extras e negativas somadas por colaborador num intervalo. */
+export interface HorasNoIntervalo {
+  de: DataISO
+  ate: DataISO
+  /** Último dia com horas gravadas até `ate` (null: nenhum). */
+  dados_ate: DataISO | null
+  colaboradores: {
+    id: number
+    extra_min: Minutos
+    negativa_min: Minutos
+    /** Dias que passaram do limite diário da empresa. */
+    dias_extra_acima: number
+    dias_negativa_acima: number
+  }[]
+}
+
+/** Resposta de GET /colaboradores/:id/dias. */
+export interface DiasColaborador {
+  de: DataISO
+  ate: DataISO
+  /** 0 = sem alerta diário. */
+  limites: { extra_dia: Minutos; negativa_dia: Minutos }
+  dias: {
+    dia: DataISO
+    extra_min: Minutos
+    negativa_min: Minutos
+    /** Entradas e saídas do dia ("09:33"). */
+    marcacoes: string[]
+    extra_acima: boolean
+    negativa_acima: boolean
+  }[]
 }
 
 export interface FechamentoPublicado {
@@ -397,6 +433,9 @@ export interface Configuracoes {
   teto_periodicidade: 'semanal' | 'mensal'
   alerta_saldo_positivo_minutos: Minutos
   alerta_saldo_negativo_minutos: Minutos
+  /** Limites diários: passou disso num dia, o dia é marcado. 0 = sem alerta. */
+  alerta_extra_dia_minutos: Minutos
+  alerta_negativa_dia_minutos: Minutos
   fuso_horario: string
   cota_calcular_por_hora: number
   atualizado_em: DataHoraISO

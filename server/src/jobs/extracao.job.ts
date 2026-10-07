@@ -1,6 +1,6 @@
 import { db, withTransaction, type Executor } from '../db/database'
-import { calcularTotais } from '../integrations/secullum/calculo'
-import { ROTA_TOTAIS, type ClienteSecullum } from '../integrations/secullum/cliente'
+import { calcularPeriodo } from '../integrations/secullum/calculo'
+import { ROTA_CALCULO, type ClienteSecullum } from '../integrations/secullum/cliente'
 import { SecullumError, type OpcoesCliente, type TotaisSecullum } from '../integrations/secullum/tipos'
 import {
     buscarConfigExtracao,
@@ -28,8 +28,10 @@ import {
     type EtapaErro,
     type FechamentoReivindicado,
 } from '../models/extracao.models'
+import { gravarDias } from '../models/horas-dia.models'
 import { buscarCredenciais, registrarChamadaApi } from '../models/sincronizacao.models'
 import { calcularHoras, mensagensErroMapeamento, type ItemMapeamento, type RegraPagas } from '../services/calculo-horas.service'
+import { diasOuNada } from '../services/horas-dia.service'
 import { decidirPublicacao } from '../services/publicacao.service'
 import { clienteDaEmpresa } from './cliente-empresa'
 import type { Log } from './log'
@@ -51,7 +53,7 @@ type Desfecho =
 
 class CotaEsgotada extends Error {
     constructor(public liberaEm: Date) {
-        super(`Cota de ${ROTA_TOTAIS} esgotada até ${liberaEm.toISOString()}.`)
+        super(`Cota de ${ROTA_CALCULO} esgotada até ${liberaEm.toISOString()}.`)
     }
 }
 
@@ -60,12 +62,12 @@ const UMA_HORA_MS = 60 * 60 * 1000
 async function reservarCota(empresaId: number, execucaoId: number, cota: number, ex: Executor) {
     return withTransaction(async client => {
         await travarEmpresa(empresaId, client)
-        const uso = await chamadasNaUltimaHora(empresaId, ROTA_TOTAIS, client)
+        const uso = await chamadasNaUltimaHora(empresaId, client)
         if (uso.total >= cota) {
             const base = uso.mais_antiga ? new Date(uso.mais_antiga).getTime() : Date.now()
             throw new CotaEsgotada(new Date(base + UMA_HORA_MS + 1000))
         }
-        return reservarChamada(empresaId, execucaoId, ROTA_TOTAIS, client)
+        return reservarChamada(empresaId, execucaoId, ROTA_CALCULO, client)
     }, ex)
 }
 
@@ -86,10 +88,10 @@ function prepararCliente(ctx: Contexto, credenciais: NonNullable<Awaited<ReturnT
         ...ctx.op.opcoesCliente,
         ganchos: {
             antes: async rota => {
-                if (rota === ROTA_TOTAIS) reserva = await reservarCota(ctx.f.empresa_id, ctx.execucaoId, cota, ctx.ex)
+                if (rota === ROTA_CALCULO) reserva = await reservarCota(ctx.f.empresa_id, ctx.execucaoId, cota, ctx.ex)
             },
             depois: async (rota, status, duracaoMs) => {
-                if (rota === ROTA_TOTAIS && reserva) {
+                if (rota === ROTA_CALCULO && reserva) {
                     await concluirChamada(reserva, status, duracaoMs, ctx.ex)
                     reserva = null
                 } else {
@@ -104,7 +106,7 @@ async function calcularColaborador(
     ctx: Contexto, cliente: ClienteSecullum, col: ColaboradorElegivel,
 ): Promise<{ dados: TotaisSecullum } | { comErro: true } | { demitido: true } | { desfecho: Desfecho }> {
     try {
-        const dados = await calcularTotais(cliente, {
+        const dados = await calcularPeriodo(cliente, {
             cpf: col.cpf,
             dataInicial: ctx.f.periodo_inicio,
             dataFinal: ctx.f.data_referencia,
@@ -197,9 +199,14 @@ async function extrairColaboradores(ctx: Contexto, pendentes: ColaboradorElegive
             return { tipo: 'abortado', fatal: true, mensagem: 'Erro de mapeamento de colunas do Secullum.' }
         }
 
+        const dias = diasOuNada(chamada.dados, mapeamento, (mensagem) => ctx.op.log.erro(`fechamento ${f.id}, colaborador ${col.id}: ${mensagem}`))
         try {
             const valores = resultado.valores
-            await withTransaction(client => gravarRegistro(f.id, col.id, valores, chamada.dados, client), ex)
+            const alvoDias = { colaboradorId: col.id, empresaId: f.empresa_id, unidadeId: f.unidade_id, de: f.periodo_inicio, ate: f.data_referencia }
+            await withTransaction(async client => {
+                await gravarRegistro(f.id, col.id, valores, chamada.dados, client)
+                await gravarDias(alvoDias, dias, client)
+            }, ex)
             await somarProgresso(ctx.execucaoId, 1, 0, ex)
         } catch (err) {
             await erro(ctx, 'gravacao', (err as Error).message, col.id)

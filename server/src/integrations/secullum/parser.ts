@@ -1,9 +1,13 @@
 import { horasParaMinutos } from '../../utils/minutos'
 import { normalizarChaves } from './normalizar'
-import { SecullumError, type TotaisSecullum } from './tipos'
+import { SecullumError, type DiaSecullum, type TotaisSecullum } from './tipos'
 
 const COLUNAS_SEM_HORAS = new Set(['data', 'dia', 'datas'])
 const COLUNA_DE_BATIDA = /^(entrada|sa[ií]da)\s*\d+$/i
+
+export function colunaDeBatida(coluna: string) {
+    return COLUNA_DE_BATIDA.test(coluna.trim())
+}
 
 export function colunaInformativa(coluna: string) {
     const nome = coluna.trim()
@@ -22,8 +26,23 @@ export function lerTotais(resposta: unknown): TotaisSecullum {
     }
     return {
         colunas: colunas.map(c => String(c ?? '').trim()),
-        totais: totais.map(t => (t === null || t === undefined ? '' : String(t))),
+        totais: totais.map(texto),
+        ...(Array.isArray(dados.linhas) && { dias: lerDias(dados.linhas, colunas.length) }),
     }
+}
+
+const texto = (valor: unknown) => (valor === null || valor === undefined ? '' : String(valor))
+
+// Linhas: [{ Key: "2026-09-28T00:00:00", Value: ["28/09/2026 - Seg", "09:33", ..., "02:04", ...] }]
+function lerDias(linhas: unknown[], quantidadeColunas: number): DiaSecullum[] {
+    return linhas.map(linha => {
+        const { key, value } = normalizarChaves(linha)
+        const dia = /^(\d{4}-\d{2}-\d{2})/.exec(String(key ?? ''))?.[1]
+        if (!dia || !Array.isArray(value) || value.length !== quantidadeColunas) {
+            throw new SecullumError(`Secullum Calcular: linha do dia "${String(key)}" fora do formato.`, 'formato')
+        }
+        return { dia, valores: value.map(texto) }
+    })
 }
 
 // Aceita "08:48", "125:30", "-03:15", "03:15-" (sinal no fim) e vazio. Centesimal ("8,80") é recusado.
