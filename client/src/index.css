@@ -1075,6 +1075,24 @@ tr.linha-negativo {
   fill: var(--negativo);
 }
 
+.grafico-barra-conferir {
+  fill: var(--aviso);
+}
+
+/* limites do banco: linhas tracejadas com o valor ao lado */
+.grafico-limite {
+  stroke: var(--aviso);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.8;
+}
+
+.grafico-limite-rotulo {
+  font-size: 10px;
+  fill: var(--aviso);
+  font-variant-numeric: tabular-nums;
+}
+
 .grafico-legenda {
   margin-top: 6px;
   font-size: 13px;

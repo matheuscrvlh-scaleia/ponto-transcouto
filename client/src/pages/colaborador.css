@@ -1,0 +1,460 @@
+/* ---------- Perfil do colaborador ---------- */
+
+/* topo: identidade à esquerda, banco acumulado à direita */
+.perfil-topo {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 32px;
+}
+
+.perfil-identidade {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.perfil-avatar {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent-contrast);
+  background: linear-gradient(140deg, var(--destaque-de), var(--destaque-ate));
+}
+
+.perfil-identidade-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.perfil-nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.perfil-cargo {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.perfil-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.perfil-acao {
+  width: auto;
+  min-height: 36px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.perfil-banco {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: var(--muted);
+  text-align: right;
+}
+
+.perfil-banco-rotulo {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text);
+}
+
+.perfil-banco-valor {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.perfil-banco-ref,
+.perfil-banco-pagas {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.perfil-filtro {
+  margin-top: 4px;
+}
+
+/* ----- números do intervalo ----- */
+
+.perfil-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.perfil-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--app-borda);
+  border-radius: var(--raio-card);
+  box-shadow: var(--sombra-suave);
+}
+
+.perfil-kpi-rotulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.perfil-kpi-icone {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-suave);
+}
+
+.perfil-kpi.positivo .perfil-kpi-icone {
+  color: var(--positivo);
+  background: var(--positivo-bg);
+}
+
+.perfil-kpi.negativo .perfil-kpi-icone {
+  color: var(--negativo);
+  background: var(--negativo-bg);
+}
+
+.perfil-kpi.aviso .perfil-kpi-icone {
+  color: var(--aviso);
+  background: var(--aviso-bg);
+}
+
+.perfil-kpi-valor {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.perfil-kpi-detalhe {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.perfil-kpi.aviso .perfil-kpi-detalhe {
+  color: var(--aviso);
+  font-weight: 600;
+}
+
+/* ----- gráfico por dia ----- */
+
+.perfil-legenda {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.perfil-legenda span::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.perfil-legenda-mais::before {
+  background: var(--positivo);
+}
+
+.perfil-legenda-menos::before {
+  background: var(--negativo);
+}
+
+.perfil-grafico {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 180px;
+  margin-top: 12px;
+  padding-bottom: 18px;
+  position: relative;
+}
+
+/* linha do zero */
+.perfil-grafico::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc((100% - 18px) / 2);
+  border-top: 1px solid var(--border);
+}
+
+.perfil-grafico-dia {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+}
+
+.perfil-grafico-dia:hover {
+  background: var(--muted);
+}
+
+.perfil-grafico-dia.conferir {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--aviso-bg) 6px 12px);
+}
+
+.perfil-grafico-metade {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.perfil-grafico-metade.cima {
+  align-items: flex-end;
+}
+
+.perfil-grafico-metade.baixo {
+  align-items: flex-start;
+}
+
+.perfil-barra {
+  width: min(70%, 22px);
+  min-height: 2px;
+}
+
+.perfil-barra.mais {
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--destaque-de), var(--positivo));
+}
+
+.perfil-barra.menos {
+  border-radius: 0 0 4px 4px;
+  background: var(--negativo);
+  opacity: 0.85;
+}
+
+.perfil-barra.acima {
+  box-shadow: 0 0 0 2px var(--aviso-border);
+}
+
+.perfil-grafico-rotulo {
+  position: absolute;
+  bottom: -18px;
+  left: 0;
+  right: 0;
+  font-size: 10px;
+  text-align: center;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- abas ----- */
+
+.perfil-abas-card {
+  gap: 14px;
+}
+
+.perfil-dias-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.perfil-alternar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.perfil-tabela-dias td,
+.perfil-tabela-dias th {
+  vertical-align: middle;
+}
+
+.perfil-tabela-dias tbody tr:hover {
+  background: var(--muted);
+}
+
+.perfil-tabela-dias tr.dia-acima {
+  background: color-mix(in srgb, var(--aviso-bg) 60%, transparent);
+}
+
+.perfil-tabela-dias tr.conferir {
+  background: var(--aviso-bg);
+}
+
+.perfil-dia {
+  white-space: nowrap;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.perfil-dia-semana {
+  display: inline-block;
+  min-width: 30px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.perfil-dia-data {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.perfil-sem-calculo {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* batidas em colunas: a 1ª entrada de todos os dias fica uma embaixo da outra */
+.perfil-batidas {
+  display: inline-grid;
+  gap: 4px;
+}
+
+.perfil-batida {
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.perfil-batida.entrada {
+  color: var(--positivo);
+  background: var(--positivo-bg);
+}
+
+.perfil-batida.saida {
+  color: var(--text-h);
+  background: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.perfil-batida.texto {
+  color: var(--aviso);
+  background: var(--aviso-bg);
+}
+
+.perfil-tabela-dias .forte.texto-aviso {
+  font-weight: 700;
+  color: var(--aviso);
+}
+
+.perfil-alertas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.perfil-conferir {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--aviso);
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-border);
+  white-space: nowrap;
+  cursor: help;
+}
+
+.perfil-tabela-dias tfoot th,
+.perfil-tabela-dias tfoot td {
+  font-weight: 700;
+  color: var(--text-h);
+  text-transform: none;
+  letter-spacing: 0;
+  border-top: 1px solid var(--border);
+}
+
+.perfil-nota {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.perfil-inclusao {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.perfil-historico > * {
+  box-shadow: none;
+  border: none;
+  padding: 0;
+}
+
+@media (max-width: 1100px) {
+  .perfil-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .perfil-banco {
+    align-items: flex-start;
+    text-align: left;
+    width: 100%;
+  }
+
+  .perfil-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .perfil-grafico {
+    height: 140px;
+  }
+}

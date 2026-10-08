@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { Carregando, ErroCarregamento, EstadoVazio } from '../components/Estados'
 import { GraficoDias, GraficoSemanas } from '../components/GraficoSemanas'
+import { FiltroPeriodo } from '../components/FiltroPeriodo'
 import { Horas } from '../components/Horas'
 import { IndicadorCurva } from '../components/IndicadorCurva'
 import { SeloTempoReal } from '../components/SeloTempoReal'
@@ -15,10 +16,14 @@ import {
   formatarHoraOuData,
   formatarMinutos,
   hojeISO,
+  iniciais,
+  somarDias,
 } from '../lib/formato'
+import { useIntervaloDaUrl } from '../lib/intervalo'
 import { useRecurso } from '../lib/useRecurso'
 import type { ColaboradorDetalhe, DiaHistorico, Minutos, SemanaHistorico } from '../types/api'
 import { TituloPagina } from '../components/TituloPagina'
+import { PerfilIntervalo } from './PerfilIntervalo'
 import { alertarFalha } from '../lib/alertas'
 
 const LIMITE_HISTORICO = 26
@@ -86,10 +91,12 @@ export function DetalheColaborador() {
   )
 
   useEffect(() => {
-    document.title = dados ? `${dados.colaborador.nome} — Copiloto de Ponto` : 'Copiloto de Ponto'
+    document.title = dados ? `${dados.colaborador.nome} Copiloto de Ponto` : 'Copiloto de Ponto'
   }, [dados])
 
   const origem = (location.state as { de?: string } | null)?.de
+  // datas na URL: o filtro de período do perfil (mesmo do Dashboard e de Colaboradores)
+  const periodo = useIntervaloDaUrl()
 
   if (carregando) return <Carregando texto="Carregando colaborador..." />
   if (erro || !dados) return erro ? <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} /> : null
@@ -98,6 +105,11 @@ export function DetalheColaborador() {
   const tempoReal = colaborador.modo_extracao === 'tempo_real'
   const voltarPara = origem ?? `/unidades/${unidadeId ?? colaborador.unidade.id}`
   const aoVivo = colaborador.resumo?.fonte === 'tempo_real'
+  const hoje = hojeISO()
+  const intervalo = periodo.escolhido ??
+    (colaborador.resumo
+      ? { de: colaborador.resumo.periodo_inicio, ate: colaborador.resumo.data_referencia }
+      : { de: somarDias(hoje, -29), ate: hoje })
 
   return (
     <section className="pagina">
@@ -114,75 +126,68 @@ export function DetalheColaborador() {
         </p>
       </div>
 
-      <header className="detalhe-header">
-        <div>
-          <TituloPagina>
-            {colaborador.nome}
-            {colaborador.ativo === false && <span className="badge badge-neutral badge-titulo">Inativo</span>}
-          </TituloPagina>
-          <p className="pagina-sub">{[colaborador.unidade.nome, colaborador.funcao].filter(Boolean).join(' · ')}</p>
-          <Link to={`/batidas?colaborador=${colaborador.id}`} className="btn-link detalhe-link-batidas nao-imprimir">
-            Ver batidas de ponto →
-          </Link>
-          <ExportarHistorico colaborador={colaborador} />
+      <header className="dash-card perfil-topo">
+        <TituloPagina>{colaborador.nome}</TituloPagina>
+        <div className="perfil-identidade">
+          <span className="avatar perfil-avatar" aria-hidden="true">
+            {iniciais(colaborador.nome)}
+          </span>
+          <div className="perfil-identidade-texto">
+            <h2 className="perfil-nome">
+              {colaborador.nome}
+              {colaborador.ativo === false && <span className="badge badge-neutral badge-titulo">Inativo</span>}
+            </h2>
+            <p className="perfil-cargo">{[colaborador.funcao, colaborador.unidade.nome].filter(Boolean).join(' · ')}</p>
+            <div className="perfil-acoes nao-imprimir">
+              <Link to={`/batidas?colaborador=${colaborador.id}`} className="btn-secondary perfil-acao">
+                Ver no log de batidas
+              </Link>
+              <ExportarHistorico colaborador={colaborador} />
+            </div>
+          </div>
         </div>
+
         {colaborador.resumo && (
-          <div className="detalhe-saldo">
-            <span className="detalhe-saldo-rotulo">Banco acumulado atual</span>
-            <Horas minutos={colaborador.resumo.saldo_min} sinal destacar className="detalhe-saldo-valor" />
-            <span className="detalhe-saldo-ref">
+          <div className="perfil-banco">
+            <span className="perfil-banco-rotulo">Banco acumulado atual</span>
+            <Horas minutos={colaborador.resumo.saldo_min} sinal destacar className="perfil-banco-valor" />
+            <span className="perfil-banco-ref">
               {aoVivo && (
                 <>
                   <SeloTempoReal />{' '}
                 </>
               )}
               {referenciaResumo(colaborador.resumo, tempoReal)}
-              {colaborador.fora_da_curva && (
-                <>
-                  {' '}
-                  <IndicadorCurva
-                    valor={colaborador.fora_da_curva}
-                    limite={
-                      colaborador.fora_da_curva === 'positivo'
-                        ? colaborador.limites.alerta_pos
-                        : colaborador.limites.alerta_neg
-                    }
-                  />
-                </>
-              )}
+            </span>
+            {colaborador.fora_da_curva && (
+              <IndicadorCurva
+                valor={colaborador.fora_da_curva}
+                limite={colaborador.fora_da_curva === 'positivo' ? colaborador.limites.alerta_pos : colaborador.limites.alerta_neg}
+                pilula
+              />
+            )}
+            <span className="perfil-banco-pagas">
+              Pagas no período: <Horas minutos={colaborador.resumo.pagas_min} className="forte" />
             </span>
           </div>
         )}
       </header>
 
-      {colaborador.resumo && (
-        <dl className="kpis kpis-3">
-          <div className="kpi">
-            <dt>Extras no período</dt>
-            <dd>
-              <Horas minutos={colaborador.resumo.extra_min} />
-            </dd>
-          </div>
-          <div className="kpi">
-            <dt>Negativas no período</dt>
-            <dd>
-              <Horas minutos={colaborador.resumo.negativa_min} />
-            </dd>
-          </div>
-          <div className="kpi">
-            <dt>Pagas no período</dt>
-            <dd>
-              <Horas minutos={colaborador.resumo.pagas_min} />
-            </dd>
-          </div>
-        </dl>
-      )}
+      <div className="perfil-filtro nao-imprimir">
+        <FiltroPeriodo escolhido={periodo.escolhido} de={periodo.deParam} ate={periodo.ateParam} onMudar={periodo.mudar} />
+      </div>
 
-      {tempoReal ? (
-        <HistoricoTempoReal nome={colaborador.nome} diario={dados.diario} historico={dados.historico} />
-      ) : (
-        <HistoricoSemanal nome={colaborador.nome} historico={dados.historico} />
-      )}
+      <PerfilIntervalo
+        colaboradorId={colaborador.id}
+        intervalo={intervalo}
+        historico={
+          tempoReal ? (
+            <HistoricoTempoReal nome={colaborador.nome} diario={dados.diario} historico={dados.historico} />
+          ) : (
+            <HistoricoSemanal nome={colaborador.nome} historico={dados.historico} />
+          )
+        }
+      />
     </section>
   )
 }

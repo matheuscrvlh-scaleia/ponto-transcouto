@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { detalhe, dias, historico, historicoDiario } from '../controllers/colaboradores.controllers'
+import { detalhe, dias, diasDetalhe, historico, historicoDiario } from '../controllers/colaboradores.controllers'
 import { authenticate, exigirTela } from '../middlewares/auth.middlewares'
 
 export async function colaboradoresRoutes(app: FastifyInstance) {
@@ -9,4 +9,5 @@ export async function colaboradoresRoutes(app: FastifyInstance) {
     app.get('/colaboradores/:id/historico', acesso, historico)
     app.get('/colaboradores/:id/historico-diario', acesso, historicoDiario)
     app.get('/colaboradores/:id/dias', acesso, dias)
+    app.get('/colaboradores/:id/dias-detalhe', acesso, diasDetalhe)
 }

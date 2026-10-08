@@ -1,18 +1,19 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
 import { Carregando, ErroCarregamento, EstadoVazio } from '../components/Estados'
 import { Horas } from '../components/Horas'
-import { IconeRelogio } from '../components/Icones'
+import { IconeRelogio, IconeSeletor, IconeUnidade } from '../components/Icones'
 import { IndicadorCurva } from '../components/IndicadorCurva'
 import { SeloTempoReal } from '../components/SeloTempoReal'
-import { DiasColaborador } from './DiasColaborador'
+import { DiasColaborador, DiasColaboradorLinhas } from './DiasColaborador'
 import { RelatorioColaboradores } from './RelatorioColaboradores'
 import { baixarCsv, imprimirComoPdf, minutosCsv, paraNomeArquivo, type CelulaCsv } from '../lib/exportar'
+import { BarraFiltros, BuscaFiltro, LinhaFiltros, Segmentado, SelecaoFiltro } from '../components/BarraFiltros'
 import { FiltroPeriodo } from '../components/FiltroPeriodo'
 import { formatarData, formatarDataHora, hojeISO, iniciais, normalizarBusca } from '../lib/formato'
-import { textoAlemDosDados, textoDoIntervalo, useHorasNoIntervalo } from '../lib/intervalo'
+import { textoDoIntervalo, useHorasNoIntervalo } from '../lib/intervalo'
 import {
   caminhoColaboradores,
   ORDEM_PADRAO,
@@ -113,8 +114,8 @@ function linhasPlanilha(
   filtro: string,
   periodo: string | null,
 ): CelulaCsv[][] {
-  // com intervalo de datas, as pagas (que só existem por período) saem
-  const semPagas = periodo !== null
+  // com intervalo de datas, tudo é só do intervalo: saldo = extras − negativas; pagas e curva (período e banco) saem
+  const noIntervalo = periodo !== null
   const curva = (linha: Linha) =>
     linha.fora_da_curva === 'positivo' ? 'Acima do limite' : linha.fora_da_curva === 'negativo' ? 'Abaixo do limite' : ''
   return [
@@ -127,11 +128,10 @@ function linhasPlanilha(
       'Nome',
       ...(consolidado ? ['Unidade'] : []),
       'Função',
-      'Saldo banco',
+      noIntervalo ? 'Saldo do intervalo' : 'Saldo banco',
       'Extras',
       'Negativas',
-      ...(semPagas ? [] : ['Pagas']),
-      'Fora da curva',
+      ...(noIntervalo ? [] : ['Pagas', 'Fora da curva']),
       'Dias acima do limite diário',
     ],
     ...linhas.map((linha) => [
@@ -141,8 +141,7 @@ function linhasPlanilha(
       minutosCsv(linha.saldo_min),
       minutosCsv(linha.extra_min),
       minutosCsv(linha.negativa_min),
-      ...(semPagas ? [] : [minutosCsv(linha.pagas_min)]),
-      curva(linha),
+      ...(noIntervalo ? [] : [minutosCsv(linha.pagas_min), curva(linha)]),
       linha.dias_extra_acima + linha.dias_negativa_acima,
     ]),
   ]
@@ -154,14 +153,25 @@ export function Colaboradores() {
   // sem unidade na URL (/colaboradores): todas as unidades do usuário
   const consolidado = !unidadeId
   const { unidades: unidadesSessao } = useAuth()
-  const { empresa: empresaEmFoco } = useEmpresaAdmin()
+  const { empresa: empresaEmFoco, ehAdmin, empresaId } = useEmpresaAdmin()
   const location = useLocation()
+  const navigate = useNavigate()
+  // unidades do seletor: as da sessão (a equipe vê só as da empresa escolhida na barra lateral)
+  const unidadesSeletor = (ehAdmin && empresaId != null ? unidadesSessao.filter((u) => u.empresa_id === empresaId) : unidadesSessao)
+    .slice()
+    .sort((a, b) => a.nome_exibicao.localeCompare(b.nome_exibicao, 'pt-BR'))
+
+  /** Troca de unidade mantendo busca, filtros e datas: cada unidade tem a sua rota (e "Todas" é /colaboradores). */
+  function irParaUnidade(id: string) {
+    navigate({ pathname: id ? caminhoColaboradores(id) : '/colaboradores', search: location.search })
+  }
   const [params, setParams] = useSearchParams()
   const { dados, erro, carregando, recarregar } = usePainel(unidadeId)
 
   const busca = params.get('busca') ?? ''
   const filtro = lerFiltro(params.get('filtro'))
   const ordem = lerOrdem(params.get('ordem'))
+  const ordemAtual = `${ordem.campo}.${ordem.direcao}`
   // intervalo de datas da URL e as horas somadas nele (sem intervalo: o período atual, para o limite diário)
   const intervalo = useHorasNoIntervalo(unidadeId, dados?.colaboradores)
   const intervaloEscolhido = intervalo.escolhido
@@ -176,7 +186,7 @@ export function Colaboradores() {
 
   useEffect(() => {
     const nome = dados ? (dados.unidade?.nome ?? 'Todas as unidades') : null
-    document.title = nome ? `Colaboradores · ${nome} — Copiloto de Ponto` : 'Colaboradores — Copiloto de Ponto'
+    document.title = nome ? `Colaboradores · ${nome} Copiloto de Ponto` : 'Colaboradores Copiloto de Ponto'
   }, [dados])
 
   function atualizarParam(chave: string, valor: string, padrao: string) {
@@ -207,7 +217,12 @@ export function Colaboradores() {
         const doIntervalo = porColaborador.get(linha.id)
         return {
           ...linha,
-          ...(comIntervalo && { extra_min: doIntervalo?.extra_min ?? 0, negativa_min: doIntervalo?.negativa_min ?? 0 }),
+          ...(comIntervalo && {
+            extra_min: doIntervalo?.extra_min ?? 0,
+            negativa_min: doIntervalo?.negativa_min ?? 0,
+            saldo_min: (doIntervalo?.extra_min ?? 0) - (doIntervalo?.negativa_min ?? 0),
+            fora_da_curva: null,
+          }),
           dias_extra_acima: doIntervalo?.dias_extra_acima ?? 0,
           dias_negativa_acima: doIntervalo?.dias_negativa_acima ?? 0,
         }
@@ -270,7 +285,13 @@ export function Colaboradores() {
         ? (linha.alerta_neg ?? limites.alerta_neg)
         : undefined
 
-  const colunasVisiveis = comIntervalo ? COLUNAS.filter((coluna) => coluna.campo !== 'pagas_min') : COLUNAS
+  const colunasVisiveis = comIntervalo
+    ? COLUNAS.filter((coluna) => coluna.campo !== 'pagas_min').map((coluna) =>
+        coluna.campo === 'saldo_min' ? { ...coluna, rotulo: 'Saldo do intervalo' } : coluna,
+      )
+    : COLUNAS
+  // "Fora da curva" olha o banco acumulado: some com intervalo de datas
+  const filtrosVisiveis = comIntervalo ? FILTROS.filter((item) => item.valor !== 'fora') : FILTROS
   const textoIntervalo = intervaloEscolhido ? textoDoIntervalo(intervaloEscolhido) : null
   // período de cada linha aberta: o intervalo escolhido ou o período dos números dela
   const diasDe = (linha: Linha) => intervaloEscolhido ?? { de: linha.periodo_inicio, ate: linha.dados_ate }
@@ -311,22 +332,11 @@ export function Colaboradores() {
         dados={[subtitulo, textoIntervalo ? `extras e negativas de ${textoIntervalo}` : textoDados]
           .filter(Boolean)
           .join(' · ')}
-        semPagas={comIntervalo}
+        intervalo={comIntervalo}
       />
 
       <header className="dash-header nao-imprimir">
         <TituloPagina>Colaboradores</TituloPagina>
-        <p className="pagina-sub">
-          {subtitulo}
-          {consolidado && empresaEmFoco && ` · ${empresaEmFoco.nome}`}
-          {!aoVivo && fechamento && (
-            <>
-              {' — '}dados até {formatarData(fechamento.data_referencia)}
-              {datasIguais && fechamento.semana_fechamento_mes && ' (fechamento do mês)'}
-              {!datasIguais && ' (algumas unidades com dados anteriores)'}
-            </>
-          )}
-        </p>
         {aoVivo && (
           <p className="dash-ao-vivo">
             <SeloTempoReal titulo="Os dados de cada colaborador são atualizados continuamente" />
@@ -381,64 +391,57 @@ export function Colaboradores() {
               </div>
             </div>
 
-            <div className="filtros nao-imprimir">
-              <div className="busca">
-                <label htmlFor="busca-colaborador" className="sr-only">
-                  Buscar colaborador por nome
-                </label>
-                <input
+            <BarraFiltros className="nao-imprimir">
+              <LinhaFiltros>
+                <BuscaFiltro
                   id="busca-colaborador"
-                  type="search"
+                  rotulo="Buscar colaborador por nome"
                   placeholder="Buscar por nome"
-                  value={busca}
-                  onChange={(event) => atualizarParam('busca', event.target.value, '')}
+                  valor={busca}
+                  onMudar={(valor) => atualizarParam('busca', valor, '')}
                 />
-              </div>
-              <div className="segmentos" role="group" aria-label="Filtrar colaboradores">
-                {FILTROS.map((item) => (
-                  <button
-                    key={item.valor}
-                    type="button"
-                    className={item.valor === filtro ? 'segmento ativo' : 'segmento'}
-                    aria-pressed={item.valor === filtro}
-                    onClick={() => atualizarParam('filtro', item.valor, 'todos')}
-                  >
-                    {item.rotulo}
-                  </button>
-                ))}
-              </div>
-              <FiltroPeriodo
-                escolhido={intervaloEscolhido}
-                de={intervalo.deParam}
-                ate={intervalo.ateParam}
-                onMudar={intervalo.mudar}
-              />
-              <div className="ordem-mobile">
-                <label htmlFor="ordem-mobile">Ordenar por</label>
-                <select
-                  id="ordem-mobile"
-                  value={`${ordem.campo}.${ordem.direcao}`}
-                  onChange={(event) => atualizarParam('ordem', event.target.value, ORDEM_PADRAO)}
-                >
-                  {!ORDENS_MOBILE.some((o) => o.valor === `${ordem.campo}.${ordem.direcao}`) && (
-                    <option value={`${ordem.campo}.${ordem.direcao}`}>Personalizada</option>
-                  )}
-                  {ORDENS_MOBILE.map((o) => (
-                    <option key={o.valor} value={o.valor}>
-                      {o.rotulo}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {textoIntervalo && (
-              <p className="colab-intervalo-nota">
-                Extras e negativas de <strong>{textoIntervalo}</strong>, somando os dias. O saldo do banco é o atual e
-                as pagas só existem por período, então saem da lista.
-                {intervalo.alemDosDados && textoAlemDosDados(intervalo.horasAte)}
-              </p>
-            )}
+                {unidadesSeletor.length > 1 && (
+                  <SelecaoFiltro
+                    rotulo="Unidade"
+                    icone={<IconeUnidade tamanho={15} />}
+                    opcoes={[
+                      { id: '', nome: 'Todas', geral: true },
+                      ...unidadesSeletor.map((item) => ({ id: String(item.id), nome: item.nome_exibicao })),
+                    ]}
+                    valor={unidadeId ?? ''}
+                    onMudar={irParaUnidade}
+                  />
+                )}
+                {/* no computador a ordem fica no cabeçalho da tabela */}
+                <SelecaoFiltro
+                  rotulo="Ordenar"
+                  className="so-celular"
+                  icone={<IconeSeletor tamanho={15} />}
+                  opcoes={[
+                    ...(ORDENS_MOBILE.some((o) => o.valor === ordemAtual) ? [] : [{ id: ordemAtual, nome: 'Personalizada' }]),
+                    ...ORDENS_MOBILE.map((o) => ({ id: o.valor, nome: o.rotulo })),
+                  ]}
+                  valor={ordemAtual}
+                  onMudar={(valor) => atualizarParam('ordem', valor, ORDEM_PADRAO)}
+                />
+              </LinhaFiltros>
+              <LinhaFiltros>
+                <FiltroPeriodo
+                  escolhido={intervaloEscolhido}
+                  de={intervalo.deParam}
+                  ate={intervalo.ateParam}
+                  onMudar={intervalo.mudar}
+                />
+              </LinhaFiltros>
+              <LinhaFiltros>
+                <Segmentado
+                  rotulo="Filtrar colaboradores"
+                  opcoes={filtrosVisiveis}
+                  valor={filtro}
+                  onEscolher={(valor) => atualizarParam('filtro', valor, 'todos')}
+                />
+              </LinhaFiltros>
+            </BarraFiltros>
 
             <p className="sr-only" aria-live="polite">
               {linhas.length} de {todos.length} colaboradores exibidos
@@ -495,7 +498,6 @@ export function Colaboradores() {
                                       type="button"
                                       className={aberto ? 'btn-dias aberto' : 'btn-dias'}
                                       aria-expanded={aberto}
-                                      aria-controls={`dias-${linha.id}`}
                                       onClick={() => alternarDias(linha.id)}
                                       title={aberto ? 'Fechar os dias' : 'Ver em que dias foram as horas'}
                                     >
@@ -545,11 +547,7 @@ export function Colaboradores() {
                                 </td>
                               </tr>
                               {aberto && (
-                                <tr className="linha-dias" id={`dias-${linha.id}`}>
-                                  <td colSpan={colunasVisiveis.length + 2}>
-                                    <DiasColaborador colaboradorId={linha.id} {...diasDe(linha)} />
-                                  </td>
-                                </tr>
+                                <DiasColaboradorLinhas colaboradorId={linha.id} comPagas={!comIntervalo} {...diasDe(linha)} />
                               )}
                             </Fragment>
                           )

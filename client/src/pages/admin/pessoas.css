@@ -5,17 +5,9 @@
 .pessoas-topo {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   flex-wrap: wrap;
-}
-
-.pessoas-topo p {
-  margin: 0;
-  max-width: 640px;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text);
 }
 
 .pessoas-novo {

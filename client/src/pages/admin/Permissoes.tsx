@@ -34,7 +34,7 @@ export function Permissoes() {
   )
 
   useEffect(() => {
-    document.title = 'Permissões — Copiloto de Ponto'
+    document.title = 'Permissões Copiloto de Ponto'
   }, [])
 
   const lista = grupos.dados ?? []
@@ -43,7 +43,6 @@ export function Permissoes() {
     <section className="pagina perm">
       <TituloPagina>Permissões</TituloPagina>
       <header className="pagina-header-linha">
-        <p className="pagina-sub">Crie grupos de permissão e escolha as telas que cada grupo pode acessar.</p>
         <div className="perm-acoes-topo">
           <Link to="/configuracao/usuarios" className="btn-secondary btn-compact">
             Gerenciar usuários

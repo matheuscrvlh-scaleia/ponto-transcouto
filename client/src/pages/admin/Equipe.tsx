@@ -56,7 +56,7 @@ export function Equipe() {
   const [modal, setModal] = useState<ModalAberto>(null)
 
   useEffect(() => {
-    document.title = 'Usuários gestão — Copiloto de Ponto'
+    document.title = 'Usuários gestão Copiloto de Ponto'
   }, [])
 
   useEffect(() => {
@@ -119,7 +119,6 @@ export function Equipe() {
     <section className="pagina">
       <TituloPagina>Usuários gestão</TituloPagina>
       <header className="pessoas-topo">
-        <p>Equipe Scale IA: quem administra o Copiloto, com acesso a todas as empresas, à Configuração e à Administração.</p>
         <button type="button" className="pessoas-novo" onClick={() => setModal({ tipo: 'criar' })}>
           <IconeMais tamanho={18} />
           Novo membro

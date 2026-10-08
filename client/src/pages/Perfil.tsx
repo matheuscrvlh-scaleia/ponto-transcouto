@@ -18,7 +18,7 @@ export function Perfil() {
   const { usuario, unidades, perfil } = useAuth()
 
   useEffect(() => {
-    document.title = 'Meu perfil — Copiloto de Ponto'
+    document.title = 'Meu perfil Copiloto de Ponto'
   }, [])
 
   if (!usuario) return null

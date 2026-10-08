@@ -18,10 +18,26 @@ interface Ponto {
   saldo: Minutos
   /** Texto entre parênteses na legenda (ex.: "semana +02:00"). */
   detalhe: string
+  /** Ponto que pede conferência: a barra sai na cor de aviso. */
+  conferir?: boolean
+}
+
+/** Limites do banco (alerta positivo e negativo, em minutos positivos): viram linhas tracejadas. */
+export interface LimitesSaldo {
+  pos: Minutos
+  neg: Minutos
 }
 
 /** Saldo acumulado por ponto (barras divergentes a partir do zero). `pontos` em ordem cronológica. */
-function GraficoSaldo({ pontos, larguraMaxBarra }: { pontos: Ponto[]; larguraMaxBarra: number }) {
+export function GraficoSaldo({
+  pontos,
+  larguraMaxBarra,
+  limites,
+}: {
+  pontos: Ponto[]
+  larguraMaxBarra: number
+  limites?: LimitesSaldo
+}) {
   const [ativo, setAtivo] = useState<number | null>(null)
   const container = useRef<HTMLDivElement>(null)
   const [largura, setLargura] = useState(LARGURA_PADRAO)
@@ -34,7 +50,8 @@ function GraficoSaldo({ pontos, larguraMaxBarra }: { pontos: Ponto[]; larguraMax
     return () => observador.disconnect()
   }, [])
 
-  const valores = pontos.map((ponto) => ponto.saldo)
+  // a escala também cobre os limites, para as linhas tracejadas aparecerem mesmo com o saldo longe delas
+  const valores = [...pontos.map((ponto) => ponto.saldo), ...(limites ? [limites.pos, -limites.neg] : [])]
   const passo = passoEixo(Math.max(...valores.map(Math.abs), 60))
   const max = Math.max(passo, Math.ceil(Math.max(...valores, 0) / passo) * passo)
   const min = Math.min(0, Math.floor(Math.min(...valores, 0) / passo) * passo)
@@ -70,6 +87,25 @@ function GraficoSaldo({ pontos, larguraMaxBarra }: { pontos: Ponto[]; larguraMax
           </g>
         ))}
 
+        {limites &&
+          [
+            { valor: limites.pos, rotulo: 'limite' },
+            { valor: -limites.neg, rotulo: 'limite' },
+          ].map(({ valor, rotulo }) => (
+            <g key={valor}>
+              <line x1={MARGEM.esquerda} x2={largura - MARGEM.direita} y1={y(valor)} y2={y(valor)} className="grafico-limite" />
+              <text
+                x={largura - MARGEM.direita - 2}
+                y={y(valor) + (valor > 0 ? -4 : 12)}
+                textAnchor="end"
+                className="grafico-limite-rotulo"
+              >
+                {rotulo} {valor > 0 ? '+' : '−'}
+                {formatarMinutos(Math.abs(valor))}
+              </text>
+            </g>
+          ))}
+
         {pontos.map((ponto, i) => {
           const valor = ponto.saldo
           const topo = y(Math.max(valor, 0))
@@ -87,7 +123,7 @@ function GraficoSaldo({ pontos, larguraMaxBarra }: { pontos: Ponto[]; larguraMax
               {altura > 0 && (
                 <path
                   d={caminho}
-                  className={positivo ? 'grafico-barra-pos' : 'grafico-barra-neg'}
+                  className={ponto.conferir ? 'grafico-barra-conferir' : positivo ? 'grafico-barra-pos' : 'grafico-barra-neg'}
                   opacity={ativo === null || ativo === i ? 1 : 0.45}
                 />
               )}
@@ -119,18 +155,18 @@ function GraficoSaldo({ pontos, larguraMaxBarra }: { pontos: Ponto[]; larguraMax
 }
 
 /** Saldo acumulado por semana (fotografias). `semanas` em ordem cronológica. */
-export function GraficoSemanas({ semanas }: { semanas: SemanaHistorico[] }) {
+export function GraficoSemanas({ semanas, limites }: { semanas: SemanaHistorico[]; limites?: LimitesSaldo }) {
   const pontos = semanas.map((semana) => ({
     chave: semana.fechamento_id,
     data: semana.data_referencia,
     saldo: semana.saldo_total,
     detalhe: `semana ${formatarMinutos(semana.banco_semana, { sinal: true })}`,
   }))
-  return <GraficoSaldo pontos={pontos} larguraMaxBarra={28} />
+  return <GraficoSaldo pontos={pontos} larguraMaxBarra={28} limites={limites} />
 }
 
 /** Saldo acumulado por dia (tempo real). `dias` em ordem cronológica. */
-export function GraficoDias({ dias }: { dias: DiaHistorico[] }) {
+export function GraficoDias({ dias, limites }: { dias: DiaHistorico[]; limites?: LimitesSaldo }) {
   const pontos = dias.map((dia) => ({
     chave: dia.dia,
     data: dia.dia,
@@ -140,5 +176,5 @@ export function GraficoDias({ dias }: { dias: DiaHistorico[] }) {
         ? 'primeiro dia registrado no período'
         : `banco do dia ${formatarMinutos(dia.banco_dia, { sinal: true })}`,
   }))
-  return <GraficoSaldo pontos={pontos} larguraMaxBarra={18} />
+  return <GraficoSaldo pontos={pontos} larguraMaxBarra={18} limites={limites} />
 }

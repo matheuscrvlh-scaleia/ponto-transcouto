@@ -22,7 +22,6 @@ import {
   formatarDataHora,
   formatarIntervalo,
   formatarMinutos,
-  formatarQuando,
   minutosParaEntrada,
 } from '../../lib/formato'
 import { avisarSincronizacaoPedida } from '../../lib/sincronizacao'
@@ -246,7 +245,7 @@ export function Configuracoes({ secao }: { secao: SecaoConfiguracoes }) {
   const textos = TEXTOS[secao]
 
   useEffect(() => {
-    document.title = `${textos.titulo} — Copiloto de Ponto`
+    document.title = `${textos.titulo} Copiloto de Ponto`
   }, [textos.titulo])
 
   if (carregando) return <Carregando texto={textos.carregando} />
@@ -708,13 +707,7 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
 
   return (
     <section className="pagina">
-      <header className="pagina-header">
-        <TituloPagina>{textos.titulo}</TituloPagina>
-        <p className="pagina-sub" title={formatarDataHora(config.atualizado_em)}>
-          Última alteração {formatarQuando(config.atualizado_em)}
-          {config.atualizado_por ? ` por ${config.atualizado_por.nome}` : ''}.
-        </p>
-      </header>
+      <TituloPagina>{textos.titulo}</TituloPagina>
 
       {/* Alertas: cada assunto num bloco próprio; as outras seções seguem num cartão só */}
       <form className={secao === 'alertas' ? 'config-form' : 'card'} onSubmit={salvar} noValidate>
