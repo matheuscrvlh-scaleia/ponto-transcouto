@@ -105,38 +105,38 @@ export function DetalheColaborador() {
 
       <TituloPagina>Colaborador</TituloPagina>
 
-      <header className="dash-card perfil-topo">
-        <div className="perfil-barra nao-imprimir">
+      <header className="dash-card pc-topo">
+        <div className="pc-barra nao-imprimir">
           <Link to={voltarPara} className="voltar">
             <span aria-hidden="true">←</span> Voltar para {colaborador.unidade.nome}
           </Link>
-          <div className="perfil-acoes">
-            <Link to={`/batidas?colaborador=${colaborador.id}`} className="btn-secondary perfil-acao">
+          <div className="pc-acoes">
+            <Link to={`/batidas?colaborador=${colaborador.id}`} className="btn-secondary pc-acao">
               Ver no log de batidas
             </Link>
             <ExportarHistorico colaborador={colaborador} />
           </div>
         </div>
 
-        <div className="perfil-identidade">
-          <span className="avatar perfil-avatar" aria-hidden="true">
+        <div className="pc-identidade">
+          <span className="avatar pc-avatar" aria-hidden="true">
             {iniciais(colaborador.nome)}
           </span>
-          <div className="perfil-identidade-texto">
-            <h2 className="perfil-nome">
+          <div className="pc-identidade-texto">
+            <h2 className="pc-nome">
               {colaborador.nome}
               {colaborador.ativo === false && <span className="badge badge-neutral badge-titulo">Inativo</span>}
             </h2>
-            <p className="perfil-cargo">{[colaborador.funcao, colaborador.unidade.nome].filter(Boolean).join(' · ')}</p>
+            <p className="pc-cargo">{[colaborador.funcao, colaborador.unidade.nome].filter(Boolean).join(' · ')}</p>
           </div>
         </div>
 
         {colaborador.resumo && (
-          <div className="perfil-banco">
-            <div className="perfil-banco-saldo">
-              <span className="perfil-banco-rotulo">Banco acumulado atual</span>
-              <Horas minutos={colaborador.resumo.saldo_min} sinal destacar className="perfil-banco-valor" />
-              <span className="perfil-banco-ref">
+          <div className="pc-banco">
+            <div className="pc-banco-saldo">
+              <span className="pc-banco-rotulo">Banco acumulado atual</span>
+              <Horas minutos={colaborador.resumo.saldo_min} sinal destacar className="pc-banco-valor" />
+              <span className="pc-banco-ref">
                 {aoVivo && (
                   <>
                     <SeloTempoReal />{' '}
@@ -145,18 +145,18 @@ export function DetalheColaborador() {
                 {referenciaResumo(colaborador.resumo, tempoReal)}
               </span>
             </div>
-            <div className="perfil-banco-estado">
+            <div className="pc-banco-estado">
               <EstadoDoBanco saldo={colaborador.resumo.saldo_min} limites={colaborador.limites} />
             </div>
-            <div className="perfil-banco-pagas">
-              <span className="perfil-banco-rotulo">Pagas no período</span>
-              <Horas minutos={colaborador.resumo.pagas_min} className="perfil-banco-pagas-valor" />
+            <div className="pc-banco-pagas">
+              <span className="pc-banco-rotulo">Pagas no período</span>
+              <Horas minutos={colaborador.resumo.pagas_min} className="pc-banco-pagas-valor" />
             </div>
           </div>
         )}
       </header>
 
-      <div className="perfil-filtro nao-imprimir">
+      <div className="pc-filtro nao-imprimir">
         <FiltroPeriodo escolhido={periodo.escolhido} de={periodo.deParam} ate={periodo.ateParam} onMudar={periodo.mudar} />
       </div>
 

@@ -67,7 +67,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
   const [aba, setAba] = useState<Aba>('dias')
   const { dados, erro, carregando, recarregar } = useRecurso(
     (signal) => api<DiasDetalhe>(`/colaboradores/${colaboradorId}/dias-detalhe`, { signal, query: intervalo }),
-    `perfil-dias-${colaboradorId}-${intervalo.de}-${intervalo.ate}`,
+    `pc-dias-${colaboradorId}-${intervalo.de}-${intervalo.ate}`,
   )
 
   const dias = useMemo(
@@ -102,7 +102,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
 
   return (
     <>
-      <div className="perfil-kpis">
+      <div className="pc-kpis">
         <Indicador
           icone={<IconeMais tamanho={16} />}
           rotulo="Extras"
@@ -169,22 +169,22 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
       </div>
 
       {dias.length > 0 && (
-        <section className="dash-card perfil-grafico-card" aria-labelledby="titulo-grafico-dias">
+        <section className="dash-card pc-grafico-card" aria-labelledby="titulo-grafico-dias">
           <div className="dash-card-topo">
             <div>
               <h2 id="titulo-grafico-dias">Extras e negativas por dia</h2>
               <p className="dash-card-sub">De {texto}</p>
             </div>
-            <p className="perfil-legenda" aria-hidden="true">
-              <span className="perfil-legenda-mais">Extras</span>
-              <span className="perfil-legenda-menos">Negativas</span>
+            <p className="pc-legenda" aria-hidden="true">
+              <span className="pc-legenda-mais">Extras</span>
+              <span className="pc-legenda-menos">Negativas</span>
             </p>
           </div>
           <GraficoDiasPerfil dias={dias} />
         </section>
       )}
 
-      <section className="dash-card perfil-abas-card">
+      <section className="dash-card pc-abas-card">
         <Segmentado
           rotulo="Conteúdo do perfil"
           opcoes={[
@@ -197,7 +197,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
         />
         {aba === 'dias' && <TabelaDias dias={dias} intervalo={texto} />}
         {aba === 'batidas' && <BatidasDoIntervalo colaboradorId={colaboradorId} intervalo={intervalo} dias={dias} />}
-        {aba === 'historico' && <div className="perfil-historico">{historico}</div>}
+        {aba === 'historico' && <div className="pc-historico">{historico}</div>}
       </section>
     </>
   )
@@ -217,15 +217,15 @@ function Indicador({
   tom?: 'positivo' | 'negativo' | 'aviso'
 }) {
   return (
-    <div className={tom ? `perfil-kpi ${tom}` : 'perfil-kpi'}>
-      <p className="perfil-kpi-rotulo">
-        <span className="perfil-kpi-icone" aria-hidden="true">
+    <div className={tom ? `pc-kpi ${tom}` : 'pc-kpi'}>
+      <p className="pc-kpi-rotulo">
+        <span className="pc-kpi-icone" aria-hidden="true">
           {icone}
         </span>
         {rotulo}
       </p>
-      <p className="perfil-kpi-valor">{valor}</p>
-      <p className="perfil-kpi-detalhe">{detalhe}</p>
+      <p className="pc-kpi-valor">{valor}</p>
+      <p className="pc-kpi-detalhe">{detalhe}</p>
     </div>
   )
 }
@@ -247,28 +247,28 @@ function GraficoDiasPerfil({ dias }: { dias: DiaAnalisado[] }) {
   // com muitos dias, o rótulo aparece a cada N dias para não embolar
   const passo = dias.length > 45 ? 7 : dias.length > 20 ? 3 : 1
   return (
-    <div className="perfil-grafico" role="img" aria-label="Extras e negativas de cada dia do intervalo">
+    <div className="pc-grafico" role="img" aria-label="Extras e negativas de cada dia do intervalo">
       {dias.map((d, i) => {
         const titulo = `${diaDaSemana(d.dia)} ${formatarData(d.dia, { ano: false })}: extras ${formatarMinutos(d.extra_min)}, negativas ${formatarMinutos(d.negativa_min)}`
         return (
-          <div key={d.dia} className={d.conferir ? 'perfil-grafico-dia conferir' : 'perfil-grafico-dia'} title={titulo}>
-            <div className="perfil-grafico-metade cima">
+          <div key={d.dia} className={d.conferir ? 'pc-grafico-dia conferir' : 'pc-grafico-dia'} title={titulo}>
+            <div className="pc-grafico-metade cima">
               {d.extra_min > 0 && (
                 <span
-                  className={d.extra_acima ? 'perfil-grafico-barra mais acima' : 'perfil-grafico-barra mais'}
+                  className={d.extra_acima ? 'pc-grafico-barra mais acima' : 'pc-grafico-barra mais'}
                   style={{ height: `${(d.extra_min / maior) * 100}%` }}
                 />
               )}
             </div>
-            <div className="perfil-grafico-metade baixo">
+            <div className="pc-grafico-metade baixo">
               {d.negativa_min > 0 && (
                 <span
-                  className={d.negativa_acima ? 'perfil-grafico-barra menos acima' : 'perfil-grafico-barra menos'}
+                  className={d.negativa_acima ? 'pc-grafico-barra menos acima' : 'pc-grafico-barra menos'}
                   style={{ height: `${(d.negativa_min / maior) * 100}%` }}
                 />
               )}
             </div>
-            <span className="perfil-grafico-rotulo" aria-hidden="true">
+            <span className="pc-grafico-rotulo" aria-hidden="true">
               {i % passo === 0 ? d.dia.slice(8) : ''}
             </span>
           </div>
@@ -292,19 +292,19 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
   const negativa = visiveis.reduce((soma, d) => soma + d.negativa_min, 0)
 
   return (
-    <div className="perfil-dias">
-      <div className="perfil-dias-topo">
+    <div className="pc-dias">
+      <div className="pc-dias-topo">
         <p className="dash-card-sub">
           {visiveis.length} {visiveis.length === 1 ? 'dia' : 'dias'} de {intervalo}, do mais recente para o mais antigo
         </p>
-        <label className="perfil-alternar">
+        <label className="pc-alternar">
           <input type="checkbox" checked={soComHoras} onChange={(event) => setSoComHoras(event.target.checked)} />
           Só dias com extras, negativas ou alerta
         </label>
       </div>
 
       <div className="table-wrap">
-        <table className="perfil-tabela-dias">
+        <table className="pc-tabela-dias">
           <caption className="sr-only">Batidas, extras e negativas de cada dia de {intervalo}</caption>
           <thead>
             <tr>
@@ -329,11 +329,11 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
               const classe = d.conferir ? 'conferir' : d.extra_acima || d.negativa_acima ? 'dia-acima' : undefined
               return (
                 <tr key={d.dia} className={classe}>
-                  <th scope="row" className="perfil-dia">
-                    <span className="perfil-dia-semana">{diaDaSemana(d.dia)}</span>
-                    <span className="perfil-dia-data">{formatarData(d.dia, { ano: false })}</span>
+                  <th scope="row" className="pc-dia">
+                    <span className="pc-dia-semana">{diaDaSemana(d.dia)}</span>
+                    <span className="pc-dia-data">{formatarData(d.dia, { ano: false })}</span>
                     {!d.tem_calculo && (
-                      <span className="perfil-sem-calculo" title="Só as batidas do log: as horas do dia entram na próxima coleta">
+                      <span className="pc-sem-calculo" title="Só as batidas do log: as horas do dia entram na próxima coleta">
                         sem cálculo
                       </span>
                     )}
@@ -342,9 +342,9 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
                     {d.marcacoes.length === 0 ? (
                       <span className="texto-suave">sem batidas</span>
                     ) : (
-                      <span className="perfil-batidas" style={{ gridTemplateColumns: `repeat(${maxBatidas}, auto)` }}>
+                      <span className="pc-batidas" style={{ gridTemplateColumns: `repeat(${maxBatidas}, auto)` }}>
                         {classificarMarcacoes(d.marcacoes).map(({ texto, classe }, i) => (
-                          <span key={i} className={`perfil-batida ${classe}`}>
+                          <span key={i} className={`pc-batida ${classe}`}>
                             {texto}
                           </span>
                         ))}
@@ -359,7 +359,7 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
                     {d.negativa_min ? <Horas minutos={d.negativa_min} /> : <span className="texto-suave">—</span>}
                   </td>
                   <td>
-                    <span className="perfil-alertas">
+                    <span className="pc-alertas">
                       {d.extra_acima && (
                         <span className="limite-dia-indicador mais" title="Extras acima do limite diário">
                           ▲ limite
@@ -371,7 +371,7 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
                         </span>
                       )}
                       {d.conferir && (
-                        <span className="perfil-conferir" title={d.conferir}>
+                        <span className="pc-conferir" title={d.conferir}>
                           Conferir ponto
                         </span>
                       )}
@@ -397,7 +397,7 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
           </tfoot>
         </table>
       </div>
-      <p className="perfil-nota">
+      <p className="pc-nota">
         “Entre batidas” soma o tempo de cada entrada até a saída seguinte. “Conferir ponto” marca dia com número ímpar de
         batidas ou com mais de 16h entre elas (batida esquecida ou fora de ordem na FriPonto).
       </p>
@@ -421,7 +421,7 @@ function BatidasDoIntervalo({
 
   const linkLog = `/batidas?colaborador=${colaboradorId}&de=${intervalo.de}&ate=${intervalo.ate}`
   return (
-    <div className="perfil-batidas-lista">
+    <div className="pc-batidas-lista">
       <p className="dash-card-sub">
         {total.toLocaleString('pt-BR')} {total === 1 ? 'batida' : 'batidas'} de {textoDoIntervalo(intervalo)} ·{' '}
         <Link to={linkLog} className="btn-link">
@@ -456,7 +456,7 @@ function BatidasDoIntervalo({
                       <td>{origemDa(batida)}</td>
                       <td>
                         <span className={`batida-situacao ${situacao.classe}`}>{situacao.rotulo}</span>
-                        {inclusao && <span className="perfil-inclusao">{inclusao}</span>}
+                        {inclusao && <span className="pc-inclusao">{inclusao}</span>}
                       </td>
                     </tr>
                   )

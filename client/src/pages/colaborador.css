@@ -1,21 +1,21 @@
 /* ---------- Perfil do colaborador ---------- */
 
 /* topo: identidade à esquerda, banco acumulado à direita */
-.perfil-topo {
+.pc-topo {
   /* barra, identidade e faixa do banco, uma embaixo da outra, cada uma na largura toda */
   flex-direction: column;
   align-items: stretch;
   gap: 18px;
 }
 
-.perfil-identidade {
+.pc-identidade {
   display: flex;
   align-items: center;
   gap: 16px;
   min-width: 0;
 }
 
-.perfil-avatar {
+.pc-avatar {
   flex-shrink: 0;
   width: 64px;
   height: 64px;
@@ -25,14 +25,14 @@
   background: linear-gradient(140deg, var(--destaque-de), var(--destaque-ate));
 }
 
-.perfil-identidade-texto {
+.pc-identidade-texto {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
 
-.perfil-nome {
+.pc-nome {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -43,14 +43,14 @@
   color: var(--text-h);
 }
 
-.perfil-cargo {
+.pc-cargo {
   margin: 0;
   font-size: 13px;
   color: var(--text);
 }
 
 /* barra no topo do card: voltar à esquerda, ações (log, CSV, PDF) à direita */
-.perfil-barra {
+.pc-barra {
   width: 100%;
   display: flex;
   flex-wrap: wrap;
@@ -62,19 +62,19 @@
   border-bottom: 1px solid var(--border);
 }
 
-.perfil-barra .voltar {
+.pc-barra .voltar {
   padding: 0;
   font-size: 13px;
 }
 
-.perfil-acoes {
+.pc-acoes {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.perfil-acao {
+.pc-acao {
   width: auto;
   min-height: 36px;
   padding: 0 14px;
@@ -85,7 +85,7 @@
 }
 
 /* faixa do banco: saldo à esquerda, estado e régua no meio (largura livre), pagas à direita */
-.perfil-banco {
+.pc-banco {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -95,21 +95,21 @@
   background: var(--muted);
 }
 
-.perfil-banco-saldo,
-.perfil-banco-pagas {
+.pc-banco-saldo,
+.pc-banco-pagas {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.perfil-banco-pagas {
+.pc-banco-pagas {
   align-items: flex-end;
   text-align: right;
   padding-left: 24px;
   border-left: 1px solid var(--border);
 }
 
-.perfil-banco-rotulo {
+.pc-banco-rotulo {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -117,45 +117,45 @@
   color: var(--text);
 }
 
-.perfil-banco-valor {
+.pc-banco-valor {
   font-size: 30px;
   font-weight: 800;
   line-height: 1.1;
 }
 
-.perfil-banco-ref {
+.pc-banco-ref {
   font-size: 12px;
   color: var(--text);
 }
 
-.perfil-banco-pagas-valor {
+.pc-banco-pagas-valor {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-h);
 }
 
 /* no meio, a frase do estado fica à esquerda, em cima da régua */
-.perfil-banco-estado .dc-estado {
+.pc-banco-estado .dc-estado {
   align-self: flex-start;
 }
 
-.perfil-banco-estado .dc-medidor {
+.pc-banco-estado .dc-medidor {
   margin-top: 8px;
 }
 
-.perfil-filtro {
+.pc-filtro {
   margin-top: 4px;
 }
 
 /* ----- números do intervalo ----- */
 
-.perfil-kpis {
+.pc-kpis {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
-.perfil-kpi {
+.pc-kpi {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -166,7 +166,7 @@
   box-shadow: var(--sombra-suave);
 }
 
-.perfil-kpi-rotulo {
+.pc-kpi-rotulo {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -176,7 +176,7 @@
   color: var(--text);
 }
 
-.perfil-kpi-icone {
+.pc-kpi-icone {
   display: inline-grid;
   place-items: center;
   width: 28px;
@@ -186,22 +186,22 @@
   background: var(--accent-suave);
 }
 
-.perfil-kpi.positivo .perfil-kpi-icone {
+.pc-kpi.positivo .pc-kpi-icone {
   color: var(--positivo);
   background: var(--positivo-bg);
 }
 
-.perfil-kpi.negativo .perfil-kpi-icone {
+.pc-kpi.negativo .pc-kpi-icone {
   color: var(--negativo);
   background: var(--negativo-bg);
 }
 
-.perfil-kpi.aviso .perfil-kpi-icone {
+.pc-kpi.aviso .pc-kpi-icone {
   color: var(--aviso);
   background: var(--aviso-bg);
 }
 
-.perfil-kpi-valor {
+.pc-kpi-valor {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
@@ -210,20 +210,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-.perfil-kpi-detalhe {
+.pc-kpi-detalhe {
   margin: 0;
   font-size: 12px;
   color: var(--text);
 }
 
-.perfil-kpi.aviso .perfil-kpi-detalhe {
+.pc-kpi.aviso .pc-kpi-detalhe {
   color: var(--aviso);
   font-weight: 600;
 }
 
 /* ----- gráfico por dia ----- */
 
-.perfil-legenda {
+.pc-legenda {
   display: flex;
   gap: 14px;
   margin: 0;
@@ -231,7 +231,7 @@
   color: var(--text);
 }
 
-.perfil-legenda span::before {
+.pc-legenda span::before {
   content: '';
   display: inline-block;
   width: 10px;
@@ -241,15 +241,15 @@
   vertical-align: -1px;
 }
 
-.perfil-legenda-mais::before {
+.pc-legenda-mais::before {
   background: var(--positivo);
 }
 
-.perfil-legenda-menos::before {
+.pc-legenda-menos::before {
   background: var(--negativo);
 }
 
-.perfil-grafico {
+.pc-grafico {
   display: flex;
   align-items: stretch;
   gap: 3px;
@@ -260,7 +260,7 @@
 }
 
 /* linha do zero */
-.perfil-grafico::after {
+.pc-grafico::after {
   content: '';
   position: absolute;
   left: 0;
@@ -269,7 +269,7 @@
   border-top: 1px solid var(--border);
 }
 
-.perfil-grafico-dia {
+.pc-grafico-dia {
   position: relative;
   flex: 1 1 0;
   min-width: 0;
@@ -278,49 +278,49 @@
   border-radius: 6px;
 }
 
-.perfil-grafico-dia:hover {
+.pc-grafico-dia:hover {
   background: var(--muted);
 }
 
-.perfil-grafico-dia.conferir {
+.pc-grafico-dia.conferir {
   background: repeating-linear-gradient(135deg, transparent 0 6px, var(--aviso-bg) 6px 12px);
 }
 
-.perfil-grafico-metade {
+.pc-grafico-metade {
   flex: 1;
   display: flex;
   justify-content: center;
 }
 
-.perfil-grafico-metade.cima {
+.pc-grafico-metade.cima {
   align-items: flex-end;
 }
 
-.perfil-grafico-metade.baixo {
+.pc-grafico-metade.baixo {
   align-items: flex-start;
 }
 
-.perfil-grafico-barra {
+.pc-grafico-barra {
   width: min(70%, 22px);
   min-height: 2px;
 }
 
-.perfil-grafico-barra.mais {
+.pc-grafico-barra.mais {
   border-radius: 4px 4px 0 0;
   background: linear-gradient(180deg, var(--destaque-de), var(--positivo));
 }
 
-.perfil-grafico-barra.menos {
+.pc-grafico-barra.menos {
   border-radius: 0 0 4px 4px;
   background: var(--negativo);
   opacity: 0.85;
 }
 
-.perfil-grafico-barra.acima {
+.pc-grafico-barra.acima {
   box-shadow: 0 0 0 2px var(--aviso-border);
 }
 
-.perfil-grafico-rotulo {
+.pc-grafico-rotulo {
   position: absolute;
   bottom: -18px;
   left: 0;
@@ -333,11 +333,11 @@
 
 /* ----- abas ----- */
 
-.perfil-abas-card {
+.pc-abas-card {
   gap: 14px;
 }
 
-.perfil-dias-topo {
+.pc-dias-topo {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -345,7 +345,7 @@
   gap: 8px 16px;
 }
 
-.perfil-alternar {
+.pc-alternar {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -354,43 +354,43 @@
   cursor: pointer;
 }
 
-.perfil-tabela-dias td,
-.perfil-tabela-dias th {
+.pc-tabela-dias td,
+.pc-tabela-dias th {
   vertical-align: middle;
 }
 
-.perfil-tabela-dias tbody tr:hover {
+.pc-tabela-dias tbody tr:hover {
   background: var(--muted);
 }
 
-.perfil-tabela-dias tr.dia-acima {
+.pc-tabela-dias tr.dia-acima {
   background: color-mix(in srgb, var(--aviso-bg) 60%, transparent);
 }
 
-.perfil-tabela-dias tr.conferir {
+.pc-tabela-dias tr.conferir {
   background: var(--aviso-bg);
 }
 
-.perfil-dia {
+.pc-dia {
   white-space: nowrap;
   text-transform: none;
   letter-spacing: 0;
 }
 
-.perfil-dia-semana {
+.pc-dia-semana {
   display: inline-block;
   min-width: 30px;
   font-weight: 500;
   color: var(--text);
 }
 
-.perfil-dia-data {
+.pc-dia-data {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-h);
 }
 
-.perfil-sem-calculo {
+.pc-sem-calculo {
   display: block;
   font-size: 11px;
   font-weight: 500;
@@ -398,12 +398,12 @@
 }
 
 /* batidas em colunas: a 1ª entrada de todos os dias fica uma embaixo da outra */
-.perfil-batidas {
+.pc-batidas {
   display: inline-grid;
   gap: 4px;
 }
 
-.perfil-batida {
+.pc-batida {
   padding: 3px 8px;
   border-radius: 8px;
   font-size: 12px;
@@ -413,34 +413,34 @@
   white-space: nowrap;
 }
 
-.perfil-batida.entrada {
+.pc-batida.entrada {
   color: var(--positivo);
   background: var(--positivo-bg);
 }
 
-.perfil-batida.saida {
+.pc-batida.saida {
   color: var(--text-h);
   background: var(--muted);
   border: 1px solid var(--border);
 }
 
-.perfil-batida.texto {
+.pc-batida.texto {
   color: var(--aviso);
   background: var(--aviso-bg);
 }
 
-.perfil-tabela-dias .forte.texto-aviso {
+.pc-tabela-dias .forte.texto-aviso {
   font-weight: 700;
   color: var(--aviso);
 }
 
-.perfil-alertas {
+.pc-alertas {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
 
-.perfil-conferir {
+.pc-conferir {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
@@ -454,8 +454,8 @@
   cursor: help;
 }
 
-.perfil-tabela-dias tfoot th,
-.perfil-tabela-dias tfoot td {
+.pc-tabela-dias tfoot th,
+.pc-tabela-dias tfoot td {
   font-weight: 700;
   color: var(--text-h);
   text-transform: none;
@@ -463,38 +463,38 @@
   border-top: 1px solid var(--border);
 }
 
-.perfil-nota {
+.pc-nota {
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--text);
 }
 
-.perfil-inclusao {
+.pc-inclusao {
   display: block;
   margin-top: 2px;
   font-size: 11px;
   color: var(--text);
 }
 
-.perfil-historico > * {
+.pc-historico > * {
   box-shadow: none;
   border: none;
   padding: 0;
 }
 
 @media (max-width: 1100px) {
-  .perfil-kpis {
+  .pc-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
-  .perfil-banco {
+  .pc-banco {
     grid-template-columns: 1fr;
     padding: 14px 16px;
   }
 
-  .perfil-banco-pagas {
+  .pc-banco-pagas {
     align-items: flex-start;
     text-align: left;
     padding: 12px 0 0;
@@ -502,11 +502,11 @@
     border-top: 1px solid var(--border);
   }
 
-  .perfil-kpis {
+  .pc-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .perfil-grafico {
+  .pc-grafico {
     height: 140px;
   }
 }
