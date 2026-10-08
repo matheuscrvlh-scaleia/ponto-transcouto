@@ -133,20 +133,25 @@ export function DetalheColaborador() {
 
         {colaborador.resumo && (
           <div className="perfil-banco">
-            <span className="perfil-banco-rotulo">Banco acumulado atual</span>
-            <Horas minutos={colaborador.resumo.saldo_min} sinal destacar className="perfil-banco-valor" />
-            <span className="perfil-banco-ref">
-              {aoVivo && (
-                <>
-                  <SeloTempoReal />{' '}
-                </>
-              )}
-              {referenciaResumo(colaborador.resumo, tempoReal)}
-            </span>
-            <EstadoDoBanco saldo={colaborador.resumo.saldo_min} limites={colaborador.limites} />
-            <span className="perfil-banco-pagas">
-              Pagas no período: <Horas minutos={colaborador.resumo.pagas_min} className="forte" />
-            </span>
+            <div className="perfil-banco-saldo">
+              <span className="perfil-banco-rotulo">Banco acumulado atual</span>
+              <Horas minutos={colaborador.resumo.saldo_min} sinal destacar className="perfil-banco-valor" />
+              <span className="perfil-banco-ref">
+                {aoVivo && (
+                  <>
+                    <SeloTempoReal />{' '}
+                  </>
+                )}
+                {referenciaResumo(colaborador.resumo, tempoReal)}
+              </span>
+            </div>
+            <div className="perfil-banco-estado">
+              <EstadoDoBanco saldo={colaborador.resumo.saldo_min} limites={colaborador.limites} />
+            </div>
+            <div className="perfil-banco-pagas">
+              <span className="perfil-banco-rotulo">Pagas no período</span>
+              <Horas minutos={colaborador.resumo.pagas_min} className="perfil-banco-pagas-valor" />
+            </div>
           </div>
         )}
       </header>

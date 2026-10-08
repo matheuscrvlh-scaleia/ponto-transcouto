@@ -2,20 +2,12 @@
 
 /* topo: identidade à esquerda, banco acumulado à direita */
 .perfil-topo {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px 32px;
+  gap: 18px;
 }
 
-/* nome e avatar centralizados no espaço à esquerda do card do banco */
 .perfil-identidade {
-  flex: 1 1 320px;
-  align-self: stretch;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 16px;
   min-width: 0;
 }
@@ -89,19 +81,33 @@
   text-decoration: none;
 }
 
+/* faixa do banco: saldo à esquerda, estado e régua no meio (largura livre), pagas à direita */
 .perfil-banco {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 32px;
+  padding: 16px 22px;
   border-radius: 16px;
   background: var(--muted);
+}
+
+.perfil-banco-saldo,
+.perfil-banco-pagas {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.perfil-banco-pagas {
+  align-items: flex-end;
   text-align: right;
+  padding-left: 24px;
+  border-left: 1px solid var(--border);
 }
 
 .perfil-banco-rotulo {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -109,15 +115,29 @@
 }
 
 .perfil-banco-valor {
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 800;
   line-height: 1.1;
 }
 
-.perfil-banco-ref,
-.perfil-banco-pagas {
+.perfil-banco-ref {
   font-size: 12px;
   color: var(--text);
+}
+
+.perfil-banco-pagas-valor {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+/* no meio, a frase do estado fica à esquerda, em cima da régua */
+.perfil-banco-estado .dc-estado {
+  align-self: flex-start;
+}
+
+.perfil-banco-estado .dc-medidor {
+  margin-top: 8px;
 }
 
 .perfil-filtro {
@@ -467,9 +487,16 @@
 
 @media (max-width: 640px) {
   .perfil-banco {
+    grid-template-columns: 1fr;
+    padding: 14px 16px;
+  }
+
+  .perfil-banco-pagas {
     align-items: flex-start;
     text-align: left;
-    width: 100%;
+    padding: 12px 0 0;
+    border-left: none;
+    border-top: 1px solid var(--border);
   }
 
   .perfil-kpis {
