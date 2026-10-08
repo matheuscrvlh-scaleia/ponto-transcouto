@@ -7,8 +7,8 @@ import type { LinhaPainel } from './painel'
 import { useRecurso } from './useRecurso'
 import type { DataISO, HorasNoIntervalo } from '../types/api'
 
-/* Intervalo de datas do Dashboard e de Colaboradores: fica na URL (?de=&ate=), então
-   os atalhos de um para o outro levam o mesmo intervalo. Sem datas, vale o período atual. */
+/* Intervalo de datas do Dashboard, de Colaboradores e do perfil do colaborador: fica na URL
+   (?de=&ate=), então os atalhos de uma tela para a outra levam o mesmo intervalo. Sem datas, vale o período atual. */
 
 export type Intervalo = { de: DataISO; ate: DataISO }
 
@@ -27,13 +27,9 @@ export function textoDoIntervalo({ de, ate }: Intervalo) {
   return de === ate ? formatarData(de) : `${formatarData(de)} a ${formatarData(ate)}`
 }
 
-/**
- * Intervalo escolhido na URL e as horas somadas por colaborador nele (GET /horas-dia).
- * Sem intervalo escolhido, busca o período atual das linhas: serve para contar os dias acima do limite diário.
- */
-export function useHorasNoIntervalo(unidadeId: string | undefined, linhas: LinhaPainel[] | undefined) {
+/** Intervalo escolhido na URL (null: nenhum) e como mudá-lo. */
+export function useIntervaloDaUrl() {
   const [params, setParams] = useSearchParams()
-  const { query: empresaQuery } = useEmpresaAdmin()
   const hoje = hojeISO()
 
   // uma data só vale para a ponta que falta (sem "até": até hoje)
@@ -41,20 +37,6 @@ export function useHorasNoIntervalo(unidadeId: string | undefined, linhas: Linha
   const ateParam = lerData(params.get('ate'))
   const escolhido: Intervalo | null =
     deParam || ateParam ? { de: deParam ?? ateParam!, ate: ateParam ?? (deParam! > hoje ? deParam! : hoje) } : null
-  const periodoAtual = useMemo(() => periodoDasLinhas(linhas ?? []), [linhas])
-  const intervalo = escolhido ?? periodoAtual
-
-  const horas = useRecurso(
-    (signal) =>
-      intervalo
-        ? api<HorasNoIntervalo>('/horas-dia', {
-            signal,
-            query: { ...intervalo, unidade_id: unidadeId ? Number(unidadeId) : undefined, ...(unidadeId ? {} : empresaQuery) },
-          })
-        : Promise.resolve(null),
-    `horas-dia-${unidadeId ?? `todas-${empresaQuery.empresa_id ?? 'todas'}`}-${intervalo?.de}-${intervalo?.ate}`,
-  )
-  const porColaborador = useMemo(() => new Map((horas.dados?.colaboradores ?? []).map((c) => [c.id, c])), [horas.dados])
 
   /** Intervalo na URL; sem datas, volta ao período atual. */
   function mudar(novo: Partial<Intervalo>) {
@@ -72,16 +54,30 @@ export function useHorasNoIntervalo(unidadeId: string | undefined, linhas: Linha
     )
   }
 
-  // dias gravados só até a última coleta: o fim do intervalo pode estar além
-  const horasAte = horas.dados?.dados_ate ?? null
-  const alemDosDados = Boolean(escolhido && !horas.carregando && (!horasAte || horasAte < escolhido.ate))
-
-  return { escolhido, deParam, ateParam, horas, porColaborador, horasAte, alemDosDados, mudar }
+  return { escolhido, deParam, ateParam, mudar }
 }
 
-/** Aviso de até onde há horas por dia, quando o intervalo vai além (texto para juntar a uma nota). */
-export function textoAlemDosDados(horasAte: DataISO | null) {
-  return horasAte
-    ? ` Horas por dia gravadas até ${formatarData(horasAte)}: os dias depois disso entram na próxima coleta.`
-    : ' Ainda não há horas por dia neste intervalo: elas são gravadas a partir da próxima coleta.'
+/**
+ * Intervalo escolhido na URL e as horas somadas por colaborador nele (GET /horas-dia).
+ * Sem intervalo escolhido, busca o período atual das linhas: serve para contar os dias acima do limite diário.
+ */
+export function useHorasNoIntervalo(unidadeId: string | undefined, linhas: LinhaPainel[] | undefined) {
+  const { escolhido, deParam, ateParam, mudar } = useIntervaloDaUrl()
+  const { query: empresaQuery } = useEmpresaAdmin()
+  const periodoAtual = useMemo(() => periodoDasLinhas(linhas ?? []), [linhas])
+  const intervalo = escolhido ?? periodoAtual
+
+  const horas = useRecurso(
+    (signal) =>
+      intervalo
+        ? api<HorasNoIntervalo>('/horas-dia', {
+            signal,
+            query: { ...intervalo, unidade_id: unidadeId ? Number(unidadeId) : undefined, ...(unidadeId ? {} : empresaQuery) },
+          })
+        : Promise.resolve(null),
+    `horas-dia-${unidadeId ?? `todas-${empresaQuery.empresa_id ?? 'todas'}`}-${intervalo?.de}-${intervalo?.ate}`,
+  )
+  const porColaborador = useMemo(() => new Map((horas.dados?.colaboradores ?? []).map((c) => [c.id, c])), [horas.dados])
+
+  return { escolhido, deParam, ateParam, horas, porColaborador, mudar }
 }

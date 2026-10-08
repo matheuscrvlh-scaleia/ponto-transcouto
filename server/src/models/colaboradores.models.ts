@@ -31,7 +31,7 @@ export async function buscarPermitido(ator: Ator, colaboradorId: number) {
 
 export async function registroAtual(ator: Ator, colaboradorId: number) {
     const { rows } = await db.query<RegistroAtual>(
-        `SELECT f.id AS fechamento_id, c.data_referencia::text,
+        `SELECT f.id AS fechamento_id, c.data_referencia::text, c.periodo_inicio::text,
                 r.extra_periodo AS extra_min, r.negativa_periodo AS negativa_min,
                 r.pagas_periodo AS pagas_min, r.banco_periodo AS banco_min,
                 r.saldo_banco_total AS saldo_min
@@ -50,7 +50,7 @@ export async function registroAtual(ator: Ator, colaboradorId: number) {
 /** Valor ao vivo do colaborador (empresa em tempo real), se já foi atualizado alguma vez. */
 export async function registroTempoReal(ator: Ator, colaboradorId: number) {
     const { rows } = await db.query<RegistroAtual & { atualizado_em: Date }>(
-        `SELECT NULL::int AS fechamento_id, rt.dados_ate::text AS data_referencia,
+        `SELECT NULL::int AS fechamento_id, rt.dados_ate::text AS data_referencia, rt.periodo_inicio::text,
                 rt.extra_periodo AS extra_min, rt.negativa_periodo AS negativa_min,
                 rt.pagas_periodo AS pagas_min, rt.banco_periodo AS banco_min,
                 rt.saldo_banco_total AS saldo_min, rt.extraido_em AS atualizado_em

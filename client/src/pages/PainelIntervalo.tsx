@@ -1,8 +1,9 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { CartaoKpi, ItemResumo } from '../components/CartoesPainel'
 import { Horas } from '../components/Horas'
 import { IconeAlerta, IconeCalendario, IconeMais, IconeMedia, IconeMenos, IconeRelogio } from '../components/Icones'
+import { ModalColaboradores } from '../components/ModalColaboradores'
 import { formatarMinutos, iniciais } from '../lib/formato'
 import type { LinhaPainel as Linha } from '../lib/painel'
 import type { HorasNoIntervalo, Minutos } from '../types/api'
@@ -10,10 +11,11 @@ import type { HorasNoIntervalo, Minutos } from '../types/api'
 /* Dashboard com intervalo de datas escolhido: tudo é só daquele intervalo (quem fez extras,
    quem ficou devendo, quem passou do limite diário, e quanto), sem o saldo acumulado do banco. */
 
-const MAX_NA_LISTA = 6
-
 type HorasColaborador = HorasNoIntervalo['colaboradores'][number]
 type Pessoa = { linha: Linha; extra: Minutos; negativa: Minutos; diasExtra: number; diasNegativa: number }
+
+/** Colaboradores por trás de um total do resumo, abertos num modal. */
+type Grupo = { titulo: string; descricao: string; pessoas: Pessoa[]; valor: (p: Pessoa) => Minutos; sinal?: boolean }
 
 interface Props {
   linhas: Linha[]
@@ -63,7 +65,10 @@ export function PainelIntervalo({
     .sort((a, b) => b.diasExtra + b.diasNegativa - (a.diasExtra + a.diasNegativa) || b.extra - a.extra || porNome(a, b))
   const totalExtras = comExtras.reduce((soma, p) => soma + p.extra, 0)
   const totalNegativas = comNegativas.reduce((soma, p) => soma + p.negativa, 0)
-  const comHoras = pessoas.filter((p) => p.extra > 0 || p.negativa > 0).length
+  const comHorasNoIntervalo = pessoas.filter((p) => p.extra > 0 || p.negativa > 0)
+  const comHoras = comHorasNoIntervalo.length
+  const [grupo, setGrupo] = useState<Grupo | null>(null)
+  const porId = useMemo(() => new Map(pessoas.map((p) => [p.linha.id, p])), [pessoas])
 
   const pessoa = (p: Pessoa, valor: ReactNode, info: string, classeAvatar: string) => (
     <li key={p.linha.id}>
@@ -82,8 +87,8 @@ export function PainelIntervalo({
 
   const diasAcima = (p: Pessoa) =>
     [
-      p.diasExtra ? `${p.diasExtra} ${p.diasExtra === 1 ? 'dia' : 'dias'} com extras` : null,
-      p.diasNegativa ? `${p.diasNegativa} ${p.diasNegativa === 1 ? 'dia' : 'dias'} com negativas` : null,
+      p.diasExtra ? `+ extras em ${p.diasExtra} ${p.diasExtra === 1 ? 'dia' : 'dias'}` : null,
+      p.diasNegativa ? `− negativas em ${p.diasNegativa} ${p.diasNegativa === 1 ? 'dia' : 'dias'}` : null,
     ]
       .filter(Boolean)
       .join(' e ')
@@ -145,8 +150,8 @@ export function PainelIntervalo({
           {comExtras.length === 0 ? (
             <p className="dash-vazio">Ninguém com horas extras neste intervalo.</p>
           ) : (
-            <ul className="dash-pessoas dash-pessoas-barras">
-              {comExtras.slice(0, MAX_NA_LISTA).map((p) =>
+            <ul className="dash-pessoas dash-pessoas-barras dash-pessoas-rolagem">
+              {comExtras.map((p) =>
                 pessoa(
                   p,
                   <>
@@ -171,12 +176,28 @@ export function PainelIntervalo({
             {incompleto ? `Soma dos ${linhas.length} colaboradores exibidos` : 'Soma de todos os colaboradores'}, de {intervalo}
           </p>
           <ul className="dash-resumo">
-            <ItemResumo icone={<IconeMais />} rotulo="Extras" detalhe={`${comExtras.length} colaboradores`} minutos={totalExtras} />
+            <ItemResumo
+              icone={<IconeMais />}
+              rotulo="Extras"
+              detalhe={`${comExtras.length} colaboradores`}
+              minutos={totalExtras}
+              onAbrir={() =>
+                setGrupo({ titulo: 'Extras', descricao: `Quem fez extras de ${intervalo}`, pessoas: comExtras, valor: (p) => p.extra })
+              }
+            />
             <ItemResumo
               icone={<IconeMenos />}
               rotulo="Negativas"
               detalhe={`${comNegativas.length} colaboradores`}
               minutos={totalNegativas}
+              onAbrir={() =>
+                setGrupo({
+                  titulo: 'Negativas',
+                  descricao: `Quem teve negativas (faltas e atrasos) de ${intervalo}`,
+                  pessoas: comNegativas,
+                  valor: (p) => p.negativa,
+                })
+              }
             />
             <ItemResumo
               icone={<IconeRelogio />}
@@ -184,6 +205,15 @@ export function PainelIntervalo({
               detalhe="só no intervalo"
               minutos={totalExtras - totalNegativas}
               sinal
+              onAbrir={() =>
+                setGrupo({
+                  titulo: 'Extras − negativas',
+                  descricao: `Extras menos negativas de cada colaborador, de ${intervalo}`,
+                  pessoas: comHorasNoIntervalo,
+                  valor: (p) => p.extra - p.negativa,
+                  sinal: true,
+                })
+              }
             />
             {comExtras.length > 0 && (
               <ItemResumo
@@ -191,6 +221,14 @@ export function PainelIntervalo({
                 rotulo="Extras por pessoa"
                 detalhe="média de quem fez"
                 minutos={Math.round(totalExtras / comExtras.length)}
+                onAbrir={() =>
+                  setGrupo({
+                    titulo: 'Extras por pessoa',
+                    descricao: `Média de ${formatarMinutos(Math.round(totalExtras / comExtras.length))} entre quem fez extras de ${intervalo}`,
+                    pessoas: comExtras,
+                    valor: (p) => p.extra,
+                  })
+                }
               />
             )}
           </ul>
@@ -211,10 +249,10 @@ export function PainelIntervalo({
           {comNegativas.length === 0 ? (
             <p className="dash-vazio">Ninguém com negativas neste intervalo.</p>
           ) : (
-            <ul className="dash-pessoas">
-              {comNegativas
-                .slice(0, MAX_NA_LISTA)
-                .map((p) => pessoa(p, <Horas minutos={-p.negativa} destacar className="forte" />, 'Negativas', 'avatar-negativo'))}
+            <ul className="dash-pessoas dash-pessoas-rolagem">
+              {comNegativas.map((p) =>
+                pessoa(p, <Horas minutos={-p.negativa} destacar className="forte" />, 'Negativas', 'avatar-negativo'),
+              )}
             </ul>
           )}
         </article>
@@ -231,19 +269,48 @@ export function PainelIntervalo({
               Ninguém passou do limite diário neste intervalo. O limite é definido em Configuração → Alertas e horas pagas.
             </p>
           ) : (
-            <ul className="dash-pessoas">
-              {acimaDoDia.slice(0, MAX_NA_LISTA).map((p) =>
+            <ul className="dash-pessoas dash-pessoas-rolagem">
+              {acimaDoDia.map((p) =>
                 pessoa(
                   p,
-                  <span className="selo-limite-dia">{p.diasExtra + p.diasNegativa}</span>,
+                  <span className="limite-dia-indicadores">
+                    {p.diasExtra > 0 && (
+                      <span className="limite-dia-indicador mais" title={`${p.diasExtra} ${p.diasExtra === 1 ? 'dia' : 'dias'} com extras acima do limite`}>
+                        ▲ {p.diasExtra}
+                      </span>
+                    )}
+                    {p.diasNegativa > 0 && (
+                      <span className="limite-dia-indicador menos" title={`${p.diasNegativa} ${p.diasNegativa === 1 ? 'dia' : 'dias'} com negativas acima do limite`}>
+                        ▼ {p.diasNegativa}
+                      </span>
+                    )}
+                  </span>,
                   diasAcima(p),
-                  'avatar-aviso',
+                  // azul: só extras; vermelho: só negativas; amarelo: os dois
+                  p.diasExtra && p.diasNegativa ? 'avatar-aviso' : p.diasExtra ? 'avatar-positivo' : 'avatar-negativo',
                 ),
               )}
             </ul>
           )}
         </article>
       </div>
+
+      {grupo && (
+        <ModalColaboradores
+          titulo={grupo.titulo}
+          descricao={grupo.descricao}
+          linhas={grupo.pessoas.map((p) => p.linha)}
+          valor={(linha) => {
+            const p = porId.get(linha.id)
+            return p ? grupo.valor(p) : 0
+          }}
+          sinal={grupo.sinal}
+          link={linkColaborador}
+          complemento={complemento}
+          origem={origem}
+          onFechar={() => setGrupo(null)}
+        />
+      )}
     </>
   )
 }

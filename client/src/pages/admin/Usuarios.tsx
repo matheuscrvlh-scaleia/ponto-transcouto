@@ -53,7 +53,7 @@ export function Usuarios() {
   const [modal, setModal] = useState<Modal>(null)
 
   useEffect(() => {
-    document.title = 'Usuários — Copiloto de Ponto'
+    document.title = 'Usuários Copiloto de Ponto'
   }, [])
 
   useEffect(() => {
@@ -149,7 +149,6 @@ export function Usuarios() {
     <section className="pagina">
       <TituloPagina>Usuários</TituloPagina>
       <header className="pessoas-topo">
-        <p>Cadastre os usuários da empresa, escolha o grupo de permissão de cada um e as unidades que ele acompanha.</p>
         <button type="button" className="pessoas-novo" onClick={() => setModal({ tipo: 'criar' })}>
           <IconeMais tamanho={18} />
           Novo usuário

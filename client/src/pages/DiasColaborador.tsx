@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Horas } from '../components/Horas'
 import { api } from '../lib/api'
+import { marcacoesParaExibir } from '../lib/batidas'
 import { formatarData, formatarMinutos } from '../lib/formato'
 import { useRecurso } from '../lib/useRecurso'
 import type { DataISO, DiasColaborador as Resposta } from '../types/api'
@@ -18,62 +19,147 @@ interface Props {
   ate: DataISO
 }
 
-/** Linha aberta em Colaboradores: as horas de cada dia do intervalo, somando o total da linha. */
-export function DiasColaborador({ colaboradorId, de, ate }: Props) {
+/** Busca os dias e calcula o que as duas versões (linhas da tabela e cartão) mostram. */
+function useDias({ colaboradorId, de, ate }: Props) {
   const [todosOsDias, setTodosOsDias] = useState(false)
-  const { dados, erro, carregando, recarregar } = useRecurso(
+  const recurso = useRecurso(
     (signal) => api<Resposta>(`/colaboradores/${colaboradorId}/dias`, { signal, query: { de, ate } }),
     `dias-${colaboradorId}-${de}-${ate}`,
   )
+  const dias = recurso.dados?.dias ?? []
+  const comHoras = dias.filter((d) => d.extra_min > 0 || d.negativa_min > 0)
+  const limites = recurso.dados?.limites
+  const textoLimites = [
+    limites?.extra_dia ? `extras acima de ${formatarMinutos(limites.extra_dia)}` : null,
+    limites?.negativa_dia ? `negativas acima de ${formatarMinutos(limites.negativa_dia)}` : null,
+  ].filter(Boolean)
 
-  if (carregando) return <p className="dias-colab-nota">Carregando os dias…</p>
-  if (erro || !dados) {
+  return {
+    ...recurso,
+    dias,
+    visiveis: todosOsDias ? dias : comHoras,
+    todosOsDias,
+    alternarTodos: () => setTodosOsDias((atual) => !atual),
+    extra: dias.reduce((soma, d) => soma + d.extra_min, 0),
+    negativa: dias.reduce((soma, d) => soma + d.negativa_min, 0),
+    intervalo: `${formatarData(de, { ano: false })} a ${formatarData(ate, { ano: false })}`,
+    textoLimites: textoLimites.length ? ` · limite diário: ${textoLimites.join(' ou ')}` : '',
+  }
+}
+
+const horasOuTraco = (minutos: number) => (minutos ? <Horas minutos={minutos} /> : <span className="dias-colab-zero">—</span>)
+
+/**
+ * Linha aberta em Colaboradores (computador): os dias viram linhas da própria tabela, com as extras
+ * e negativas de cada dia embaixo das colunas Extras e Negativas, e o total no fim.
+ */
+export function DiasColaboradorLinhas({ comPagas, ...props }: Props & { comPagas: boolean }) {
+  const d = useDias(props)
+  // Nome | Saldo | Extras | Negativas | (Pagas) | Indicador
+  const totalColunas = comPagas ? 6 : 5
+  const linhaUnica = (conteudo: ReactNode) => (
+    <tr className="linha-dias-nota">
+      <td colSpan={totalColunas}>{conteudo}</td>
+    </tr>
+  )
+
+  if (d.carregando) return linhaUnica('Carregando os dias…')
+  if (d.erro || !d.dados) {
+    return linhaUnica(
+      <>
+        Não foi possível carregar os dias.{' '}
+        <button type="button" className="btn-link" onClick={d.recarregar}>
+          Tentar de novo
+        </button>
+      </>,
+    )
+  }
+  if (d.dias.length === 0) return linhaUnica(`Ainda não há horas por dia de ${d.intervalo}.`)
+
+  return (
+    <>
+      <tr className="linha-dias-topo">
+        <td colSpan={totalColunas}>
+          <span>
+            Dia a dia de {d.intervalo}
+            {d.textoLimites}
+          </span>
+          <button type="button" className="btn-link" onClick={d.alternarTodos}>
+            {d.todosOsDias ? 'Só dias com horas' : `Ver todos os ${d.dias.length} dias`}
+          </button>
+        </td>
+      </tr>
+      {d.visiveis.length === 0 && linhaUnica(`Nenhum dia com extras ou negativas em ${d.intervalo}.`)}
+      {d.visiveis.map((dia) => {
+        const acima = dia.extra_acima || dia.negativa_acima
+        return (
+          <tr key={dia.dia} className={acima ? 'linha-dia dia-acima' : 'linha-dia'}>
+            <th scope="row" className="linha-dia-nome">
+              <span className="linha-dia-data">
+                <span className="dias-colab-semana">{diaDaSemana(dia.dia)}</span> {formatarData(dia.dia, { ano: false })}
+              </span>
+              <span className="linha-dia-marcacoes">{dia.marcacoes.length ? marcacoesParaExibir(dia.marcacoes).join(' · ') : 'sem marcações'}</span>
+            </th>
+            <td />
+            <td className={dia.extra_acima ? 'num forte' : 'num'}>{horasOuTraco(dia.extra_min)}</td>
+            <td className={dia.negativa_acima ? 'num forte' : 'num'}>{horasOuTraco(dia.negativa_min)}</td>
+            {comPagas && <td />}
+            <td>{acima && <span className="selo-limite-dia">acima do limite</span>}</td>
+          </tr>
+        )
+      })}
+      <tr className="linha-dia-total">
+        <th scope="row" className="linha-dia-nome">
+          Total de {d.intervalo}
+        </th>
+        <td />
+        <td className="num">
+          <Horas minutos={d.extra} />
+        </td>
+        <td className="num">
+          <Horas minutos={d.negativa} />
+        </td>
+        {comPagas && <td />}
+        <td />
+      </tr>
+    </>
+  )
+}
+
+/** Cartão aberto em Colaboradores (celular): tabela compacta com dia, extras e negativas. */
+export function DiasColaborador(props: Props) {
+  const d = useDias(props)
+
+  if (d.carregando) return <p className="dias-colab-nota">Carregando os dias…</p>
+  if (d.erro || !d.dados) {
     return (
       <p className="dias-colab-nota">
         Não foi possível carregar os dias.{' '}
-        <button type="button" className="btn-link" onClick={recarregar}>
+        <button type="button" className="btn-link" onClick={d.recarregar}>
           Tentar de novo
         </button>
       </p>
     )
   }
-
-  const intervalo = `${formatarData(de, { ano: false })} a ${formatarData(ate, { ano: false })}`
-  if (dados.dias.length === 0) {
-    return (
-      <p className="dias-colab-nota">
-        Ainda não há horas por dia de {intervalo}. Elas passam a ser gravadas a partir da próxima coleta da FriPonto.
-      </p>
-    )
-  }
-
-  const comHoras = dados.dias.filter((d) => d.extra_min > 0 || d.negativa_min > 0)
-  const visiveis = todosOsDias ? dados.dias : comHoras
-  const extra = dados.dias.reduce((soma, d) => soma + d.extra_min, 0)
-  const negativa = dados.dias.reduce((soma, d) => soma + d.negativa_min, 0)
-  const { extra_dia: limiteExtra, negativa_dia: limiteNegativa } = dados.limites
-  const limites = [
-    limiteExtra > 0 ? `extras acima de ${formatarMinutos(limiteExtra)}` : null,
-    limiteNegativa > 0 ? `negativas acima de ${formatarMinutos(limiteNegativa)}` : null,
-  ].filter(Boolean)
+  if (d.dias.length === 0) return <p className="dias-colab-nota">Ainda não há horas por dia de {d.intervalo}.</p>
 
   return (
     <div className="dias-colab">
       <div className="dias-colab-topo">
         <span>
-          Dia a dia de {intervalo}
-          {limites.length > 0 && <> · limite diário: {limites.join(' ou ')}</>}
+          Dia a dia de {d.intervalo}
+          {d.textoLimites}
         </span>
-        <button type="button" className="btn-link" onClick={() => setTodosOsDias((atual) => !atual)}>
-          {todosOsDias ? 'Só dias com horas' : `Ver todos os ${dados.dias.length} dias`}
+        <button type="button" className="btn-link" onClick={d.alternarTodos}>
+          {d.todosOsDias ? 'Só dias com horas' : `Ver todos os ${d.dias.length} dias`}
         </button>
       </div>
 
-      {visiveis.length === 0 ? (
-        <p className="dias-colab-nota">Nenhum dia com extras ou negativas em {intervalo}.</p>
+      {d.visiveis.length === 0 ? (
+        <p className="dias-colab-nota">Nenhum dia com extras ou negativas em {d.intervalo}.</p>
       ) : (
         <table className="dias-colab-tabela">
-          <caption className="sr-only">Horas por dia de {intervalo}</caption>
+          <caption className="sr-only">Horas por dia de {d.intervalo}</caption>
           <thead>
             <tr>
               <th scope="col">Dia</th>
@@ -87,32 +173,28 @@ export function DiasColaborador({ colaboradorId, de, ate }: Props) {
             </tr>
           </thead>
           <tbody>
-            {visiveis.map((d) => (
-              <tr key={d.dia} className={d.extra_acima || d.negativa_acima ? 'dia-acima' : undefined}>
+            {d.visiveis.map((dia) => (
+              <tr key={dia.dia} className={dia.extra_acima || dia.negativa_acima ? 'dia-acima' : undefined}>
                 <th scope="row">
-                  <span className="dias-colab-semana">{diaDaSemana(d.dia)}</span> {formatarData(d.dia, { ano: false })}
-                  {(d.extra_acima || d.negativa_acima) && <span className="selo-limite-dia">acima do limite</span>}
+                  <span className="dias-colab-semana">{diaDaSemana(dia.dia)}</span> {formatarData(dia.dia, { ano: false })}
+                  {(dia.extra_acima || dia.negativa_acima) && <span className="selo-limite-dia">acima do limite</span>}
                 </th>
-                <td className="dias-colab-marcacoes">{d.marcacoes.length ? d.marcacoes.join(' · ') : '—'}</td>
-                <td className={d.extra_acima ? 'num forte' : 'num'}>
-                  {d.extra_min ? <Horas minutos={d.extra_min} /> : <span className="dias-colab-zero">—</span>}
-                </td>
-                <td className={d.negativa_acima ? 'num forte' : 'num'}>
-                  {d.negativa_min ? <Horas minutos={d.negativa_min} /> : <span className="dias-colab-zero">—</span>}
-                </td>
+                <td className="dias-colab-marcacoes">{dia.marcacoes.length ? marcacoesParaExibir(dia.marcacoes).join(' · ') : '—'}</td>
+                <td className={dia.extra_acima ? 'num forte' : 'num'}>{horasOuTraco(dia.extra_min)}</td>
+                <td className={dia.negativa_acima ? 'num forte' : 'num'}>{horasOuTraco(dia.negativa_min)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr>
               <th scope="row" colSpan={2}>
-                Total de {intervalo}
+                Total de {d.intervalo}
               </th>
               <td className="num">
-                <Horas minutos={extra} />
+                <Horas minutos={d.extra} />
               </td>
               <td className="num">
-                <Horas minutos={negativa} />
+                <Horas minutos={d.negativa} />
               </td>
             </tr>
           </tfoot>

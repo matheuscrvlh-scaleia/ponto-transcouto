@@ -69,3 +69,22 @@ export async function dias(req: FastifyRequest, res: FastifyReply) {
         dias: lista,
     })
 }
+
+/**
+ * Dia a dia para a tela de detalhe: as horas de cada dia (como em /dias) mais as batidas do log, com os limites
+ * diários da empresa. Dias fora da janela da coleta (ou do log de batidas) simplesmente não vêm na lista.
+ */
+export async function diasDetalhe(req: FastifyRequest, res: FastifyReply) {
+    const { de, ate } = diasColaboradorQuerySchema.parse(req.query)
+    const colaborador = await buscarColaborador(req)
+    const [config, lista] = await Promise.all([
+        configuracoesModel.buscar(colaborador.empresa_id),
+        horasDiaModel.diasDetalhados(req.usuario, colaborador.id, colaborador.empresa_id, de, ate),
+    ])
+    res.send({
+        de,
+        ate,
+        limites: { extra_dia: config?.alerta_extra_dia_minutos ?? 0, negativa_dia: config?.alerta_negativa_dia_minutos ?? 0 },
+        dias: lista,
+    })
+}

@@ -39,3 +39,19 @@ export type DiaColaborador = {
     extra_acima: boolean
     negativa_acima: boolean
 }
+
+/** Uma marcação da FonteDados no dia (tipo: 0 original, 1 manual, 2 pré-assinalada, 3 desconsiderada). */
+export type BatidaDoDia = {
+    hora: string
+    tipo: number
+    origem: number
+    equipamento_id: number | null
+    incluida_em: string | null
+}
+
+/** Dia do colaborador com as horas calculadas (se a coleta já gravou) e as batidas do log. */
+export type DiaDetalhado = DiaColaborador & {
+    /** false: o dia só tem batidas (ainda não passou por uma coleta de horas). */
+    tem_calculo: boolean
+    batidas: BatidaDoDia[]
+}

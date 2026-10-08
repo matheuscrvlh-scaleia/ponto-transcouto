@@ -97,7 +97,7 @@ function plural(n: number, um: string, varios: string) {
 
 export function Fechamentos() {
   useEffect(() => {
-    document.title = 'Fechamentos — Copiloto de Ponto'
+    document.title = 'Fechamentos Copiloto de Ponto'
   }, [])
 
   return (
@@ -208,13 +208,7 @@ function PainelFechamentos() {
 
   return (
     <section className="pagina dash fech">
-      <header className="dash-header">
-        <TituloPagina>Fechamentos</TituloPagina>
-        <p className="pagina-sub">
-          Extração das horas da FriPonto por unidade, a cada semana e no fechamento do mês.
-          {ativo && ' A lista se atualiza sozinha enquanto há extração em andamento.'}
-        </p>
-      </header>
+      <TituloPagina>Fechamentos</TituloPagina>
 
       <div className="dash-kpis">
         <KpiUltimoCiclo ciclos={ciclos} carregando={lista.carregando} />

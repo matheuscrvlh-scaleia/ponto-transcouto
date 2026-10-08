@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
 import { Aviso, Carregando, ErroCarregamento, EstadoVazio } from '../components/Estados'
 import { CartaoKpi, ItemResumo } from '../components/CartoesPainel'
 import { FiltroPeriodo } from '../components/FiltroPeriodo'
@@ -25,7 +24,7 @@ import { MedidorCurva, type GrupoCurva } from '../components/MedidorCurva'
 import { ModalColaboradores } from '../components/ModalColaboradores'
 import { SeloTempoReal } from '../components/SeloTempoReal'
 import { formatarData, formatarDataHora, formatarDiaSemana, formatarMinutos, iniciais } from '../lib/formato'
-import { textoAlemDosDados, textoDoIntervalo, useHorasNoIntervalo } from '../lib/intervalo'
+import { textoDoIntervalo, useHorasNoIntervalo } from '../lib/intervalo'
 import {
   caminhoColaboradores,
   ORDEM_PADRAO,
@@ -41,8 +40,6 @@ import type { FiltroDashboard } from '../types/api'
 import './dashboard.css'
 import { TituloPagina } from '../components/TituloPagina'
 
-const MAX_EM_ATENCAO = 5
-
 function maiuscula(texto: string) {
   return texto.charAt(0).toLocaleUpperCase('pt-BR') + texto.slice(1)
 }
@@ -52,7 +49,6 @@ export function DashboardUnidade() {
   // sem unidade na URL (/unidades): painel consolidado de todas as unidades do usuário
   const consolidado = !unidadeId
   const { telas, unidades: unidadesSessao } = useAuth()
-  const { empresa: empresaEmFoco } = useEmpresaAdmin()
   const linkFechamentos = caminhoFechamentos(telas)
   const location = useLocation()
   const navigate = useNavigate()
@@ -70,7 +66,7 @@ export function DashboardUnidade() {
 
   useEffect(() => {
     const nome = dados ? (dados.unidade?.nome ?? 'Todas as unidades') : null
-    document.title = nome ? `${nome} — Copiloto de Ponto` : 'Copiloto de Ponto'
+    document.title = nome ? `${nome} Copiloto de Ponto` : 'Copiloto de Ponto'
   }, [dados])
 
   /** Atalho dos cards: abre a tela de Colaboradores já com o filtro e a ordem. */
@@ -296,19 +292,6 @@ export function DashboardUnidade() {
     <section className="pagina dash">
       <header className="dash-header">
         <TituloPagina>{nomePainel}</TituloPagina>
-        <p className="pagina-sub">
-          {consolidado
-            ? `Banco de horas de ${unidadesPainel.length} ${unidadesPainel.length === 1 ? 'unidade' : 'unidades'} juntas` +
-              (empresaEmFoco ? ` · ${empresaEmFoco.nome}` : '')
-            : 'Banco de horas dos colaboradores'}
-          {!aoVivo && fechamento && (
-            <>
-              {' — '}dados até {formatarData(fechamento.data_referencia)}
-              {datasIguais && fechamento.semana_fechamento_mes && ' (fechamento do mês)'}
-              {!datasIguais && ' (algumas unidades com dados anteriores)'}
-            </>
-          )}
-        </p>
         {aoVivo && (
           <p className="dash-ao-vivo">
             <SeloTempoReal titulo="Os dados de cada colaborador são atualizados continuamente" />
@@ -318,13 +301,6 @@ export function DashboardUnidade() {
         <div className="dash-filtro-periodo">
           <FiltroPeriodo escolhido={escolhido} de={intervalo.deParam} ate={intervalo.ateParam} onMudar={intervalo.mudar} />
         </div>
-        {textoIntervalo && (
-          <p className="colab-intervalo-nota">
-            Extras e negativas de <strong>{textoIntervalo}</strong>, somando os dias. Saldo, limites e distribuição são
-            do banco de horas atual.
-            {intervalo.alemDosDados && textoAlemDosDados(intervalo.horasAte)}
-          </p>
-        )}
       </header>
 
       {dados.aviso_fechamento_mes && (
@@ -507,8 +483,8 @@ export function DashboardUnidade() {
               {emAtencao.length === 0 ? (
                 <p className="dash-vazio">Nenhum colaborador fora da curva no momento.</p>
               ) : (
-                <ul className="dash-pessoas">
-                  {emAtencao.slice(0, MAX_EM_ATENCAO).map((linha) => (
+                <ul className="dash-pessoas dash-pessoas-rolagem">
+                  {emAtencao.map((linha) => (
                     <li key={linha.id}>
                       <Link to={linkColaborador(linha)} state={origem} className="dash-pessoa">
                         <span className={`avatar avatar-${linha.fora_da_curva}`} aria-hidden="true">

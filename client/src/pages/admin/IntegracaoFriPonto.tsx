@@ -63,7 +63,7 @@ export function IntegracaoFriPonto() {
   const [paginaHistorico, setPaginaHistorico] = useState(1)
 
   useEffect(() => {
-    document.title = 'Integração FriPonto — Copiloto de Ponto'
+    document.title = 'Integração FriPonto Copiloto de Ponto'
   }, [])
 
   const status = useRecurso(
@@ -128,10 +128,7 @@ export function IntegracaoFriPonto() {
 
   return (
     <section className="pagina integ">
-      <header className="pagina-header">
-        <TituloPagina>Integração FriPonto</TituloPagina>
-        <p className="pagina-sub">Situação da conexão com o FriPonto e pedidos de nova extração de cadastros e de horas.</p>
-      </header>
+      <TituloPagina>Integração FriPonto</TituloPagina>
 
       {status.carregando && <Carregando texto="Carregando integração..." />}
       {status.erro && <ErroCarregamento erro={status.erro} onTentarDeNovo={status.recarregar} />}
