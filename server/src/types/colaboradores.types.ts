@@ -37,8 +37,6 @@ export type ColaboradorAcessivel = {
 export type RegistroAtual = {
     fechamento_id: number
     data_referencia: string
-    /** início do período de apuração dos números (dia seguinte ao fechamento anterior) */
-    periodo_inicio: string
     extra_min: number
     negativa_min: number
     pagas_min: number

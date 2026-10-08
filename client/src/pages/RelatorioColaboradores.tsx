@@ -16,8 +16,8 @@ interface Props {
   filtro: string
   ordem: string
   dados: string
-  /** Intervalo de datas escolhido: saldo do intervalo (extras − negativas); pagas e curva (período e banco acumulado) saem. */
-  intervalo?: boolean
+  /** Intervalo de datas escolhido: as pagas só existem por período, então saem do relatório. */
+  semPagas?: boolean
 }
 
 function somar(linhas: Linha[], campo: 'saldo_min' | 'extra_min' | 'negativa_min' | 'pagas_min') {
@@ -33,7 +33,7 @@ export function RelatorioColaboradores({
   filtro,
   ordem,
   dados,
-  intervalo = false,
+  semPagas = false,
 }: Props) {
   const acima = linhas.filter((linha) => linha.fora_da_curva === 'positivo').length
   const abaixo = linhas.filter((linha) => linha.fora_da_curva === 'negativo').length
@@ -69,7 +69,7 @@ export function RelatorioColaboradores({
           <span className="rel-caixa-nota">{linhas.length === totalGeral ? 'todos da lista' : `de ${totalGeral} no painel`}</span>
         </div>
         <div className="rel-caixa">
-          <span className="rel-caixa-rotulo">{intervalo ? 'Saldo do intervalo' : 'Saldo banco'}</span>
+          <span className="rel-caixa-rotulo">Saldo banco</span>
           <span className={`rel-caixa-valor ${classeSinal(saldoTotal)}`}>{formatarMinutos(saldoTotal, { sinal: true })}</span>
           <span className="rel-caixa-nota">soma da lista</span>
         </div>
@@ -83,22 +83,20 @@ export function RelatorioColaboradores({
           <span className="rel-caixa-valor">{formatarMinutos(somar(linhas, 'negativa_min'))}</span>
           <span className="rel-caixa-nota">total da lista</span>
         </div>
-        {!intervalo && (
+        {!semPagas && (
           <div className="rel-caixa">
             <span className="rel-caixa-rotulo">Pagas</span>
             <span className="rel-caixa-valor">{formatarMinutos(somar(linhas, 'pagas_min'))}</span>
             <span className="rel-caixa-nota">total da lista</span>
           </div>
         )}
-        {!intervalo && (
-          <div className="rel-caixa">
-            <span className="rel-caixa-rotulo">Fora da curva</span>
-            <span className="rel-caixa-valor">
-              <span className="rel-pos">▲ {acima}</span> <span className="rel-neg">▼ {abaixo}</span>
-            </span>
-            <span className="rel-caixa-nota">acima · abaixo do limite</span>
-          </div>
-        )}
+        <div className="rel-caixa">
+          <span className="rel-caixa-rotulo">Fora da curva</span>
+          <span className="rel-caixa-valor">
+            <span className="rel-pos">▲ {acima}</span> <span className="rel-neg">▼ {abaixo}</span>
+          </span>
+          <span className="rel-caixa-nota">acima · abaixo do limite</span>
+        </div>
       </div>
 
       <table className={consolidado ? 'rel-tabela com-unidade' : 'rel-tabela'}>
@@ -108,11 +106,11 @@ export function RelatorioColaboradores({
             <th className="rel-col-nome">Colaborador</th>
             {consolidado && <th className="rel-col-unidade">Unidade</th>}
             <th className="rel-col-funcao">Função</th>
-            <th className="rel-col-saldo">{intervalo ? 'Saldo do intervalo' : 'Saldo banco'}</th>
+            <th className="rel-col-saldo">Saldo banco</th>
             <th className="rel-col-horas">Extras</th>
             <th className="rel-col-horas">Negativas</th>
-            {!intervalo && <th className="rel-col-horas">Pagas</th>}
-            {!intervalo && <th className="rel-col-curva">Situação</th>}
+            {!semPagas && <th className="rel-col-horas">Pagas</th>}
+            <th className="rel-col-curva">Situação</th>
           </tr>
         </thead>
         <tbody>
@@ -145,18 +143,16 @@ export function RelatorioColaboradores({
                 </td>
                 <td className="rel-col-horas">{formatarMinutos(linha.extra_min)}</td>
                 <td className="rel-col-horas">{formatarMinutos(linha.negativa_min)}</td>
-                {!intervalo && <td className="rel-col-horas">{formatarMinutos(linha.pagas_min)}</td>}
-                {!intervalo && (
-                  <td className="rel-col-curva">
-                    {curva === 'positivo' ? (
-                      <span className="rel-curva rel-curva-pos">▲ Acima</span>
-                    ) : curva === 'negativo' ? (
-                      <span className="rel-curva rel-curva-neg">▼ Abaixo</span>
-                    ) : (
-                      <span className="rel-curva">Normal</span>
-                    )}
-                  </td>
-                )}
+                {!semPagas && <td className="rel-col-horas">{formatarMinutos(linha.pagas_min)}</td>}
+                <td className="rel-col-curva">
+                  {curva === 'positivo' ? (
+                    <span className="rel-curva rel-curva-pos">▲ Acima</span>
+                  ) : curva === 'negativo' ? (
+                    <span className="rel-curva rel-curva-neg">▼ Abaixo</span>
+                  ) : (
+                    <span className="rel-curva">Normal</span>
+                  )}
+                </td>
               </tr>
             )
           })}

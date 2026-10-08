@@ -42,18 +42,15 @@ export function ItemResumo({
   detalhe,
   minutos,
   sinal = false,
-  onAbrir,
 }: {
   icone: ReactNode
   rotulo: string
   detalhe: string
   minutos: Minutos
   sinal?: boolean
-  /** Com ação, o item vira botão (ex.: abrir os colaboradores que compõem o total). */
-  onAbrir?: () => void
 }) {
-  const conteudo = (
-    <>
+  return (
+    <li>
       <span className="dash-resumo-icone" aria-hidden="true">
         {icone}
       </span>
@@ -62,18 +59,6 @@ export function ItemResumo({
         <span className="dash-resumo-detalhe">{detalhe}</span>
       </span>
       <Horas minutos={minutos} sinal={sinal} destacar={sinal} className="dash-resumo-valor" />
-    </>
-  )
-  return (
-    <li>
-      {onAbrir ? (
-        <button type="button" className="dash-resumo-botao" onClick={onAbrir} title={`Ver colaboradores: ${rotulo}`}>
-          {conteudo}
-          <IconeSetaDiagonal tamanho={14} className="dash-resumo-seta" />
-        </button>
-      ) : (
-        conteudo
-      )}
     </li>
   )
 }

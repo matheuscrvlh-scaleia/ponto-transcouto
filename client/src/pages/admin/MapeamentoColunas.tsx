@@ -47,7 +47,7 @@ export function MapeamentoColunas() {
   )
 
   useEffect(() => {
-    document.title = 'Mapeamento de colunas Copiloto de Ponto'
+    document.title = 'Mapeamento de colunas — Copiloto de Ponto'
   }, [])
 
   if (carregando) return <Carregando texto="Carregando mapeamento..." />
@@ -118,7 +118,12 @@ function EditorMapeamento({ inicial, query }: { inicial: MapeamentoResposta; que
 
   return (
     <section className="pagina">
-      <TituloPagina>Mapeamento de colunas</TituloPagina>
+      <header className="pagina-header">
+        <TituloPagina>Mapeamento de colunas</TituloPagina>
+        <p className="pagina-sub">
+          O que cada coluna do cálculo de totais da Secullum representa. Colunas não mapeadas fazem a extração falhar.
+        </p>
+      </header>
 
       {naoMapeadas.length > 0 && (
         <section className="card" aria-labelledby="titulo-detectadas">

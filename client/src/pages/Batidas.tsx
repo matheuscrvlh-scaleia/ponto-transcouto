@@ -3,12 +3,19 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
 import { Carregando, ErroCarregamento, EstadoVazio } from '../components/Estados'
-import { BarraFiltros, BuscaFiltro, LinhaFiltros, Segmentado, SelecaoFiltro } from '../components/BarraFiltros'
-import { FiltroPeriodo } from '../components/FiltroPeriodo'
-import { IconeBatidas, IconeUnidade } from '../components/Icones'
 import { api } from '../lib/api'
-import { formatarData, formatarDiaPorExtenso, hojeISO, iniciais } from '../lib/formato'
-import { ORIGENS, origemDa, situacaoDa, textoInclusao } from '../lib/batidas'
+import {
+  dataDoInstante,
+  datasDoPeriodo,
+  formatarData,
+  formatarDiaPorExtenso,
+  formatarHoraOuData,
+  hojeISO,
+  iniciais,
+  PERIODOS_RAPIDOS,
+  periodoRapidoDe,
+  type PeriodoRapido,
+} from '../lib/formato'
 import { useRecurso } from '../lib/useRecurso'
 import type { Batida, BatidasResposta, FiltroTipoBatida } from '../types/api'
 import './dashboard.css'
@@ -19,7 +26,6 @@ const POR_PAGINA = 50
 /** O worker traz as batidas novas a cada ~5 min; a primeira página se atualiza sozinha. */
 const INTERVALO_ATUALIZACAO_MS = 2 * 60_000
 const ESPERA_BUSCA_MS = 350
-const ORIGENS_NO_FILTRO = [1, 6, 7, 5, 4, 2, 3, 8]
 
 const TIPOS: { valor: FiltroTipoBatida; rotulo: string }[] = [
   { valor: 'todas', rotulo: 'Todas' },
@@ -27,6 +33,40 @@ const TIPOS: { valor: FiltroTipoBatida; rotulo: string }[] = [
   { valor: 'manuais', rotulo: 'Manuais' },
   { valor: 'desconsideradas', rotulo: 'Desconsideradas' },
 ]
+
+/** Origem da marcação na FriPonto (FonteDados). */
+const ORIGENS: Record<number, string> = {
+  0: 'Desconhecida',
+  1: 'Relógio de ponto',
+  2: 'Incluída manualmente',
+  3: 'Pré-assinalada',
+  4: 'Check-in',
+  5: 'Central do Funcionário (web)',
+  6: 'Aplicativo',
+  7: 'Aplicativo (offline)',
+  8: 'Integração externa',
+}
+const ORIGENS_NO_FILTRO = [1, 6, 7, 5, 4, 2, 3, 8]
+
+type Situacao = { rotulo: string; classe: 'original' | 'manual' | 'pre' | 'desconsiderada' }
+
+function situacaoDa(batida: Batida): Situacao {
+  if (batida.tipo === 3) return { rotulo: 'Desconsiderada', classe: 'desconsiderada' }
+  if (batida.tipo === 1 || batida.origem === 2) return { rotulo: 'Manual', classe: 'manual' }
+  if (batida.tipo === 2) return { rotulo: 'Pré-assinalada', classe: 'pre' }
+  return { rotulo: 'Original', classe: 'original' }
+}
+
+const origemDa = (batida: Batida) => ORIGENS[batida.origem] ?? `Origem ${batida.origem}`
+
+/** "lançada em 01/10 às 09:12" — só quando a marcação entrou na FriPonto em outro dia ou horário. */
+function textoInclusao(batida: Batida) {
+  if (!batida.incluida_em) return null
+  const [dia, horario = ''] = batida.incluida_em.split('T')
+  const hora = horario.slice(0, 5)
+  if (dia === batida.data && hora === batida.hora) return null
+  return `lançada em ${formatarData(dia, { ano: false })} às ${hora}`
+}
 
 function lerTipo(valor: string | null): FiltroTipoBatida {
   return TIPOS.some((tipo) => tipo.valor === valor) ? (valor as FiltroTipoBatida) : 'todas'
@@ -109,7 +149,7 @@ export function Batidas() {
   )
 
   useEffect(() => {
-    document.title = 'Batidas Copiloto de Ponto'
+    document.title = 'Batidas — Copiloto de Ponto'
   }, [])
 
   useEffect(() => {
@@ -158,7 +198,14 @@ export function Batidas() {
 
   return (
     <section className="pagina dash batidas">
-      <TituloPagina>Batidas</TituloPagina>
+      <header className="dash-header">
+        <TituloPagina>Batidas</TituloPagina>
+        <p className="pagina-sub">
+          Marcações de ponto vindas da FriPonto, da mais recente para a mais antiga
+          {dados?.importado_em &&
+            ` · atualizado ${dataDoInstante(dados.importado_em) === hoje ? 'às' : 'em'} ${formatarHoraOuData(dados.importado_em)}`}
+        </p>
+      </header>
 
       <section className="dash-card batidas-card" aria-labelledby="titulo-batidas">
         <div className="dash-card-topo" ref={topoLista}>
@@ -171,56 +218,89 @@ export function Batidas() {
           </div>
         </div>
 
-        <BarraFiltros>
-          <LinhaFiltros>
-            <BuscaFiltro
+        <div className="filtros batidas-filtros">
+          <div className="busca">
+            <label htmlFor="busca-batidas" className="sr-only">
+              Buscar colaborador por nome
+            </label>
+            <input
               id="busca-batidas"
-              rotulo="Buscar colaborador por nome"
+              type="search"
               placeholder="Buscar colaborador"
-              valor={textoBusca}
-              onMudar={setTextoBusca}
+              value={textoBusca}
+              onChange={(event) => setTextoBusca(event.target.value)}
             />
-            {variasUnidades && (
-              <SelecaoFiltro
-                rotulo="Unidade"
-                icone={<IconeUnidade tamanho={15} />}
-                opcoes={[
-                  { id: '', nome: 'Todas', geral: true },
-                  ...unidadesVisiveis.map((unidade) => ({ id: String(unidade.id), nome: unidade.nome_exibicao })),
-                ]}
-                valor={String(unidadeId ?? '')}
-                onMudar={(valor) => atualizar({ unidade: valor })}
-              />
-            )}
-          </LinhaFiltros>
-          <LinhaFiltros>
-            <FiltroPeriodo
-              escolhido={de || ate ? { de: de ?? ate!, ate: ate ?? hoje } : null}
-              de={de}
-              ate={ate}
-              onMudar={(novo) => atualizar({ de: novo.de, ate: novo.ate })}
-              rotuloVazio="Qualquer data"
-            />
-          </LinhaFiltros>
-          <LinhaFiltros>
-            <Segmentado
-              rotulo="Filtrar por situação"
-              opcoes={TIPOS}
-              valor={tipo}
-              onEscolher={(valor) => atualizar({ tipo: valor === 'todas' ? undefined : valor })}
-            />
-            <SelecaoFiltro
-              rotulo="Origem"
-              icone={<IconeBatidas tamanho={15} />}
-              opcoes={[
-                { id: '', nome: 'Todas', geral: true },
-                ...ORIGENS_NO_FILTRO.map((codigo) => ({ id: String(codigo), nome: ORIGENS[codigo] })),
-              ]}
-              valor={String(origemFiltro ?? '')}
-              onMudar={(valor) => atualizar({ origem: valor })}
-            />
-          </LinhaFiltros>
-        </BarraFiltros>
+          </div>
+
+          {variasUnidades && (
+            <label className="batidas-campo">
+              <span>Unidade</span>
+              <select value={unidadeId ?? ''} onChange={(event) => atualizar({ unidade: event.target.value })}>
+                <option value="">Todas</option>
+                {unidadesVisiveis.map((unidade) => (
+                  <option key={unidade.id} value={unidade.id}>
+                    {unidade.nome_exibicao}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <label className="batidas-campo">
+            <span>Período</span>
+            <select
+              value={periodoRapidoDe(de, ate, hoje) ?? (de || ate ? 'livre' : '')}
+              onChange={(event) => {
+                const valor = event.target.value
+                if (valor === '') atualizar({ de: undefined, ate: undefined })
+                else if (valor !== 'livre') atualizar(datasDoPeriodo(valor as PeriodoRapido, hoje))
+              }}
+            >
+              <option value="">Qualquer data</option>
+              {PERIODOS_RAPIDOS.map((item) => (
+                <option key={item.valor} value={item.valor}>
+                  {item.rotulo}
+                </option>
+              ))}
+              {/* datas escolhidas à mão: só aparece enquanto não batem com nenhuma seleção rápida */}
+              {periodoRapidoDe(de, ate, hoje) === null && (de || ate) && <option value="livre">Personalizado</option>}
+            </select>
+          </label>
+          <label className="batidas-campo">
+            <span>De</span>
+            <input type="date" value={de ?? ''} max={ate ?? hoje} onChange={(event) => atualizar({ de: event.target.value })} />
+          </label>
+          <label className="batidas-campo">
+            <span>Até</span>
+            <input type="date" value={ate ?? ''} min={de} max={hoje} onChange={(event) => atualizar({ ate: event.target.value })} />
+          </label>
+
+          <label className="batidas-campo">
+            <span>Origem</span>
+            <select value={origemFiltro ?? ''} onChange={(event) => atualizar({ origem: event.target.value })}>
+              <option value="">Todas</option>
+              {ORIGENS_NO_FILTRO.map((codigo) => (
+                <option key={codigo} value={codigo}>
+                  {ORIGENS[codigo]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="segmentos" role="group" aria-label="Filtrar por situação">
+            {TIPOS.map((item) => (
+              <button
+                key={item.valor}
+                type="button"
+                className={item.valor === tipo ? 'segmento ativo' : 'segmento'}
+                aria-pressed={item.valor === tipo}
+                onClick={() => atualizar({ tipo: item.valor === 'todas' ? undefined : item.valor })}
+              >
+                {item.rotulo}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {(colaboradorId || comFiltro) && (
           <div className="batidas-ativos">

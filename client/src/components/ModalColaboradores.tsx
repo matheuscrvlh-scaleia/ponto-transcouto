@@ -17,17 +17,13 @@ interface Props<T extends LinhaDashboard> {
   ordem?: 'desc' | 'asc'
   link: (linha: T) => string
   complemento: (linha: T) => string
-  limiteDe?: (linha: T) => Minutos | undefined
-  /** O que mostrar e ordenar em cada linha (ex.: extras do intervalo); sem isso, o saldo do banco com a curva. */
-  valor?: (linha: T) => Minutos
-  /** Com `valor`: mostra o sinal e a cor (positivo/negativo). */
-  sinal?: boolean
+  limiteDe: (linha: T) => Minutos | undefined
   /** state do Link, para o detalhe do colaborador voltar ao painel com os filtros */
   origem: { de: string }
   onFechar: () => void
 }
 
-/* Colaboradores de um pedaço de gráfico (faixa de saldo, dentro/acima/abaixo da curva) ou de um total do resumo. */
+/* Colaboradores de um pedaço de gráfico (faixa de saldo, dentro/acima/abaixo da curva). */
 export function ModalColaboradores<T extends LinhaDashboard>({
   titulo,
   descricao,
@@ -36,18 +32,15 @@ export function ModalColaboradores<T extends LinhaDashboard>({
   link,
   complemento,
   limiteDe,
-  valor,
-  sinal = false,
   origem,
   onFechar,
 }: Props<T>) {
   const [busca, setBusca] = useState('')
   const termo = normalizarBusca(busca)
   const fator = ordem === 'asc' ? 1 : -1
-  const numero = (linha: T) => (valor ? valor(linha) : linha.saldo_min)
   const visiveis = linhas
     .filter((linha) => normalizarBusca(`${linha.nome} ${complemento(linha)}`).includes(termo))
-    .sort((a, b) => fator * (numero(a) - numero(b)) || a.nome.localeCompare(b.nome, 'pt-BR'))
+    .sort((a, b) => fator * (a.saldo_min - b.saldo_min) || a.nome.localeCompare(b.nome, 'pt-BR'))
 
   return (
     <Modal titulo={titulo} onFechar={onFechar} largo>
@@ -88,14 +81,8 @@ export function ModalColaboradores<T extends LinhaDashboard>({
                   {complemento(linha) && <span className="modal-colab-info">{complemento(linha)}</span>}
                 </span>
                 <span className="modal-colab-saldo">
-                  {valor ? (
-                    <Horas minutos={valor(linha)} sinal={sinal} destacar={sinal} className="forte" />
-                  ) : (
-                    <>
-                      <Horas minutos={linha.saldo_min} sinal destacar className="forte" />
-                      <IndicadorCurva valor={linha.fora_da_curva} limite={limiteDe?.(linha)} compacto />
-                    </>
-                  )}
+                  <Horas minutos={linha.saldo_min} sinal destacar className="forte" />
+                  <IndicadorCurva valor={linha.fora_da_curva} limite={limiteDe(linha)} compacto />
                 </span>
               </Link>
             </li>

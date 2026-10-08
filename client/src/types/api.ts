@@ -172,39 +172,6 @@ export interface DiasColaborador {
   }[]
 }
 
-/** Batida do log da FriPonto dentro de um dia (GET /colaboradores/:id/dias-detalhe). */
-export interface BatidaDoDia {
-  /** 'HH:MM' */
-  hora: string
-  /** 0 Original, 1 Manual, 2 Pré-assinalada, 3 Desconsiderada */
-  tipo: TipoBatida
-  /** Mesma tabela de origens de Batida. */
-  origem: number
-  equipamento_id: number | null
-  /** Quando a marcação entrou na FriPonto (horário local, sem fuso). */
-  incluida_em: string | null
-}
-
-/** Resposta de GET /colaboradores/:id/dias-detalhe: dias com horas calculadas, batidas e marca de limite diário. */
-export interface DiasDetalhe {
-  de: DataISO
-  ate: DataISO
-  /** 0 = sem alerta diário. */
-  limites: { extra_dia: Minutos; negativa_dia: Minutos }
-  dias: {
-    dia: DataISO
-    /** false: o dia só tem batidas, ainda sem horas calculadas pela coleta. */
-    tem_calculo: boolean
-    extra_min: Minutos
-    negativa_min: Minutos
-    /** Entradas e saídas que entraram no cálculo, na ordem das colunas; pode trazer 'FOLGA', 'FALTA' etc. */
-    marcacoes: string[]
-    extra_acima: boolean
-    negativa_acima: boolean
-    batidas: BatidaDoDia[]
-  }[]
-}
-
 export interface FechamentoPublicado {
   id: number
   periodo_inicio: DataISO
@@ -274,8 +241,6 @@ export interface ColaboradorDetalhe {
     fechamento_id: number | null
     /** No tempo real, a data até onde vão os dados (hoje). */
     data_referencia: DataISO
-    /** Início do período de apuração dos números. */
-    periodo_inicio: DataISO
     fonte: FonteDados
     atualizado_em: DataHoraISO | null
     extra_min: Minutos

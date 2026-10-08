@@ -41,7 +41,7 @@ export function Empresas() {
   const [situacao, setSituacao] = useState<'' | 'ativas' | 'inativas'>('')
 
   useEffect(() => {
-    document.title = 'Empresas Copiloto de Ponto'
+    document.title = 'Empresas — Copiloto de Ponto'
   }, [])
 
   const termo = normalizarBusca(busca.trim())
@@ -133,6 +133,7 @@ export function Empresas() {
     <section className="pagina">
       <TituloPagina>Empresas</TituloPagina>
       <header className="pessoas-topo">
+        <p>Clientes atendidos: dados cadastrais, contato e credenciais da integração com a Secullum.</p>
         <button type="button" className="pessoas-novo" onClick={() => setEditando('nova')}>
           <IconeMais tamanho={18} />
           Nova empresa

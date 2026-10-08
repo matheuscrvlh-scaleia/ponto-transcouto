@@ -52,7 +52,7 @@ export function Unidades() {
   )
 
   useEffect(() => {
-    document.title = 'Unidades Copiloto de Ponto'
+    document.title = 'Unidades — Copiloto de Ponto'
   }, [])
 
   const empresa = empresas.find((item) => item.id === empresaId)
@@ -103,6 +103,10 @@ export function Unidades() {
     <section className="pagina unid">
       <TituloPagina>Unidades</TituloPagina>
       <header className="unid-cabecalho">
+        <p className="pagina-sub">
+          Cada CNPJ da FriPonto vira uma unidade. Dê um nome curto para ela aparecer assim nos painéis e desative as que não
+          devem ser extraídas.
+        </p>
         <button type="button" className="unid-botao" onClick={sincronizar} disabled={sincronizando}>
           <IconeSincronizar tamanho={16} />
           {sincronizando ? 'Pedindo...' : 'Sincronizar com a FriPonto'}

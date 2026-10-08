@@ -70,7 +70,7 @@ export function DetalheFechamento() {
   }, [emAndamento, rodando, recarregar])
 
   useEffect(() => {
-    if (dados) document.title = `${dados.unidade.nome} ${formatarData(dados.data_referencia)} Fechamentos`
+    if (dados) document.title = `${dados.unidade.nome} ${formatarData(dados.data_referencia)} — Fechamentos`
   }, [dados])
 
   if (carregando) return <Carregando texto="Carregando fechamento..." />
