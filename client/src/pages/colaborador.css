@@ -2,6 +2,9 @@
 
 /* topo: identidade à esquerda, banco acumulado à direita */
 .perfil-topo {
+  /* barra, identidade e faixa do banco, uma embaixo da outra, cada uma na largura toda */
+  flex-direction: column;
+  align-items: stretch;
   gap: 18px;
 }
 
@@ -48,7 +51,7 @@
 
 /* barra no topo do card: voltar à esquerda, ações (log, CSV, PDF) à direita */
 .perfil-barra {
-  flex-basis: 100%;
+  width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -297,23 +300,23 @@
   align-items: flex-start;
 }
 
-.perfil-barra {
+.perfil-grafico-barra {
   width: min(70%, 22px);
   min-height: 2px;
 }
 
-.perfil-barra.mais {
+.perfil-grafico-barra.mais {
   border-radius: 4px 4px 0 0;
   background: linear-gradient(180deg, var(--destaque-de), var(--positivo));
 }
 
-.perfil-barra.menos {
+.perfil-grafico-barra.menos {
   border-radius: 0 0 4px 4px;
   background: var(--negativo);
   opacity: 0.85;
 }
 
-.perfil-barra.acima {
+.perfil-grafico-barra.acima {
   box-shadow: 0 0 0 2px var(--aviso-border);
 }
 

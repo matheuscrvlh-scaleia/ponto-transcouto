@@ -255,7 +255,7 @@ function GraficoDiasPerfil({ dias }: { dias: DiaAnalisado[] }) {
             <div className="perfil-grafico-metade cima">
               {d.extra_min > 0 && (
                 <span
-                  className={d.extra_acima ? 'perfil-barra mais acima' : 'perfil-barra mais'}
+                  className={d.extra_acima ? 'perfil-grafico-barra mais acima' : 'perfil-grafico-barra mais'}
                   style={{ height: `${(d.extra_min / maior) * 100}%` }}
                 />
               )}
@@ -263,7 +263,7 @@ function GraficoDiasPerfil({ dias }: { dias: DiaAnalisado[] }) {
             <div className="perfil-grafico-metade baixo">
               {d.negativa_min > 0 && (
                 <span
-                  className={d.negativa_acima ? 'perfil-barra menos acima' : 'perfil-barra menos'}
+                  className={d.negativa_acima ? 'perfil-grafico-barra menos acima' : 'perfil-grafico-barra menos'}
                   style={{ height: `${(d.negativa_min / maior) * 100}%` }}
                 />
               )}
