@@ -113,10 +113,6 @@ export function DetalheColaborador() {
 
   return (
     <section className="pagina">
-      <Link to={voltarPara} className="voltar">
-        <span aria-hidden="true">←</span> Voltar para {colaborador.unidade.nome}
-      </Link>
-
       {/* o título fica na barra do topo, que não sai na impressão */}
       <div className="so-impressao impressao-cabecalho">
         <p className="impressao-titulo">Histórico de horas — {colaborador.nome}</p>
@@ -126,8 +122,21 @@ export function DetalheColaborador() {
         </p>
       </div>
 
+      <TituloPagina>Colaborador</TituloPagina>
+
       <header className="dash-card perfil-topo">
-        <TituloPagina>{colaborador.nome}</TituloPagina>
+        <div className="perfil-barra nao-imprimir">
+          <Link to={voltarPara} className="voltar">
+            <span aria-hidden="true">←</span> Voltar para {colaborador.unidade.nome}
+          </Link>
+          <div className="perfil-acoes">
+            <Link to={`/batidas?colaborador=${colaborador.id}`} className="btn-secondary perfil-acao">
+              Ver no log de batidas
+            </Link>
+            <ExportarHistorico colaborador={colaborador} />
+          </div>
+        </div>
+
         <div className="perfil-identidade">
           <span className="avatar perfil-avatar" aria-hidden="true">
             {iniciais(colaborador.nome)}
@@ -138,12 +147,6 @@ export function DetalheColaborador() {
               {colaborador.ativo === false && <span className="badge badge-neutral badge-titulo">Inativo</span>}
             </h2>
             <p className="perfil-cargo">{[colaborador.funcao, colaborador.unidade.nome].filter(Boolean).join(' · ')}</p>
-            <div className="perfil-acoes nao-imprimir">
-              <Link to={`/batidas?colaborador=${colaborador.id}`} className="btn-secondary perfil-acao">
-                Ver no log de batidas
-              </Link>
-              <ExportarHistorico colaborador={colaborador} />
-            </div>
           </div>
         </div>
 
