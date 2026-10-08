@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Horas } from '../components/Horas'
 import { api } from '../lib/api'
+import { marcacoesParaExibir } from '../lib/batidas'
 import { formatarData, formatarMinutos } from '../lib/formato'
 import { useRecurso } from '../lib/useRecurso'
 import type { DataISO, DiasColaborador as Resposta } from '../types/api'
@@ -97,7 +98,7 @@ export function DiasColaboradorLinhas({ comPagas, ...props }: Props & { comPagas
               <span className="linha-dia-data">
                 <span className="dias-colab-semana">{diaDaSemana(dia.dia)}</span> {formatarData(dia.dia, { ano: false })}
               </span>
-              <span className="linha-dia-marcacoes">{dia.marcacoes.length ? dia.marcacoes.join(' · ') : 'sem marcações'}</span>
+              <span className="linha-dia-marcacoes">{dia.marcacoes.length ? marcacoesParaExibir(dia.marcacoes).join(' · ') : 'sem marcações'}</span>
             </th>
             <td />
             <td className={dia.extra_acima ? 'num forte' : 'num'}>{horasOuTraco(dia.extra_min)}</td>
@@ -178,7 +179,7 @@ export function DiasColaborador(props: Props) {
                   <span className="dias-colab-semana">{diaDaSemana(dia.dia)}</span> {formatarData(dia.dia, { ano: false })}
                   {(dia.extra_acima || dia.negativa_acima) && <span className="selo-limite-dia">acima do limite</span>}
                 </th>
-                <td className="dias-colab-marcacoes">{dia.marcacoes.length ? dia.marcacoes.join(' · ') : '—'}</td>
+                <td className="dias-colab-marcacoes">{dia.marcacoes.length ? marcacoesParaExibir(dia.marcacoes).join(' · ') : '—'}</td>
                 <td className={dia.extra_acima ? 'num forte' : 'num'}>{horasOuTraco(dia.extra_min)}</td>
                 <td className={dia.negativa_acima ? 'num forte' : 'num'}>{horasOuTraco(dia.negativa_min)}</td>
               </tr>

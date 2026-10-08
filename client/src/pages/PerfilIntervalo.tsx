@@ -5,7 +5,7 @@ import { Carregando, ErroCarregamento } from '../components/Estados'
 import { Horas } from '../components/Horas'
 import { IconeAlerta, IconeCalendario, IconeMais, IconeMenos, IconeRelogio } from '../components/Icones'
 import { api } from '../lib/api'
-import { origemDa, situacaoDa, textoInclusao } from '../lib/batidas'
+import { ehHorario, marcacoesParaExibir, origemDa, situacaoDa, textoInclusao } from '../lib/batidas'
 import { formatarData, formatarDiaPorExtenso, formatarMinutos } from '../lib/formato'
 import { textoDoIntervalo, type Intervalo } from '../lib/intervalo'
 import { useRecurso } from '../lib/useRecurso'
@@ -20,7 +20,6 @@ import './colaborador.css'
 const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 /** Mais que isso trabalhado num dia quase sempre é batida esquecida ou fora de ordem. */
 const DIA_SUSPEITO_MIN = 16 * 60
-const HORA = /^\d{1,2}:\d{2}$/
 
 type Dia = DiasDetalhe['dias'][number]
 type Aba = 'dias' | 'batidas' | 'historico'
@@ -41,7 +40,7 @@ const minutosDe = (hora: string) => {
  */
 export function analisarDia(todas: string[]): { trabalhado: Minutos | null; conferir: string | null } {
   // textos como FOLGA ou FALTA ficam de fora da conta
-  const marcacoes = todas.filter((m) => HORA.test(m))
+  const marcacoes = todas.filter(ehHorario)
   if (marcacoes.length === 0) return { trabalhado: null, conferir: null }
   let trabalhado = 0
   for (let i = 0; i + 1 < marcacoes.length; i += 2) {
@@ -88,6 +87,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
   const extra = dias.reduce((soma, d) => soma + d.extra_min, 0)
   const negativa = dias.reduce((soma, d) => soma + d.negativa_min, 0)
   const diasComExtra = dias.filter((d) => d.extra_min > 0).length
+  const maiorExtra = dias.reduce<(typeof dias)[number] | null>((maior, d) => (d.extra_min > 0 && (!maior || d.extra_min >= maior.extra_min) ? d : maior), null)
   const diasComNegativa = dias.filter((d) => d.negativa_min > 0).length
   const acimaExtra = dias.filter((d) => d.extra_acima).length
   const acimaNegativa = dias.filter((d) => d.negativa_acima).length
@@ -95,7 +95,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
   const mediaTrabalhada = trabalhados.length
     ? Math.round(trabalhados.reduce((soma, d) => soma + (d.trabalhado ?? 0), 0) / trabalhados.length)
     : null
-  const diasComBatida = dias.filter((d) => d.marcacoes.length > 0).length
+  const diasComBatida = dias.filter((d) => d.marcacoes.some(ehHorario)).length
   const aConferir = dias.filter((d) => d.conferir).length
   const { extra_dia: limiteExtra, negativa_dia: limiteNegativa } = dados.limites
   const semLimite = !limiteExtra && !limiteNegativa
@@ -107,7 +107,11 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
           icone={<IconeMais tamanho={16} />}
           rotulo="Extras"
           valor={<Horas minutos={extra} />}
-          detalhe={diasComExtra ? `em ${diasComExtra} ${diasComExtra === 1 ? 'dia' : 'dias'}` : 'nenhum dia'}
+          detalhe={
+            maiorExtra
+              ? `em ${diasComExtra} ${diasComExtra === 1 ? 'dia' : 'dias'} · maior ${formatarMinutos(maiorExtra.extra_min)} em ${formatarData(maiorExtra.dia, { ano: false })}`
+              : 'nenhum dia'
+          }
           tom="positivo"
         />
         <Indicador
@@ -228,6 +232,15 @@ function Indicador({
 
 type DiaAnalisado = Dia & ReturnType<typeof analisarDia>
 
+/** Horários alternam entrada/saída; textos da FriPonto (FOLGA, FALTA…) aparecem uma vez, em destaque. */
+function classificarMarcacoes(marcacoes: string[]) {
+  let horarios = 0
+  return marcacoesParaExibir(marcacoes).map((texto) => ({
+    texto,
+    classe: !ehHorario(texto) ? 'texto' : horarios++ % 2 === 0 ? 'entrada' : 'saida',
+  }))
+}
+
 /** Barras por dia: extras para cima (azul), negativas para baixo (vermelho), na mesma escala. */
 function GraficoDiasPerfil({ dias }: { dias: DiaAnalisado[] }) {
   const maior = Math.max(60, ...dias.map((d) => Math.max(d.extra_min, d.negativa_min)))
@@ -274,7 +287,7 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
   const visiveis = [...dias]
     .filter((d) => !soComHoras || d.extra_min > 0 || d.negativa_min > 0 || d.conferir)
     .sort((a, b) => b.dia.localeCompare(a.dia))
-  const maxBatidas = Math.max(2, ...visiveis.map((d) => d.marcacoes.length))
+  const maxBatidas = Math.max(2, ...visiveis.map((d) => d.marcacoes.filter(ehHorario).length))
   const extra = visiveis.reduce((soma, d) => soma + d.extra_min, 0)
   const negativa = visiveis.reduce((soma, d) => soma + d.negativa_min, 0)
 
@@ -330,14 +343,9 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
                       <span className="texto-suave">sem batidas</span>
                     ) : (
                       <span className="perfil-batidas" style={{ gridTemplateColumns: `repeat(${maxBatidas}, auto)` }}>
-                        {d.marcacoes.map((hora, i) => (
-                          <span
-                            key={i}
-                            className={
-                              !HORA.test(hora) ? 'perfil-batida texto' : i % 2 === 0 ? 'perfil-batida entrada' : 'perfil-batida saida'
-                            }
-                          >
-                            {hora}
+                        {classificarMarcacoes(d.marcacoes).map(({ texto, classe }, i) => (
+                          <span key={i} className={`perfil-batida ${classe}`}>
+                            {texto}
                           </span>
                         ))}
                       </span>

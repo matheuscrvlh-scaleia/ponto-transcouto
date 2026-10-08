@@ -35,3 +35,23 @@ export function textoInclusao(batida: Pick<Batida, 'data' | 'hora' | 'incluida_e
   if (dia === batida.data && hora === batida.hora) return null
   return `lançada em ${formatarData(dia, { ano: false })} às ${hora}`
 }
+
+const HORA = /^\d{1,2}:\d{2}$/
+
+/** É um horário ("09:33"); o resto são textos do cálculo da FriPonto (FOLGA, FALTA…). */
+export const ehHorario = (marcacao: string) => HORA.test(marcacao)
+
+/**
+ * Marcações para mostrar: os horários como vieram e cada texto (FOLGA, FALTA…) uma vez só,
+ * já que a FriPonto repete o texto em todas as colunas de entrada e saída do dia.
+ */
+export function marcacoesParaExibir(marcacoes: string[]) {
+  const textosVistos = new Set<string>()
+  return marcacoes.filter((marcacao) => {
+    if (ehHorario(marcacao)) return true
+    const texto = marcacao.toUpperCase()
+    if (textosVistos.has(texto)) return false
+    textosVistos.add(texto)
+    return true
+  })
+}
