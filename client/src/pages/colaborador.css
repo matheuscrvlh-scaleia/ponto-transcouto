@@ -9,9 +9,13 @@
   gap: 20px 32px;
 }
 
+/* nome e avatar centralizados no espaço à esquerda do card do banco */
 .perfil-identidade {
+  flex: 1 1 320px;
+  align-self: stretch;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   min-width: 0;
 }

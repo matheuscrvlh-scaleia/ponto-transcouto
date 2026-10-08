@@ -77,6 +77,8 @@ export interface Secao {
   tipo: TipoSecao
   inicio: DataISO
   fim: DataISO
+  /** Início do período de apuração (mês) em que a seção está: de onde vêm as extras acumuladas. */
+  periodoInicio: DataISO
   /** Semana que fecha o mês (registro oficial do mês). */
   fechamentoMes: boolean
   /** Totais oficiais da seção; null na seção em andamento. */
@@ -181,7 +183,7 @@ export function calcularDias(brutos: DiaApi[], base: Base, gravados?: Map<DataIS
 }
 
 function montarSecao(
-  base: Pick<Secao, 'chave' | 'tipo' | 'inicio' | 'fim' | 'fechamentoMes' | 'oficial' | 'abertura'>,
+  base: Pick<Secao, 'chave' | 'tipo' | 'inicio' | 'fim' | 'periodoInicio' | 'fechamentoMes' | 'oficial' | 'abertura'>,
   dias: DiaCalculado[],
 ): Secao {
   const comCalculo = dias.filter((d) => d.temCalculo)
@@ -229,6 +231,7 @@ export function secoesSemanais(historico: SemanaHistorico[], dias: DiaApi[], hoj
         tipo: 'semana',
         inicio: inicio > fim ? fim : inicio,
         fim,
+        periodoInicio: semana.periodo_inicio,
         fechamentoMes: semana.semana_fechamento_mes,
         oficial: {
           extra: semana.extra_semana,
@@ -258,6 +261,7 @@ export function secoesSemanais(historico: SemanaHistorico[], dias: DiaApi[], hoj
           tipo: 'andamento',
           inicio: depois[0].dia,
           fim: depois[depois.length - 1].dia,
+          periodoInicio: ultima.periodo_inicio,
           fechamentoMes: false,
           oficial: null,
           abertura: ultima.saldo_total,
@@ -296,6 +300,7 @@ export function secoesTempoReal(
           tipo: 'periodo',
           inicio,
           fim,
+          periodoInicio: inicio,
           fechamentoMes: false,
           oficial: {
             extra: ultimo.extra_periodo,
@@ -317,42 +322,6 @@ function diasUnicos(secoes: Secao[]) {
   const porDia = new Map<DataISO, DiaCalculado>()
   for (const secao of [...secoes].reverse()) for (const dia of secao.dias) porDia.set(dia.dia, dia)
   return [...porDia.values()].sort((a, b) => a.dia.localeCompare(b.dia))
-}
-
-export interface Indicadores {
-  /** Dias com horas calculadas no período. */
-  diasComDados: number
-  diasAcima: number
-  diasAcimaExtra: number
-  diasAcimaNegativa: number
-  maiorExtra: { dia: DataISO; minutos: Minutos; suspeito: boolean } | null
-  maiorNegativa: { dia: DataISO; minutos: Minutos } | null
-  diasParaConferir: number
-}
-
-/** Números do período a partir dos dias (sem repetir dia que apareça em duas seções). */
-export function calcularIndicadores(secoes: Secao[], inicio: DataISO, fim: DataISO): Indicadores {
-  const dias = diasUnicos(secoes).filter((d) => d.temCalculo && d.dia >= inicio && d.dia <= fim)
-
-  let maiorExtra: Indicadores['maiorExtra'] = null
-  let maiorNegativa: Indicadores['maiorNegativa'] = null
-  for (const d of dias) {
-    if (d.extra > 0 && (!maiorExtra || d.extra >= maiorExtra.minutos)) {
-      maiorExtra = { dia: d.dia, minutos: d.extra, suspeito: d.extra > MINUTOS_NO_DIA }
-    }
-    if (d.negativa > 0 && (!maiorNegativa || d.negativa >= maiorNegativa.minutos)) {
-      maiorNegativa = { dia: d.dia, minutos: d.negativa }
-    }
-  }
-  return {
-    diasComDados: dias.length,
-    diasAcima: dias.filter((d) => d.extraAcima || d.negativaAcima).length,
-    diasAcimaExtra: dias.filter((d) => d.extraAcima).length,
-    diasAcimaNegativa: dias.filter((d) => d.negativaAcima).length,
-    maiorExtra,
-    maiorNegativa,
-    diasParaConferir: dias.filter((d) => d.avisos.length > 0).length,
-  }
 }
 
 export interface PontoGrafico {

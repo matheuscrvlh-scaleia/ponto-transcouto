@@ -7,6 +7,7 @@ import { ORIGENS } from '../../lib/batidas'
 import { formatarData, formatarMinutos, hojeISO } from '../../lib/formato'
 import type { DiaCalculado, PontoGrafico, Secao } from '../../lib/historico-dias'
 import type { BatidaDoDia, DataISO, Minutos, SemanaHistorico } from '../../types/api'
+import './detalhe.css'
 
 const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 
@@ -391,7 +392,6 @@ interface CorpoProps {
   detalheDisponivel: boolean
   onTentarDeNovo?: () => void
   filtrado: boolean
-  inicioPeriodo: DataISO | null
 }
 
 function ConferenciaSecao({ secao }: { secao: Secao }) {
@@ -442,7 +442,6 @@ function CorpoSecao({
   detalheDisponivel,
   onTentarDeNovo,
   filtrado,
-  inicioPeriodo,
 }: CorpoProps) {
   const semDetalhe = secao.dias.length === 0
   const comEstimado = secao.dias.some((d) => d.saldo !== null && !d.saldoExato)
@@ -506,7 +505,7 @@ function CorpoSecao({
               aberto={diasAbertos.has(dia.dia)}
               onAlternar={() => onAlternarDia(dia.dia)}
               limites={limites}
-              inicioPeriodo={inicioPeriodo}
+              inicioPeriodo={secao.periodoInicio}
             />
           ))}
         </ul>
@@ -531,8 +530,6 @@ interface HistoricoProps {
   /** A consulta do detalhe por dia deu certo? */
   detalheDisponivel: boolean
   onTentarDeNovo?: () => void
-  /** Início do período do resumo (para dizer "desde dd/mm" nas extras acumuladas). */
-  inicioPeriodo: DataISO | null
 }
 
 export function HistoricoDias({
@@ -545,7 +542,6 @@ export function HistoricoDias({
   fechamentos,
   detalheDisponivel,
   onTentarDeNovo,
-  inicioPeriodo,
 }: HistoricoProps) {
   const hoje = hojeISO()
   const [abertas, setAbertas] = useState<Set<string>>(() => new Set(secoes[0] ? [secoes[0].chave] : []))
@@ -593,7 +589,7 @@ export function HistoricoDias({
   }
 
   return (
-    <>
+    <div className="dc-historico">
       {pontos.length > 1 && (
         <section className="dc-card" aria-labelledby="dc-grafico-titulo">
           <h2 id="dc-grafico-titulo">Evolução do saldo</h2>
@@ -623,9 +619,10 @@ export function HistoricoDias({
               <h2 id="dc-historico-titulo">{tempoReal ? 'Histórico por período' : 'Histórico semanal'}</h2>
               <p className="dc-card-sub">
                 Abra {tempoReal ? 'um período' : 'uma semana'} para ver os dias e um dia para ver as batidas, as contas e o saldo até ali.
-                {textoLimites.length > 0
-                  ? ` Dias marcados pelo limite diário atual da empresa: ${textoLimites.join(' ou ')}.`
-                  : ' O limite diário da empresa não está configurado, então nenhum dia é marcado.'}
+                {detalheDisponivel &&
+                  (textoLimites.length > 0
+                    ? ` Dias marcados pelo limite diário atual da empresa: ${textoLimites.join(' ou ')}.`
+                    : ' O limite diário da empresa não está configurado, então nenhum dia é marcado.')}
               </p>
             </div>
           </div>
@@ -694,7 +691,6 @@ export function HistoricoDias({
                         detalheDisponivel={detalheDisponivel}
                         onTentarDeNovo={onTentarDeNovo}
                         filtrado={filtro !== 'todos'}
-                        inicioPeriodo={inicioPeriodo}
                       />
                     </div>
                   </li>
@@ -706,7 +702,7 @@ export function HistoricoDias({
       )}
 
       {tempoReal && <FechamentosDoMes nome={nome} fechamentos={fechamentosMes} />}
-    </>
+    </div>
   )
 }
 

@@ -144,18 +144,18 @@ export function ExportarHistorico({ colaborador }: { colaborador: ColaboradorDet
   }
 
   return (
-    <>
-      <button type="button" className="dc-botao" onClick={baixar} disabled={gerando}>
+    <div className="exportar nao-imprimir">
+      <button type="button" className="btn-secondary" onClick={baixar} disabled={gerando}>
         {gerando ? 'Gerando CSV...' : 'Baixar CSV'}
       </button>
       <button
         type="button"
-        className="dc-botao"
+        className="btn-secondary"
         onClick={() => imprimirComoPdf(`Histórico - ${colaborador.nome}`)}
         title="Abre a impressão do navegador; escolha “Salvar como PDF”"
       >
         Salvar PDF
       </button>
-    </>
+    </div>
   )
 }
