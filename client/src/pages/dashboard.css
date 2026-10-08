@@ -1718,6 +1718,8 @@ span.selo-limite-dia {
 /* grupo segmentado: opções num trilho só, a escolhida em destaque */
 .segmentado {
   display: flex;
+  /* só o tamanho das opções, mesmo dentro de um card em coluna (que esticaria) */
+  width: fit-content;
   max-width: 100%;
   gap: 2px;
   padding: 4px;
