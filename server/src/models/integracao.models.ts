@@ -330,7 +330,10 @@ export async function atividade(ator: Ator, empresaId: number | null) {
                          -- pendente esperando nova tentativa daqui a muito tempo não é "sincronizando agora"
                          OR (f.status = 'pendente'
                              AND (f.proxima_tentativa_em IS NULL OR f.proxima_tentativa_em <= now() + interval '5 minutes'))))::int AS fechamentos,
+                -- só empresa ainda em tempo real: ao voltar para o semanal o worker larga o rodízio e
+                -- um "Atualizar agora" pendente ficaria marcado (e "sincronizando") para sempre
                 (SELECT count(*) FROM registros_tempo_real rt
+                   JOIN configuracoes cf ON cf.empresa_id = rt.empresa_id AND cf.modo_extracao = 'tempo_real'
                   WHERE rt.empresa_id IN (SELECT id FROM emp) AND rt.unidade_id IN (${permitidas})
                     AND rt.tentado_em = ${FORCADO})::int AS tempo_real,
                 (SELECT count(*) FROM batidas_importacao bi
