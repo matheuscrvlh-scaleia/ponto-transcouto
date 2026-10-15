@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import { withTransaction } from '../db/database'
 import * as mapeamentoModel from '../models/admin-mapeamento.models'
 import * as auditoria from '../models/auditoria.models'
+import { solicitarRecalculo } from '../models/recalculo.models'
 import { colunasDasMensagensDeErro } from '../services/calculo-horas.service'
 import { exigirEmpresa } from '../services/escopo.service'
 import { salvarMapeamentoSchema } from '../types/admin-mapeamento.types'
@@ -30,6 +31,10 @@ export async function salvar(req: FastifyRequest, res: FastifyReply) {
     const salvo = await withTransaction(async client => {
         const anterior = await mapeamentoModel.listar(empresaId, client)
         await mapeamentoModel.substituir(empresaId, mapeamento, client)
+        const atual = await mapeamentoModel.listar(empresaId, client)
+        // o mapeamento novo vale também para os dados já extraídos (os totais da FriPonto ficam gravados)
+        const mudou = JSON.stringify(atual) !== JSON.stringify(anterior)
+        if (mudou) await solicitarRecalculo(empresaId, client)
         await auditoria.registrar(
             {
                 ator: req.usuario,
@@ -37,12 +42,12 @@ export async function salvar(req: FastifyRequest, res: FastifyReply) {
                 acao: 'mapeamento_colunas.alterado',
                 entidade: 'mapeamento_colunas',
                 entidadeId: empresaId,
-                dados: { antes: anterior, depois: mapeamento },
+                dados: { antes: anterior, depois: mapeamento, recalculo_solicitado: mudou },
                 ip: req.ip,
             },
             client,
         )
-        return mapeamentoModel.listar(empresaId, client)
+        return atual
     })
 
     res.send({ mapeamento: salvo })

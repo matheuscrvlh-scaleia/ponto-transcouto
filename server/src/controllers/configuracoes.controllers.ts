@@ -3,6 +3,7 @@ import { withTransaction } from '../db/database'
 import { minutosPorRodada } from '../jobs/tempo-real.job'
 import * as auditoria from '../models/auditoria.models'
 import * as configuracoesModel from '../models/configuracoes.models'
+import { recalculoPendente, solicitarRecalculo } from '../models/recalculo.models'
 import { contarElegiveis } from '../models/tempo-real.models'
 import { periodoDeHoje, previsaoDaRegua } from '../services/calendario.service'
 import { exigirEmpresa } from '../services/escopo.service'
@@ -10,6 +11,7 @@ import { empresaQuerySchema } from '../types/comum.types'
 import {
     atualizarConfiguracoesSchema,
     calendarioQuerySchema,
+    camposRegraPagas,
     camposRegua,
     camposRh,
     telaDoCampo,
@@ -31,6 +33,7 @@ async function buscarConfiguracao(empresaId: number) {
     }
     return {
         ...config,
+        recalculo_pendente: await recalculoPendente(empresaId),
         tempo_real_estimativa: { colaboradores, minutos_por_rodada: minutosPorRodada(colaboradores, config.cota_calcular_por_hora) },
     }
 }
@@ -58,6 +61,8 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
 
     const anterior = await buscarConfiguracao(empresaId)
     const mudouRegua = camposRegua.some(c => campos[c] !== undefined && campos[c] !== anterior[c])
+    // o saldo é acumulado: a regra nova de horas pagas vale também para os dados já extraídos
+    const mudouRegraPagas = camposRegraPagas.some(c => campos[c] !== undefined && campos[c] !== anterior[c])
 
     // tempo real não tem fotografia semanal, então não consegue aplicar o teto semanal de horas pagas
     const final = { ...anterior, ...campos }
@@ -75,6 +80,7 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
             : virouTempoReal
               ? await configuracoesModel.descartarCiclosNaoIniciados(empresaId, client, 'semanal')
               : 0
+        if (mudouRegraPagas) await solicitarRecalculo(empresaId, client)
         await auditoria.registrar(
             {
                 ator: req.usuario,
@@ -86,6 +92,7 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
                     antes: Object.fromEntries(chaves.map(c => [c, anterior[c]])),
                     depois: campos,
                     ciclos_descartados: ciclosDescartados,
+                    recalculo_solicitado: mudouRegraPagas,
                 },
                 ip: req.ip,
             },

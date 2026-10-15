@@ -38,6 +38,28 @@ describe('configurações', () => {
         expect(rows[0].dados.depois).toEqual({ teto_horas_pagas_minutos: 720, alerta_saldo_positivo_minutos: 480 })
     })
 
+    it('mudar a regra de horas pagas pede o recálculo do histórico; mudar só os alertas, não', async () => {
+        await db.query('DELETE FROM recalculos_saldo WHERE empresa_id = $1', [ctx.empresaId])
+        const pedidos = async () =>
+            (await db.query('SELECT count(*)::int AS n FROM recalculos_saldo WHERE empresa_id = $1', [ctx.empresaId])).rows[0].n
+
+        const alertas = await requisitar('rh', 'PATCH', '/configuracoes', { alerta_saldo_negativo_minutos: 900 })
+        expect(alertas.statusCode, alertas.body).toBe(200)
+        expect(alertas.json().recalculo_pendente).toBe(false)
+        expect(await pedidos()).toBe(0)
+
+        const teto = await requisitar('rh', 'PATCH', '/configuracoes', { teto_horas_pagas_minutos: 900 })
+        expect(teto.statusCode, teto.body).toBe(200)
+        expect(teto.json().recalculo_pendente).toBe(true)
+        expect(await pedidos()).toBe(1)
+
+        const { rows } = await db.query(
+            `SELECT dados FROM log_auditoria WHERE acao = 'configuracao.alterada' AND empresa_id = $1 ORDER BY id DESC LIMIT 1`,
+            [ctx.empresaId],
+        )
+        expect(rows[0].dados.recalculo_solicitado).toBe(true)
+    })
+
     it('rh escolhe modo, dia e hora da atualização, mas não o resto da régua', async () => {
         const proibido = await requisitar('rh', 'PATCH', '/configuracoes', { dia_fechamento_mes: 20 })
         expect(proibido.statusCode).toBe(403)

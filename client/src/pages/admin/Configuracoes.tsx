@@ -223,7 +223,16 @@ function usaTetoSemanal(config: Pick<Config, 'origem_horas_pagas' | 'teto_period
   return config.origem_horas_pagas === 'teto' && config.teto_periodicidade === 'semanal'
 }
 
+/** Regra de horas pagas: mudar recalcula o saldo de todo o histórico, não só dos próximos dados. */
+function mudouRegraPagas(salva: Config, anterior: Config) {
+  return (['origem_horas_pagas', 'teto_horas_pagas_minutos', 'teto_periodicidade'] as const).some(
+    (campo) => salva[campo] !== anterior[campo],
+  )
+}
+
 function mensagemSalvo(secao: SecaoConfiguracoes, salva: Config, anterior: Config) {
+  if (secao === 'alertas' && mudouRegraPagas(salva, anterior))
+    return 'Configurações salvas. A nova regra de horas pagas vale também para o histórico: o saldo de todos os fechamentos é recalculado em alguns minutos.'
   if (secao !== 'atualizacao') return TEXTOS[secao].salvo
   const mes = quandoColetaMes(salva.dia_fechamento_mes, salva.dias_apos_fechamento_mes)
   if (salva.modo_extracao === 'tempo_real') {
@@ -340,6 +349,12 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
 
   const camposAlertas = (
     <>
+      {config.recalculo_pendente && (
+        <Aviso>
+          Recalculando o saldo do histórico com a regra de horas pagas e o mapeamento de colunas atuais. Pode levar alguns
+          minutos.
+        </Aviso>
+      )}
       <fieldset className="config-bloco">
         <legend className="sr-only">Horas pagas</legend>
         <div className="config-bloco-topo">
@@ -348,7 +363,10 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
           </span>
           <div>
             <h2 className="config-bloco-titulo">Horas pagas</h2>
-            <p className="config-bloco-sub">De onde vem o número de horas extras pagas de cada colaborador.</p>
+            <p className="config-bloco-sub">
+              De onde vem o número de horas extras pagas de cada colaborador. A regra vale para todo o histórico: ao mudar,
+              o saldo de todos os fechamentos é recalculado.
+            </p>
           </div>
         </div>
 

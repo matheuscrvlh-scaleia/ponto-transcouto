@@ -4,10 +4,12 @@ import { db } from '../../src/db/database'
 import { descartarToken } from '../../src/integrations/secullum/auth'
 import { processarProximoFechamento } from '../../src/jobs/extracao.job'
 import { logSilencioso } from '../../src/jobs/log'
+import { recalcularEmpresa } from '../../src/jobs/recalculo.job'
 import { executarRegua } from '../../src/jobs/regua.job'
 import { executarTempoReal } from '../../src/jobs/tempo-real.job'
 import { sincronizarEmpresa } from '../../src/jobs/sincronizacao.job'
 import { criarFechamentosDoCiclo } from '../../src/models/extracao.models'
+import { pedidosPendentes, solicitarRecalculo } from '../../src/models/recalculo.models'
 import { empresasParaSincronizar } from '../../src/models/sincronizacao.models'
 import { proximosCiclos } from '../../src/services/calendario.service'
 import { encrypt } from '../../src/utils/crypt'
@@ -460,6 +462,50 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
               WHERE c.empresa_id = $1 AND c.cpf = $2 AND r.id <> $3`, [empresaId, CPF_ANA, base.id],
         )
         expect(ana).toEqual({ extra_semana: 120, base_semana_registro_id: base.id, unidade_id: unidadeB.id })
+    })
+
+    it('regra de horas pagas alterada recalcula os fechamentos já publicados, e só o recálculo os altera', async () => {
+        await sincronizarSoUnidadeA()
+        totaisPorCpf.set(CPF_ANA, [resposta('12:00', '', '02:00', ''), resposta('05:00', '', '01:00', '')])
+        totaisPorCpf.set(CPF_BRUNO, [resposta('', '', '', '')])
+        await criarCiclo('fechamento_mes', '2026-08-26', '2026-09-25', '2001-01-01T09:00:00Z')
+        await criarCiclo('semanal', '2026-09-26', '2026-10-13', '2001-01-02T09:00:00Z')
+        expect(await processar()).toBe(true)
+        expect(await processar()).toBe(true)
+
+        const saldosAna = async () => (await client.query(
+            `SELECT r.id, r.saldo_banco_total, f.teto_aplicado_minutos
+               FROM registros_horas r
+               JOIN fechamentos f ON f.id = r.fechamento_id AND f.status = 'sucesso'
+               JOIN ciclos c ON c.id = f.ciclo_id
+               JOIN colaboradores col ON col.id = r.colaborador_id
+              WHERE col.empresa_id = $1 AND col.cpf = $2
+              ORDER BY c.data_referencia`, [empresaId, CPF_ANA],
+        )).rows
+        // teto de 10h: agosto 2h para o banco − 2h; setembro herda 0, nada para o banco − 1h
+        expect((await saldosAna()).map(r => [r.saldo_banco_total, r.teto_aplicado_minutos])).toEqual([[0, 600], [-60, 600]])
+
+        // fora do recálculo, fechamento publicado continua congelado
+        const [agosto] = await saldosAna()
+        await client.query('SAVEPOINT congelado')
+        await expect(client.query('UPDATE registros_horas SET saldo_banco_total = 1 WHERE id = $1', [agosto.id]))
+            .rejects.toThrow(/congelado/)
+        await client.query('ROLLBACK TO SAVEPOINT congelado')
+
+        await client.query('UPDATE configuracoes SET teto_horas_pagas_minutos = 0 WHERE empresa_id = $1', [empresaId])
+        await solicitarRecalculo(empresaId, client)
+        const pedido = (await pedidosPendentes(client)).find(p => p.empresa_id === empresaId)!
+        const resultado = await recalcularEmpresa(empresaId, pedido, client)
+
+        expect(resultado.falhas).toEqual([])
+        // sem teto: agosto 12h − 2h = +10h; setembro +10h + 5h − 1h = +14h
+        expect((await saldosAna()).map(r => [r.saldo_banco_total, r.teto_aplicado_minutos])).toEqual([[600, 0], [840, 0]])
+        expect((await pedidosPendentes(client)).some(p => p.empresa_id === empresaId)).toBe(false)
+        // a exceção do trigger vale só dentro do recálculo
+        await client.query('SAVEPOINT congelado')
+        await expect(client.query('UPDATE registros_horas SET saldo_banco_total = 1 WHERE id = $1', [agosto.id]))
+            .rejects.toThrow(/congelado/)
+        await client.query('ROLLBACK TO SAVEPOINT congelado')
     })
 })
 

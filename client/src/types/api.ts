@@ -475,6 +475,8 @@ export interface Configuracoes {
   cota_calcular_por_hora: number
   atualizado_em: DataHoraISO
   atualizado_por: Pessoa | null
+  /** Só leitura: a regra de horas pagas ou o mapeamento mudou e o saldo do histórico ainda está sendo recalculado. */
+  recalculo_pendente: boolean
   /** Só leitura: quanto leva para atualizar todo mundo uma vez no tempo real (null sem colaboradores). */
   tempo_real_estimativa: { colaboradores: number; minutos_por_rodada: number | null }
 }

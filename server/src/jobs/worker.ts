@@ -5,6 +5,7 @@ import { registrarHeartbeat } from '../models/worker.models'
 import { executarImportacaoBatidas } from './batidas.job'
 import { executarExtracao } from './extracao.job'
 import { logConsole as log } from './log'
+import { executarRecalculos } from './recalculo.job'
 import { executarRegua } from './regua.job'
 import { executarSincronizacoes } from './sincronizacao.job'
 import { executarTempoReal } from './tempo-real.job'
@@ -40,6 +41,8 @@ export function iniciarWorker(opcoes: { umaVez?: boolean } = {}): Worker {
     async function tick() {
         await executarRegua(log)
         await executarSincronizacoes(log)
+        // regra de horas pagas ou mapeamento alterados: refaz o histórico antes de qualquer nova coleta
+        await executarRecalculos(log)
         // log de batidas: leve (fora da cota de /Calcular), roda antes da extração, que pode demorar
         await executarImportacaoBatidas({ log, deveParar: () => parar })
         await executarExtracao({ log, deveParar: () => parar, aoProgredir: () => heartbeat('extraindo', false) })

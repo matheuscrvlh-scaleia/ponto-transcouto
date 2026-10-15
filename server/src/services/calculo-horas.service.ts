@@ -109,32 +109,37 @@ export function calcularPagas(extra: number, regra: RegraPagas, colunaPagas: num
     return Math.min(extra, teto)
 }
 
+export type SomaPorCampo = ReturnType<typeof somarPorCampo>
+
+/** Valores do registro a partir das somas do período (usado também pelo recálculo do histórico). */
+export function valoresDoRegistro(
+    soma: SomaPorCampo, regra: RegraPagas, anterior: RegistroBase | null, saldoPeriodosAnteriores: number,
+): ValoresRegistro {
+    const extra = soma.extra
+    const negativa = soma.negativa
+    const pagas = calcularPagas(extra, regra, soma.pagas, anterior)
+    const banco = Math.max(extra - pagas, 0)
+
+    return {
+        extra_periodo: extra,
+        negativa_periodo: negativa,
+        pagas_periodo: pagas,
+        banco_periodo: banco,
+        extra_semana: extra - (anterior?.extra_periodo ?? 0),
+        negativa_semana: negativa - (anterior?.negativa_periodo ?? 0),
+        pagas_semana: pagas - (anterior?.pagas_periodo ?? 0),
+        banco_semana: banco - (anterior?.banco_periodo ?? 0),
+        saldo_banco_total: soma.temSaldo ? soma.saldo_banco : saldoPeriodosAnteriores + banco - negativa,
+        base_semana_registro_id: anterior?.id ?? null,
+    }
+}
+
 export function calcularHoras(entrada: EntradaCalculoHoras): ResultadoCalculoHoras {
     const erro = validarMapeamento(entrada.dados, entrada.mapeamento, entrada.regra)
     if (erro) return { ok: false, erro }
 
     const soma = somarPorCampo(entrada.dados, entrada.mapeamento)
-    const anterior = entrada.anterior
-    const extra = soma.extra
-    const negativa = soma.negativa
-    const pagas = calcularPagas(extra, entrada.regra, soma.pagas, anterior)
-    const banco = Math.max(extra - pagas, 0)
-
-    return {
-        ok: true,
-        valores: {
-            extra_periodo: extra,
-            negativa_periodo: negativa,
-            pagas_periodo: pagas,
-            banco_periodo: banco,
-            extra_semana: extra - (anterior?.extra_periodo ?? 0),
-            negativa_semana: negativa - (anterior?.negativa_periodo ?? 0),
-            pagas_semana: pagas - (anterior?.pagas_periodo ?? 0),
-            banco_semana: banco - (anterior?.banco_periodo ?? 0),
-            saldo_banco_total: soma.temSaldo ? soma.saldo_banco : entrada.saldoPeriodosAnteriores + banco - negativa,
-            base_semana_registro_id: anterior?.id ?? null,
-        },
-    }
+    return { ok: true, valores: valoresDoRegistro(soma, entrada.regra, entrada.anterior, entrada.saldoPeriodosAnteriores) }
 }
 
 export function mensagensErroMapeamento(erro: ErroMapeamento) {

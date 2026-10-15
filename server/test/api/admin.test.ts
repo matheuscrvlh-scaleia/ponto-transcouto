@@ -225,6 +225,10 @@ describe('empresas e mapeamento', () => {
         const salvo = await comoAdmin('PUT', `/admin/mapeamento-colunas?empresa_id=${ctx.empresaId}`, { mapeamento: novo })
         expect(salvo.statusCode, salvo.body).toBe(200)
         expect(salvo.json().mapeamento).toHaveLength(novo.length)
+
+        // mapeamento novo vale também para o histórico: o worker recalcula a empresa
+        const pedido = await db.query('SELECT 1 FROM recalculos_saldo WHERE empresa_id = $1', [ctx.empresaId])
+        expect(pedido.rows).toHaveLength(1)
     })
 
     it('cota da Secullum', async () => {

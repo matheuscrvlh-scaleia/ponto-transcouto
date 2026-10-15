@@ -42,6 +42,9 @@ export const camposRegua = [
     'fuso_horario',
 ] as const
 
+/** Regra de horas pagas: alterar recalcula o saldo de todo o histórico (ver jobs/recalculo.job). */
+export const camposRegraPagas = ['origem_horas_pagas', 'teto_horas_pagas_minutos', 'teto_periodicidade'] as const
+
 export const atualizarConfiguracoesSchema = z
     .object({
         teto_horas_pagas_minutos: minutos,

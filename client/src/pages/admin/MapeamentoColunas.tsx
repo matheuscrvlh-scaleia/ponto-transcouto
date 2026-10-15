@@ -103,7 +103,7 @@ function EditorMapeamento({ inicial, query }: { inicial: MapeamentoResposta; que
       setOriginal(mapeamento)
       setLinhas(mapeamento.map(criarLinha))
       setTentouSalvar(false)
-      alertarSucesso('Mapeamento salvo. Vale para as próximas extrações.')
+      alertarSucesso('Mapeamento salvo. Vale também para o histórico: o saldo de todos os fechamentos é recalculado em alguns minutos.')
     } catch (e) {
       const campos = e instanceof ApiError ? Object.values(e.campos ?? {}).flat() : []
       // erros por coluna ficam no formulário; o resto vira notificação
