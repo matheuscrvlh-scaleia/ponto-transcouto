@@ -464,6 +464,55 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
         expect(ana).toEqual({ extra_semana: 120, base_semana_registro_id: base.id, unidade_id: unidadeB.id })
     })
 
+    it('congelar dados passados: cada coleta puxa só os dias novos e os dias já fotografados não mudam', async () => {
+        await sincronizarSoUnidadeA()
+        await client.query('UPDATE configuracoes SET congelar_dados_passados = true WHERE empresa_id = $1', [empresaId])
+        const anaDe = async (fechamentoId: number) => um<Record<string, unknown>>(
+            `SELECT r.extra_periodo, r.pagas_periodo, r.banco_periodo, r.extra_semana, r.saldo_banco_total,
+                    r.dados_desde::text AS dados_desde
+               FROM registros_horas r JOIN colaboradores c ON c.id = r.colaborador_id
+              WHERE r.fechamento_id = $1 AND c.cpf = $2`, [fechamentoId, CPF_ANA],
+        )
+        const diaAna = async () => um<{ extra_min: number }>(
+            `SELECT hd.extra_min FROM horas_dia hd JOIN colaboradores c ON c.id = hd.colaborador_id
+              WHERE c.cpf = $1 AND hd.dia = '2026-09-01'`, [CPF_ANA],
+        )
+        totaisPorCpf.set(CPF_BRUNO, [resposta('', '', '', '')])
+
+        // 1) primeira semana do período: puxa do início do período
+        totaisPorCpf.set(CPF_ANA, [resposta('10:00', '', '', '')])
+        const semana1 = await criarCiclo('semanal', '2026-08-26', '2026-09-15', '2001-01-01T09:00:00Z')
+        expect(await processar()).toBe(true)
+        expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-08-26', DataFinal: '2026-09-15' })
+        expect(await anaDe(semana1.id)).toMatchObject({ extra_periodo: 600, dados_desde: '2026-08-26' })
+        expect((await diaAna()).extra_min).toBe(600)
+
+        // 2) semana seguinte: só de 16 a 22/09, somado à semana 1 (o dia 01/09 que a FriPonto devolve fica de fora)
+        chamadas = []
+        totaisPorCpf.set(CPF_ANA, [resposta('03:00', '', '', '')])
+        const semana2 = await criarCiclo('semanal', '2026-08-26', '2026-09-22', '2001-01-02T09:00:00Z')
+        expect(await processar()).toBe(true)
+        expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-09-16', DataFinal: '2026-09-22' })
+        expect(await anaDe(semana2.id)).toEqual({
+            extra_periodo: 780, pagas_periodo: 600, banco_periodo: 180, extra_semana: 180, saldo_banco_total: 180, dados_desde: '2026-09-16',
+        })
+        expect((await diaAna()).extra_min).toBe(600)
+
+        // 3) fechamento do mês: só de 23 a 25/09
+        chamadas = []
+        totaisPorCpf.set(CPF_ANA, [resposta('01:00', '', '', '')])
+        const mensal = await criarCiclo('fechamento_mes', '2026-08-26', '2026-09-25', '2001-01-03T09:00:00Z')
+        expect(await processar()).toBe(true)
+        expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-09-23', DataFinal: '2026-09-25' })
+        expect(await anaDe(mensal.id)).toMatchObject({ extra_periodo: 840, banco_periodo: 240, saldo_banco_total: 240 })
+
+        // 4) o recálculo refaz a cadeia somando os mesmos dias
+        await client.query('UPDATE configuracoes SET teto_horas_pagas_minutos = 0 WHERE empresa_id = $1', [empresaId])
+        expect((await recalcularEmpresa(empresaId, null, client)).falhas).toEqual([])
+        expect(await anaDe(semana2.id)).toMatchObject({ extra_periodo: 780, banco_periodo: 780, saldo_banco_total: 780 })
+        expect(await anaDe(mensal.id)).toMatchObject({ extra_periodo: 840, banco_periodo: 840, saldo_banco_total: 840 })
+    })
+
     it('regra de horas pagas alterada recalcula os fechamentos já publicados, e só o recálculo os altera', async () => {
         await sincronizarSoUnidadeA()
         totaisPorCpf.set(CPF_ANA, [resposta('12:00', '', '02:00', ''), resposta('05:00', '', '01:00', '')])
@@ -578,6 +627,29 @@ describe('tempo real (transação desfeita)', () => {
         expect(chamadasCalcular()).toHaveLength(0)
     })
 
+    it('com congelar dados passados, puxa só depois da última fotografia e soma a ela', async () => {
+        await sincronizarSoUnidadeA()
+        totaisPorCpf.set(CPF_ANA, [resposta('12:30', '02:00', '08:00', '00:45')])
+        totaisPorCpf.set(CPF_BRUNO, [resposta('01:00', '', '', '')])
+        await criarCiclo('semanal', '2026-08-26', '2026-09-15', '2001-01-01T09:00:00Z')
+        expect(await processar()).toBe(true)
+
+        await ativarTempoReal()
+        await client.query('UPDATE configuracoes SET congelar_dados_passados = true WHERE empresa_id = $1', [empresaId])
+        totaisPorCpf.set(CPF_ANA, [resposta('07:30', '', '', '')])
+        chamadas = []
+        expect(await tempoReal()).toBe(2)
+
+        expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-09-16', DataFinal: '2026-09-20' })
+        const ana = await um<Record<string, unknown>>(
+            `SELECT rt.extra_periodo, rt.negativa_periodo, rt.saldo_banco_total, rt.dados_desde::text AS dados_desde
+               FROM registros_tempo_real rt JOIN colaboradores c ON c.id = rt.colaborador_id WHERE c.cpf = $1`,
+            [CPF_ANA],
+        )
+        // mesmo resultado do período inteiro (20:00 + 02:00 de extras), mas sem puxar de novo até 15/09
+        expect(ana).toEqual({ extra_periodo: 1320, negativa_periodo: 525, saldo_banco_total: 195, dados_desde: '2026-09-16' })
+    })
+
     it('espera fechamento na fila e deixa a reserva da cota livre', async () => {
         await sincronizarSoUnidadeA()
         totaisPorCpf.set(CPF_ANA, [resposta('01:00', '', '', '')])
@@ -617,10 +689,10 @@ describe('régua em tempo real (transação desfeita)', () => {
     it('só cria o fechamento do mês e descarta as semanas futuras que não começaram', async () => {
         // em 20/10 o fechamento de 25/10 (gatilho 27/10) já está dentro do horizonte de 14 dias da régua
         const agora = new Date('2026-10-20T12:00:00Z')
-        // semana futura criada antes da troca para tempo real
+        // semana futura criada antes da troca para tempo real (o descarte compara com o relógio real: gatilho bem à frente)
         const { id: semanalFutura } = await um<{ id: number }>(
             `INSERT INTO ciclos (empresa_id, tipo, periodo_inicio, data_referencia, gatilho_previsto_em, gatilho_em)
-             VALUES ($1, 'semanal', '2026-09-26', '2026-10-20', '2026-10-21T09:00:00Z', '2026-10-21T09:00:00Z') RETURNING id`,
+             VALUES ($1, 'semanal', '2026-09-26', '2026-10-20', '2099-01-01T09:00:00Z', '2099-01-01T09:00:00Z') RETURNING id`,
             [empresaId],
         )
         await client.query(`UPDATE configuracoes SET modo_extracao = 'tempo_real' WHERE empresa_id = $1`, [empresaId])
@@ -635,5 +707,17 @@ describe('régua em tempo real (transação desfeita)', () => {
         expect(ciclos.every(c => c.tipo === 'fechamento_mes')).toBe(true)
         expect(ciclos.map(c => c.data_referencia)).toContain('2026-10-25')
         expect((await client.query('SELECT 1 FROM ciclos WHERE id = $1', [semanalFutura])).rowCount).toBe(0)
+    })
+
+    it('com congelar dados passados, mantém a fotografia semanal (é ela que congela a semana)', async () => {
+        const agora = new Date('2026-10-20T12:00:00Z')
+        await client.query(
+            `UPDATE configuracoes SET modo_extracao = 'tempo_real', congelar_dados_passados = true WHERE empresa_id = $1`,
+            [empresaId],
+        )
+        await executarRegua(logSilencioso, client, agora)
+
+        const tipos = (await client.query('SELECT DISTINCT tipo FROM ciclos WHERE empresa_id = $1 ORDER BY tipo', [empresaId])).rows
+        expect(tipos.map(t => t.tipo)).toEqual(['fechamento_mes', 'semanal'])
     })
 })

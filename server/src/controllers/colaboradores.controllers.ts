@@ -32,7 +32,8 @@ export async function detalhe(req: FastifyRequest, res: FastifyReply) {
         ? { ...aoVivo, fonte: 'tempo_real' as const }
         : fotografia && { ...fotografia, fonte: 'fechamento' as const, atualizado_em: null }
 
-    const curva = atual ? foraDaCurva(atual.saldo_min, limites) : null
+    // fora da curva pelo saldo do período, como no painel (o banco acumulado é só informativo)
+    const curva = atual ? foraDaCurva(atual.saldo_periodo_min, limites) : null
     res.send({
         ...colaborador,
         modo_extracao: config?.modo_extracao ?? 'semanal',

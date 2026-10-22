@@ -31,6 +31,7 @@ import {
 import { gravarDias } from '../models/horas-dia.models'
 import { buscarCredenciais, registrarChamadaApi } from '../models/sincronizacao.models'
 import { calcularHoras, mensagensErroMapeamento, type ItemMapeamento, type RegraPagas } from '../services/calculo-horas.service'
+import { inicioDaColeta } from '../services/calendario.service'
 import { diasOuNada } from '../services/horas-dia.service'
 import { decidirPublicacao } from '../services/publicacao.service'
 import { clienteDaEmpresa } from './cliente-empresa'
@@ -103,12 +104,12 @@ function prepararCliente(ctx: Contexto, credenciais: NonNullable<Awaited<ReturnT
 }
 
 async function calcularColaborador(
-    ctx: Contexto, cliente: ClienteSecullum, col: ColaboradorElegivel,
+    ctx: Contexto, cliente: ClienteSecullum, col: ColaboradorElegivel, desde: string,
 ): Promise<{ dados: TotaisSecullum } | { comErro: true } | { demitido: true } | { desfecho: Desfecho }> {
     try {
         const dados = await calcularPeriodo(cliente, {
             cpf: col.cpf,
-            dataInicial: ctx.f.periodo_inicio,
+            dataInicial: desde,
             dataFinal: ctx.f.data_referencia,
         })
         return { dados }
@@ -169,7 +170,13 @@ async function extrairColaboradores(ctx: Contexto, pendentes: ColaboradorElegive
         if (!(await heartbeatFechamento(f, ex))) return { tipo: 'perdido' }
         await ctx.op.aoProgredir?.()
 
-        const chamada = await calcularColaborador(ctx, cliente, col)
+        const anterior = await buscarRegistroAnterior({
+            colaboradorId: col.id, empresaId: f.empresa_id, periodoInicio: f.periodo_inicio, dataReferencia: f.data_referencia,
+        }, ex)
+        // congelar dados passados: puxa só os dias depois da última fotografia publicada do colaborador
+        const desde = inicioDaColeta(f.periodo_inicio, anterior, config.congelar_dados_passados)
+
+        const chamada = await calcularColaborador(ctx, cliente, col, desde)
         if ('desfecho' in chamada) return chamada.desfecho
         if ('comErro' in chamada) {
             await somarProgresso(ctx.execucaoId, 0, 1, ex)
@@ -182,13 +189,13 @@ async function extrairColaboradores(ctx: Contexto, pendentes: ColaboradorElegive
 
         let resultado: ReturnType<typeof calcularHoras>
         try {
-            const anterior = await buscarRegistroAnterior({
-                colaboradorId: col.id, empresaId: f.empresa_id, periodoInicio: f.periodo_inicio, dataReferencia: f.data_referencia,
-            }, ex)
             const saldoAnterior = await saldoPeriodosAnteriores({
                 colaboradorId: col.id, empresaId: f.empresa_id, periodoInicio: f.periodo_inicio,
             }, ex)
-            resultado = calcularHoras({ dados: chamada.dados, mapeamento, regra, anterior, saldoPeriodosAnteriores: saldoAnterior })
+            resultado = calcularHoras({
+                dados: chamada.dados, mapeamento, regra, anterior, saldoPeriodosAnteriores: saldoAnterior,
+                somarAoAnterior: desde !== f.periodo_inicio,
+            })
         } catch (err) {
             await erro(ctx, 'mapeamento', (err as Error).message, col.id)
             return { tipo: 'abortado', fatal: true, mensagem: (err as Error).message }
@@ -202,9 +209,9 @@ async function extrairColaboradores(ctx: Contexto, pendentes: ColaboradorElegive
         const dias = diasOuNada(chamada.dados, mapeamento, (mensagem) => ctx.op.log.erro(`fechamento ${f.id}, colaborador ${col.id}: ${mensagem}`))
         try {
             const valores = resultado.valores
-            const alvoDias = { colaboradorId: col.id, empresaId: f.empresa_id, unidadeId: f.unidade_id, de: f.periodo_inicio, ate: f.data_referencia }
+            const alvoDias = { colaboradorId: col.id, empresaId: f.empresa_id, unidadeId: f.unidade_id, de: desde, ate: f.data_referencia }
             await withTransaction(async client => {
-                await gravarRegistro(f.id, col.id, valores, chamada.dados, client)
+                await gravarRegistro(f.id, col.id, valores, chamada.dados, desde, client)
                 await gravarDias(alvoDias, dias, client)
             }, ex)
             await somarProgresso(ctx.execucaoId, 1, 0, ex)

@@ -107,7 +107,8 @@ describe('integração FriPonto', () => {
     it('prévia de uma semana antiga inclui as semanas seguintes como dependentes', async () => {
         expect(semanas.length).toBeGreaterThan(1)
         const alvo = semanas[0]
-        const res = await como('rh', 'GET', `/integracao/dados/previa?inicio=${alvo}&fim=${alvo}`)
+        // a semana é de um mês já fechado: só a equipe refaz (ver o teste da trava abaixo)
+        const res = await como('admin', 'GET', `/integracao/dados/previa?inicio=${alvo}&fim=${alvo}&empresa_id=${ctx.empresaId}`)
         expect(res.statusCode, res.body).toBe(200)
         const previa = res.json()
         expect(previa.fechamentos).toBe(3)
@@ -120,9 +121,38 @@ describe('integração FriPonto', () => {
         expect(previa.chamadas_estimadas).toBeGreaterThan(0)
     })
 
+    it('RH e gestor não reabrem um mês fechado (retrato do mês); a equipe reabre', async () => {
+        const { rows } = await db.query(
+            `SELECT max(c.data_referencia)::text AS ate
+               FROM ciclos c JOIN fechamentos f ON f.ciclo_id = c.id AND f.status = 'sucesso'
+              WHERE c.empresa_id = $1 AND c.tipo = 'fechamento_mes'`,
+            [ctx.empresaId],
+        )
+        const fechado: string = rows[0].ate
+        expect(fechado).not.toBeNull()
+        expect((await como('rh', 'GET', '/integracao/status')).json().mes_fechado_ate).toBe(fechado)
+
+        const periodo = `inicio=${semanas[0]}&fim=${fechado}`
+        const rh = await como('rh', 'GET', `/integracao/dados/previa?${periodo}`)
+        expect(rh.statusCode).toBe(400)
+        expect(rh.json().error).toContain('já foi fechado')
+        // o último dia do mês fechado também conta
+        const gestor = await como('gestor', 'GET', `/integracao/dados/previa?inicio=${fechado}&fim=${fechado}`)
+        expect(gestor.statusCode).toBe(400)
+
+        const equipe = await como('admin', 'GET', `/integracao/dados/previa?${periodo}&empresa_id=${ctx.empresaId}`)
+        expect(equipe.statusCode, equipe.body).toBe(200)
+    })
+
     it('gestor pede dados: reabre as semanas com ele como solicitante e fica no histórico', async () => {
         const alvo = semanas[semanas.length - 1]
+        // a Demo só tem semanas de mês fechado: sem a marca de fechamento do mês, a trava não entra (tem teste próprio)
+        const meses = await db.query(
+            `UPDATE ciclos SET tipo = 'semanal' WHERE empresa_id = $1 AND tipo = 'fechamento_mes' RETURNING id`,
+            [ctx.empresaId],
+        )
         const res = await como('gestor', 'POST', '/integracao/dados', { inicio: alvo, fim: alvo, motivo: 'conferência' })
+        await db.query(`UPDATE ciclos SET tipo = 'fechamento_mes' WHERE id = ANY($1::int[])`, [meses.rows.map(r => r.id)])
         expect(res.statusCode, res.body).toBe(202)
         expect(res.json().fechamentos).toBe(2)
 

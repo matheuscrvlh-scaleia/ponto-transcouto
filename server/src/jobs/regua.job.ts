@@ -20,13 +20,14 @@ export async function executarRegua(log: Log, ex: Executor = db, agora = new Dat
     for (const empresa of await empresasParaRegua(ex)) {
         try {
             const limite = agora.getTime() + HORIZONTE_MS
-            // tempo real: sem fotografia semanal, só o fechamento do mês (registro oficial que carrega o saldo)
-            const tempoReal = empresa.modo_extracao === 'tempo_real'
-            if (tempoReal) await descartarCiclosNaoIniciados(empresa.empresa_id, ex, 'semanal')
+            // tempo real: sem fotografia semanal, só o fechamento do mês (registro oficial que carrega o saldo);
+            // com congelar dados passados, a fotografia semanal continua: é ela que congela os dias da semana
+            const soMensal = empresa.modo_extracao === 'tempo_real' && !empresa.congelar_dados_passados
+            if (soMensal) await descartarCiclosNaoIniciados(empresa.empresa_id, ex, 'semanal')
 
             const ciclos = proximosCiclos(empresa, new Date(agora.getTime() - TOLERANCIA_ATRASO_MS), 6)
                 .filter(c => c.gatilho_em.getTime() <= limite)
-                .filter(c => !tempoReal || c.tipo === 'fechamento_mes')
+                .filter(c => !soMensal || c.tipo === 'fechamento_mes')
 
             for (const ciclo of ciclos) {
                 const cicloId = await criarCiclo(empresa.empresa_id, ciclo, ex)

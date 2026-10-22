@@ -10,6 +10,7 @@ export type EmpresaTempoReal = {
     origem_horas_pagas: 'teto' | 'coluna_secullum'
     teto_horas_pagas_minutos: number | null
     teto_periodicidade: 'semanal' | 'mensal' | null
+    congelar_dados_passados: boolean
 }
 
 export type ColaboradorRodizio = { id: number; cpf: string; unidade_id: number }
@@ -18,7 +19,7 @@ export type ColaboradorRodizio = { id: number; cpf: string; unidade_id: number }
 export async function empresasTempoReal(ex: Executor = db) {
     const { rows } = await ex.query<EmpresaTempoReal>(
         `SELECT e.id AS empresa_id, cf.fuso_horario, cf.dia_fechamento_mes, cf.cota_calcular_por_hora,
-                cf.origem_horas_pagas, cf.teto_horas_pagas_minutos, cf.teto_periodicidade
+                cf.origem_horas_pagas, cf.teto_horas_pagas_minutos, cf.teto_periodicidade, cf.congelar_dados_passados
            FROM empresas e
            JOIN configuracoes cf ON cf.empresa_id = e.id
           WHERE e.ativo AND cf.modo_extracao = 'tempo_real'
@@ -94,20 +95,22 @@ export async function reservarChamadaTempoReal(empresaId: number, rota: string, 
 
 type Alvo = { colaboradorId: number; empresaId: number; unidadeId: number; periodoInicio: string; hoje: string }
 
-export async function gravar(alvo: Alvo, valores: ValoresRegistro, dados: TotaisSecullum, ex: Executor = db) {
+/** `dadosDesde`: primeiro dia que a coleta puxou (depois do início do período = só os dias novos, ver migration 013). */
+export async function gravar(alvo: Alvo & { dadosDesde: string }, valores: ValoresRegistro, dados: TotaisSecullum, ex: Executor = db) {
     await ex.query(
         `INSERT INTO registros_tempo_real
                 (colaborador_id, empresa_id, unidade_id, periodo_inicio, dados_ate,
                  extra_periodo, negativa_periodo, pagas_periodo, banco_periodo, saldo_banco_total,
-                 base_registro_id, dados_brutos, tentado_em, extraido_em, ultimo_erro, ultimo_erro_em)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now(), NULL, NULL)
+                 base_registro_id, dados_brutos, dados_desde, tentado_em, extraido_em, ultimo_erro, ultimo_erro_em)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now(), now(), NULL, NULL)
          ON CONFLICT (colaborador_id) DO UPDATE
             SET empresa_id = EXCLUDED.empresa_id, unidade_id = EXCLUDED.unidade_id,
                 periodo_inicio = EXCLUDED.periodo_inicio, dados_ate = EXCLUDED.dados_ate,
                 extra_periodo = EXCLUDED.extra_periodo, negativa_periodo = EXCLUDED.negativa_periodo,
                 pagas_periodo = EXCLUDED.pagas_periodo, banco_periodo = EXCLUDED.banco_periodo,
                 saldo_banco_total = EXCLUDED.saldo_banco_total, base_registro_id = EXCLUDED.base_registro_id,
-                dados_brutos = EXCLUDED.dados_brutos, tentado_em = now(), extraido_em = now(),
+                dados_brutos = EXCLUDED.dados_brutos, dados_desde = EXCLUDED.dados_desde,
+                tentado_em = now(), extraido_em = now(),
                 ultimo_erro = NULL, ultimo_erro_em = NULL`,
         [
             alvo.colaboradorId,
@@ -123,6 +126,7 @@ export async function gravar(alvo: Alvo, valores: ValoresRegistro, dados: Totais
             valores.base_semana_registro_id,
             // as linhas por dia ficam em horas_dia
             { colunas: dados.colunas, totais: dados.totais },
+            alvo.dadosDesde,
         ],
     )
     // histórico diário: a última atualização do dia é o valor do dia

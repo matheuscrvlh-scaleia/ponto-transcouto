@@ -26,6 +26,8 @@ export type RegistroGravado = ValoresGravados & {
     publicado: boolean
     periodo_inicio: string
     data_referencia: string
+    /** Primeiro dia que a coleta puxou (null = o período inteiro). */
+    dados_desde: string | null
     dados: TotaisSecullum
 }
 
@@ -34,8 +36,13 @@ export type RegistroAoVivo = {
     colaborador_id: number
     periodo_inicio: string
     dados_ate: string
+    dados_desde: string | null
     dados: TotaisSecullum
 }
+
+/** Congelar dados passados: a coleta trouxe só os dias depois do registro anterior, que somam com ele. */
+const soDiasNovos = (r: { periodo_inicio: string, dados_desde: string | null }) =>
+    r.dados_desde !== null && r.dados_desde > r.periodo_inicio
 
 /** Dia do histórico diário do tempo real: só os totais já somados ficam gravados. */
 export type DiaGravado = {
@@ -107,9 +114,12 @@ class Bases {
     }
 }
 
-function calcular(dados: TotaisSecullum, mapeamento: ItemMapeamento[], regra: RegraPagas, anterior: RegistroBase | null, saldo: number) {
+function calcular(
+    dados: TotaisSecullum, mapeamento: ItemMapeamento[], regra: RegraPagas, anterior: RegistroBase | null, saldo: number,
+    somarAoAnterior: boolean,
+) {
     try {
-        const resultado = calcularHoras({ dados, mapeamento, regra, anterior, saldoPeriodosAnteriores: saldo })
+        const resultado = calcularHoras({ dados, mapeamento, regra, anterior, saldoPeriodosAnteriores: saldo, somarAoAnterior })
         return resultado.ok ? resultado : { ok: false as const, mensagem: mensagensErroMapeamento(resultado.erro).join(' ') }
     } catch (err) {
         return { ok: false as const, mensagem: (err as Error).message }
@@ -132,9 +142,11 @@ export function recalcularHistorico(entrada: {
         (a, b) => a.data_referencia.localeCompare(b.data_referencia) || a.fechamento_id - b.fechamento_id,
     )
     for (const r of registros) {
-        const anterior = bases.anterior(r.colaborador_id, r.periodo_inicio, r.data_referencia)
+        // só os dias novos: a base é o registro que termina antes deles (o mesmo que a coleta usou)
+        const janela = soDiasNovos(r)
+        const anterior = bases.anterior(r.colaborador_id, r.periodo_inicio, janela ? r.dados_desde! : r.data_referencia)
         const saldo = bases.saldoAnterior(r.colaborador_id, r.periodo_inicio)
-        const calculado = calcular(r.dados, mapeamento, regra, anterior, saldo)
+        const calculado = calcular(r.dados, mapeamento, regra, anterior, saldo, janela)
 
         let valores: ValoresGravados
         if (calculado.ok) {
@@ -160,9 +172,10 @@ export function recalcularHistorico(entrada: {
     }
 
     for (const r of entrada.aoVivo) {
-        const anterior = bases.anterior(r.colaborador_id, r.periodo_inicio, r.dados_ate)
+        const janela = soDiasNovos(r)
+        const anterior = bases.anterior(r.colaborador_id, r.periodo_inicio, janela ? r.dados_desde! : r.dados_ate)
         const saldo = bases.saldoAnterior(r.colaborador_id, r.periodo_inicio)
-        const calculado = calcular(r.dados, mapeamento, regra, anterior, saldo)
+        const calculado = calcular(r.dados, mapeamento, regra, anterior, saldo, janela)
         if (calculado.ok) resultado.aoVivo.push({ colaborador_id: r.colaborador_id, valores: calculado.valores })
         else resultado.falhas.push({ colaborador_id: r.colaborador_id, referencia: r.dados_ate, mensagem: calculado.mensagem })
     }

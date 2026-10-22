@@ -375,17 +375,25 @@ export function pontosDoGrafico(
     }
   }
 
-  const dias = diasUnicos(secoes)
+  // só até o último fechamento (os dias seguintes ainda não entram no banco oficial); no dia do fechamento vale o saldo oficial
+  const oficiais = new Map(secoes.flatMap((s) => (s.oficial ? [[s.fim, s.oficial.saldo] as const] : [])))
+  const dias = diasUnicos(secoes.filter((s) => s.tipo !== 'andamento'))
     .filter((d) => d.saldo !== null)
     .slice(-DIAS_NO_GRAFICO)
   return {
     origem: 'dias-estimados',
-    pontos: dias.map((d) => ({
-      chave: d.dia,
-      data: d.dia,
-      saldo: d.saldo ?? 0,
-      detalhe: `extra ${formatarMinutos(d.extra)}, negativa ${formatarMinutos(d.negativa)}`,
-      conferir: d.avisos.length > 0,
-    })),
+    pontos: dias.map((d) => {
+      const oficial = oficiais.get(d.dia)
+      return {
+        chave: d.dia,
+        data: d.dia,
+        saldo: oficial ?? d.saldo ?? 0,
+        detalhe:
+          oficial !== undefined
+            ? 'saldo do fechamento oficial'
+            : `extra ${formatarMinutos(d.extra)}, negativa ${formatarMinutos(d.negativa)}, estimado`,
+        conferir: d.avisos.length > 0,
+      }
+    }),
   }
 }

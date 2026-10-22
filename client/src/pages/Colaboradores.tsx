@@ -31,7 +31,7 @@ type CampoOrdem = 'nome' | 'saldo_min' | 'extra_min' | 'negativa_min' | 'pagas_m
 type Direcao = 'asc' | 'desc'
 
 const COLUNAS: { campo: CampoOrdem; rotulo: string }[] = [
-  { campo: 'saldo_min', rotulo: 'Saldo banco' },
+  { campo: 'saldo_min', rotulo: 'Saldo do período' },
   { campo: 'extra_min', rotulo: 'Extras' },
   { campo: 'negativa_min', rotulo: 'Negativas' },
   { campo: 'pagas_min', rotulo: 'Pagas' },
@@ -128,7 +128,7 @@ function linhasPlanilha(
       'Nome',
       ...(consolidado ? ['Unidade'] : []),
       'Função',
-      noIntervalo ? 'Saldo do intervalo' : 'Saldo banco',
+      noIntervalo ? 'Saldo do intervalo' : 'Saldo do período',
       'Extras',
       'Negativas',
       ...(noIntervalo ? [] : ['Pagas', 'Fora da curva']),
@@ -290,7 +290,7 @@ export function Colaboradores() {
         coluna.campo === 'saldo_min' ? { ...coluna, rotulo: 'Saldo do intervalo' } : coluna,
       )
     : COLUNAS
-  // "Fora da curva" olha o banco acumulado: some com intervalo de datas
+  // "Fora da curva" olha o saldo do período inteiro: some com intervalo de datas
   const filtrosVisiveis = comIntervalo ? FILTROS.filter((item) => item.valor !== 'fora') : FILTROS
   const textoIntervalo = intervaloEscolhido ? textoDoIntervalo(intervaloEscolhido) : null
   // período de cada linha aberta: o intervalo escolhido ou o período dos números dela

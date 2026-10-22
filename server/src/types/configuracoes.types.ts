@@ -17,6 +17,7 @@ export const camposRh = [
     'dia_semana_extracao',
     'hora_extracao',
     'dias_apos_fechamento_mes',
+    'congelar_dados_passados',
 ] as const
 
 /** Tela que libera cada campo que o cliente pode alterar (Alertas e horas pagas x Atualização dos dados). */
@@ -32,6 +33,7 @@ export const telaDoCampo: Record<(typeof camposRh)[number], 'alertas' | 'atualiz
     dia_semana_extracao: 'atualizacao',
     hora_extracao: 'atualizacao',
     dias_apos_fechamento_mes: 'atualizacao',
+    congelar_dados_passados: 'atualizacao',
 }
 
 export const camposRegua = [
@@ -62,6 +64,8 @@ export const atualizarConfiguracoesSchema = z
         fuso_horario: z.string().min(1).refine(fusoValido, 'Fuso horário inválido.'),
         cota_calcular_por_hora: z.number().int().min(1).max(100),
         modo_extracao: z.enum(['semanal', 'tempo_real']),
+        // cada coleta puxa só os dias depois da última fotografia publicada (ver migration 013)
+        congelar_dados_passados: z.boolean(),
     })
     .partial()
     .strict()
@@ -88,6 +92,7 @@ export type Configuracoes = {
     fuso_horario: string
     cota_calcular_por_hora: number
     modo_extracao: 'semanal' | 'tempo_real'
+    congelar_dados_passados: boolean
     atualizado_em: Date
     atualizado_por: { id: number; nome: string } | null
 }

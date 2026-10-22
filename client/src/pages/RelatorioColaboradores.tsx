@@ -16,7 +16,7 @@ interface Props {
   filtro: string
   ordem: string
   dados: string
-  /** Intervalo de datas escolhido: saldo do intervalo (extras − negativas); pagas e curva (período e banco acumulado) saem. */
+  /** Intervalo de datas escolhido: saldo do intervalo (extras − negativas); pagas e curva (do período inteiro) saem. */
   intervalo?: boolean
 }
 
@@ -69,7 +69,7 @@ export function RelatorioColaboradores({
           <span className="rel-caixa-nota">{linhas.length === totalGeral ? 'todos da lista' : `de ${totalGeral} no painel`}</span>
         </div>
         <div className="rel-caixa">
-          <span className="rel-caixa-rotulo">{intervalo ? 'Saldo do intervalo' : 'Saldo banco'}</span>
+          <span className="rel-caixa-rotulo">{intervalo ? 'Saldo do intervalo' : 'Saldo do período'}</span>
           <span className={`rel-caixa-valor ${classeSinal(saldoTotal)}`}>{formatarMinutos(saldoTotal, { sinal: true })}</span>
           <span className="rel-caixa-nota">soma da lista</span>
         </div>
@@ -108,7 +108,7 @@ export function RelatorioColaboradores({
             <th className="rel-col-nome">Colaborador</th>
             {consolidado && <th className="rel-col-unidade">Unidade</th>}
             <th className="rel-col-funcao">Função</th>
-            <th className="rel-col-saldo">{intervalo ? 'Saldo do intervalo' : 'Saldo banco'}</th>
+            <th className="rel-col-saldo">{intervalo ? 'Saldo do intervalo' : 'Saldo do período'}</th>
             <th className="rel-col-horas">Extras</th>
             <th className="rel-col-horas">Negativas</th>
             {!intervalo && <th className="rel-col-horas">Pagas</th>}

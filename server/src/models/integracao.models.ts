@@ -155,6 +155,19 @@ export async function fechamentosDosCiclos(cicloIds: number[], unidadeIds: numbe
     return rows
 }
 
+/** Último dia de mês fechado com fechamento do mês publicado nas unidades (null = nenhum). */
+export async function ultimoMesFechado(empresaId: number, unidadeIds: number[], ex: Executor = db) {
+    const { rows } = await ex.query<{ ate: string | null }>(
+        `SELECT max(c.data_referencia)::text AS ate
+           FROM fechamentos f
+           JOIN ciclos c ON c.id = f.ciclo_id
+          WHERE f.empresa_id = $1 AND f.unidade_id = ANY($2::int[])
+            AND c.tipo = 'fechamento_mes' AND f.status = 'sucesso'`,
+        [empresaId, unidadeIds],
+    )
+    return rows[0].ate
+}
+
 /** Semanas depois do período já extraídas (publicadas ou com falha): dependem das anteriores e são refeitas junto. */
 export async function fechamentosPosteriores(empresaId: number, unidadeIds: number[], fim: string, ex: Executor = db) {
     const { rows } = await ex.query<FechamentoPlano>(

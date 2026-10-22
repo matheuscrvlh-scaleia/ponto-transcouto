@@ -8,7 +8,7 @@ import * as configuracoesModel from '../models/configuracoes.models'
 import { criarCiclo } from '../models/extracao.models'
 import * as integracaoModel from '../models/integracao.models'
 import * as tempoRealModel from '../models/tempo-real.models'
-import { periodoDeHoje, proximosCiclos, type CicloPrevisto } from '../services/calendario.service'
+import { diaSeguinte, periodoDeHoje, proximosCiclos, type CicloPrevisto } from '../services/calendario.service'
 import { empresaDoUsuario, exigirEmpresa } from '../services/escopo.service'
 import { cotaLiberaEm, previsaoTermino } from '../services/previsao.service'
 import {
@@ -30,9 +30,9 @@ import { invalido, naoEncontrado } from '../utils/errors'
 
 const DIA_MS = 86400000
 /**
- * RH e gestor só puxam dados recentes: puxar um período reabre também as semanas
- * publicadas depois dele (e apaga as horas delas até a nova extração). Períodos
- * mais antigos ficam com a equipe Scale IA.
+ * RH e gestor só puxam dados recentes e do mês ainda aberto: puxar um período reabre também
+ * as semanas publicadas depois dele (e apaga as horas delas até a nova extração). Períodos
+ * mais antigos e meses fechados ficam com a equipe Scale IA.
  */
 export const JANELA_CLIENTE_DIAS = 45
 const LIMITE_SECULLUM_POR_HORA = 100
@@ -88,6 +88,15 @@ async function montarPlano(
                     'Para períodos mais antigos, fale com a equipe Scale IA.',
             )
         }
+        // mês fechado é o retrato do mês: depois do fechamento o RH ajusta e zera o ponto na FriPonto, e puxar de
+        // novo trocaria o retrato por esses ajustes (só a equipe refaz um mês fechado)
+        const fechado = await integracaoModel.ultimoMesFechado(empresaId, unidadeIds, ex)
+        if (fechado && inicio <= fechado) {
+            throw invalido(
+                `O período até ${dataBr(fechado)} já foi fechado e fica congelado como retrato do mês. ` +
+                    `Escolha datas a partir de ${dataBr(diaSeguinte(fechado))}. Para refazer um mês fechado, fale com a equipe Scale IA.`,
+            )
+        }
     }
     const dias = (Date.parse(fim) - Date.parse(inicio)) / DIA_MS + 1
     if (dias > MAX_DIAS_PERIODO) throw invalido(`Escolha um período de até ${MAX_DIAS_PERIODO} dias.`)
@@ -105,8 +114,10 @@ async function montarPlano(
 
     const existentes = await integracaoModel.ciclosNoPeriodo(empresaId, inicio, fim, ex)
     const datasExistentes = new Set(existentes.map(c => c.data_referencia))
-    // tempo real não tem fotografia semanal: refazer um período é refazer os fechamentos do mês
-    const doTipo = (c: { tipo: string }) => config.modo_extracao !== 'tempo_real' || c.tipo === 'fechamento_mes'
+    // tempo real não tem fotografia semanal (só com congelar dados passados): refazer um período é refazer os
+    // fechamentos do mês
+    const soMensal = config.modo_extracao === 'tempo_real' && !config.congelar_dados_passados
+    const doTipo = (c: { tipo: string }) => !soMensal || c.tipo === 'fechamento_mes'
     const novas = previstos.filter(c => !datasExistentes.has(c.data_referencia) && doTipo(c))
     const prontos = existentes.filter(c => c.gatilho_em.getTime() <= agora.getTime() && doTipo(c))
 
@@ -172,7 +183,7 @@ export async function status(req: FastifyRequest, res: FastifyReply) {
     const { empresaId, unidades } = await escopo(req, empresa_id)
 
     const unidadeIds = unidades.map(u => u.id)
-    const [empresa, worker, fila, rotas, cota, config, aoVivo, lote, chamadasCalculo] = await Promise.all([
+    const [empresa, worker, fila, rotas, cota, config, aoVivo, lote, chamadasCalculo, mesFechadoAte] = await Promise.all([
         integracaoModel.empresa(empresaId),
         integracaoModel.worker(),
         integracaoModel.fila(empresaId, unidadeIds),
@@ -182,6 +193,7 @@ export async function status(req: FastifyRequest, res: FastifyReply) {
         tempoRealModel.resumoEmpresa(empresaId, unidadeIds),
         integracaoModel.progressoFila(empresaId, unidadeIds),
         integracaoModel.chamadasCalculoUltimaHora(empresaId),
+        integracaoModel.ultimoMesFechado(empresaId, unidadeIds),
     ])
     if (!empresa) throw naoEncontrado('Empresa não encontrada.')
     const limitePorHora = cota ?? LIMITE_SECULLUM_POR_HORA
@@ -214,6 +226,8 @@ export async function status(req: FastifyRequest, res: FastifyReply) {
         fila,
         progresso: montarProgresso(lote, chamadasCalculo, limitePorHora, worker?.online ?? false),
         unidades,
+        // RH e gestor só puxam depois deste dia (ver montarPlano)
+        mes_fechado_ate: mesFechadoAte,
     })
 }
 

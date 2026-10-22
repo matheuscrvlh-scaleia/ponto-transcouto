@@ -28,6 +28,8 @@ export type EntradaCalculoHoras = {
     regra: RegraPagas
     anterior: RegistroBase | null
     saldoPeriodosAnteriores: number
+    /** Congelar dados passados: `dados` traz só os dias depois do `anterior`, e o período é o anterior mais eles. */
+    somarAoAnterior?: boolean
 }
 
 export type ValoresRegistro = {
@@ -111,6 +113,20 @@ export function calcularPagas(extra: number, regra: RegraPagas, colunaPagas: num
 
 export type SomaPorCampo = ReturnType<typeof somarPorCampo>
 
+/**
+ * Congelar dados passados: soma os dias novos aos valores do registro anterior, que não mudam mais.
+ * As pagas da coluna da FriPonto somam ao que já foi pago (limitadas às extras dos dias novos);
+ * o saldo da coluna da FriPonto, se mapeada, é o que veio agora.
+ */
+export function somarAoAnterior(soma: SomaPorCampo, anterior: RegistroBase): SomaPorCampo {
+    return {
+        ...soma,
+        extra: anterior.extra_periodo + soma.extra,
+        negativa: anterior.negativa_periodo + soma.negativa,
+        pagas: anterior.pagas_periodo + Math.min(soma.pagas, soma.extra),
+    }
+}
+
 /** Valores do registro a partir das somas do período (usado também pelo recálculo do histórico). */
 export function valoresDoRegistro(
     soma: SomaPorCampo, regra: RegraPagas, anterior: RegistroBase | null, saldoPeriodosAnteriores: number,
@@ -138,7 +154,8 @@ export function calcularHoras(entrada: EntradaCalculoHoras): ResultadoCalculoHor
     const erro = validarMapeamento(entrada.dados, entrada.mapeamento, entrada.regra)
     if (erro) return { ok: false, erro }
 
-    const soma = somarPorCampo(entrada.dados, entrada.mapeamento)
+    let soma = somarPorCampo(entrada.dados, entrada.mapeamento)
+    if (entrada.somarAoAnterior && entrada.anterior) soma = somarAoAnterior(soma, entrada.anterior)
     return { ok: true, valores: valoresDoRegistro(soma, entrada.regra, entrada.anterior, entrada.saldoPeriodosAnteriores) }
 }
 

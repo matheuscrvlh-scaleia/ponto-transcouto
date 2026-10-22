@@ -8,6 +8,7 @@ import {
   IconeAlerta,
   IconeAtividade,
   IconeBanco,
+  IconeCadeado,
   IconeCalendario,
   IconeColunas,
   IconeMoeda,
@@ -33,7 +34,8 @@ import { TituloPagina } from '../../components/TituloPagina'
 /* As três telas usam GET/PATCH /configuracoes, cada uma com os seus campos:
    - 'alertas' (Configuração, RH e equipe): horas pagas e limites "fora da curva";
    - 'atualizacao' (Configuração, RH e equipe): modo semanal ou tempo real, dia e hora da extração semanal
-     (no tempo real não há fotografia semanal: só a hora da extração do fechamento do mês);
+     (no tempo real não há fotografia semanal, a não ser com dados passados congelados: só a hora da extração do
+     fechamento do mês) e se os dias já fotografados são puxados de novo;
    - 'calendario' (Administração, só equipe): fechamento do mês, cota e prévia da régua. */
 export type SecaoConfiguracoes = 'alertas' | 'atualizacao' | 'calendario'
 
@@ -94,6 +96,23 @@ const MODOS: { valor: ModoExtracao; titulo: string; descricao: string; Icone: ty
   },
 ]
 
+const OPCOES_CONGELAR: { valor: boolean; titulo: string; descricao: string; Icone: typeof IconeCalendario }[] = [
+  {
+    valor: false,
+    titulo: 'Atualizar dias já puxados',
+    descricao:
+      'Cada coleta puxa de novo o período inteiro: se o RH corrigir na FriPonto um dia que já estava no painel, a correção entra na coleta seguinte.',
+    Icone: IconeSincronizar,
+  },
+  {
+    valor: true,
+    titulo: 'Congelar dados passados',
+    descricao:
+      'Cada coleta puxa só os dias depois da última fotografia e soma ao que já estava. Os dias já fotografados não mudam, mesmo que alguém altere na FriPonto depois.',
+    Icone: IconeCadeado,
+  },
+]
+
 const ORIGENS: { valor: Config['origem_horas_pagas']; titulo: string; descricao: string; Icone: typeof IconeMoeda }[] = [
   {
     valor: 'teto',
@@ -150,6 +169,7 @@ type Formulario = Record<(typeof CAMPOS_HORAS)[number] | (typeof CAMPOS_CALENDAR
   teto_periodicidade: Config['teto_periodicidade']
   origem_horas_pagas: Config['origem_horas_pagas']
   modo_extracao: ModoExtracao
+  congelar_dados_passados: boolean
   dia_semana_extracao: string
   hora_extracao: string
 }
@@ -164,6 +184,7 @@ function paraFormulario(config: Config): Formulario {
     teto_periodicidade: config.teto_periodicidade,
     origem_horas_pagas: config.origem_horas_pagas,
     modo_extracao: config.modo_extracao,
+    congelar_dados_passados: config.congelar_dados_passados,
     dia_semana_extracao: String(config.dia_semana_extracao),
     hora_extracao: config.hora_extracao.slice(0, 5),
     dia_fechamento_mes: String(config.dia_fechamento_mes),
@@ -194,8 +215,10 @@ function validar(form: Formulario, original: Config, secao: SecaoConfiguracoes) 
     if (form.origem_horas_pagas !== original.origem_horas_pagas) alteracoes.origem_horas_pagas = form.origem_horas_pagas
   } else if (secao === 'atualizacao') {
     if (form.modo_extracao !== original.modo_extracao) alteracoes.modo_extracao = form.modo_extracao
-    // no tempo real não há extração semanal: o dia da semana fica escondido e não é enviado
-    if (form.modo_extracao === 'semanal') {
+    if (form.congelar_dados_passados !== original.congelar_dados_passados)
+      alteracoes.congelar_dados_passados = form.congelar_dados_passados
+    // no tempo real não há extração semanal (só com dados passados congelados): o dia da semana fica escondido
+    if (temFotografiaSemanal(form)) {
       const dia = Number(form.dia_semana_extracao)
       if (!Number.isInteger(dia) || dia < 0 || dia > 6) erros.dia_semana_extracao = 'Escolha um dia da semana.'
       else if (dia !== original.dia_semana_extracao) alteracoes.dia_semana_extracao = dia
@@ -218,6 +241,11 @@ function validar(form: Formulario, original: Config, secao: SecaoConfiguracoes) 
   return { erros, alteracoes: alteracoes as Alteracoes }
 }
 
+/** Tempo real só mantém a fotografia semanal com dados passados congelados: é ela que congela a semana. */
+function temFotografiaSemanal(config: Pick<Config, 'modo_extracao' | 'congelar_dados_passados'>) {
+  return config.modo_extracao === 'semanal' || config.congelar_dados_passados
+}
+
 /** Teto de horas pagas semanal: depende da fotografia semanal, então não combina com o tempo real. */
 function usaTetoSemanal(config: Pick<Config, 'origem_horas_pagas' | 'teto_periodicidade'>) {
   return config.origem_horas_pagas === 'teto' && config.teto_periodicidade === 'semanal'
@@ -235,14 +263,20 @@ function mensagemSalvo(secao: SecaoConfiguracoes, salva: Config, anterior: Confi
     return 'Configurações salvas. A nova regra de horas pagas vale também para o histórico: o saldo de todos os fechamentos é recalculado em alguns minutos.'
   if (secao !== 'atualizacao') return TEXTOS[secao].salvo
   const mes = quandoColetaMes(salva.dia_fechamento_mes, salva.dias_apos_fechamento_mes)
+  const congelados = salva.congelar_dados_passados
+    ? ' Dados passados congelados: cada coleta puxa só os dias novos.'
+    : ''
   if (salva.modo_extracao === 'tempo_real') {
     const descartadas =
-      anterior.modo_extracao !== 'tempo_real'
+      temFotografiaSemanal(anterior) && !temFotografiaSemanal(salva)
         ? ' As fotografias semanais que ainda não tinham começado foram descartadas.'
         : ''
-    return `Salvo. Tempo real ativo: os colaboradores são atualizados continuamente e o fechamento do mês (dia ${salva.dia_fechamento_mes}) é gravado ${mes} às ${salva.hora_extracao.slice(0, 5)}.${descartadas}`
+    const semanal = temFotografiaSemanal(salva)
+      ? `, a semana é fotografada ${quandoExtrai(salva.dia_semana_extracao, salva.hora_extracao)}`
+      : ''
+    return `Salvo. Tempo real ativo: os colaboradores são atualizados continuamente${semanal} e o fechamento do mês (dia ${salva.dia_fechamento_mes}) é gravado ${mes} às ${salva.hora_extracao.slice(0, 5)}.${descartadas}${congelados}`
   }
-  return `Salvo. Os dados serão atualizados ${quandoExtrai(salva.dia_semana_extracao, salva.hora_extracao)} e o mês fechado é puxado ${mes}.`
+  return `Salvo. Os dados serão atualizados ${quandoExtrai(salva.dia_semana_extracao, salva.hora_extracao)} e o mês fechado é puxado ${mes}.${congelados}`
 }
 
 export function Configuracoes({ secao }: { secao: SecaoConfiguracoes }) {
@@ -532,7 +566,9 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
   )
 
   const tempoReal = form.modo_extracao === 'tempo_real'
-  const mudandoParaTempoReal = tempoReal && config.modo_extracao !== 'tempo_real'
+  const semanal = temFotografiaSemanal(form)
+  const perdeSemanal = temFotografiaSemanal(config) && !semanal
+  const ligandoCongelar = form.congelar_dados_passados && !config.congelar_dados_passados
   // o server recusa tempo real com teto semanal (400): avisa antes, no próprio cartão
   const tetoSemanalBloqueia = config.modo_extracao !== 'tempo_real' && usaTetoSemanal(config)
   const estimativa = config.tempo_real_estimativa ?? { colaboradores: 0, minutos_por_rodada: null }
@@ -580,7 +616,7 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
             </label>
           ))}
         </div>
-        {mudandoParaTempoReal && (
+        {perdeSemanal && (
           <Aviso>
             Ao salvar, as fotografias semanais que ainda não começaram são descartadas. As já publicadas continuam no
             histórico, e daqui em diante o histórico de cada colaborador passa a ser por dia.
@@ -589,14 +625,57 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
       </fieldset>
 
       <fieldset className="form-secao">
-        <legend>{tempoReal ? 'Fechamento do mês' : 'Dias e hora da atualização'}</legend>
+        <legend>Dias já puxados</legend>
         <p className="form-nota">
-          {tempoReal
+          O que acontece com os dias que já estão no painel quando alguém altera o ponto na FriPonto depois. Para puxar
+          de novo uma semana congelada, use{' '}
+          <Link to="/configuracao/integracao">Integração FriPonto → Puxar dados</Link>.
+        </p>
+        <div className="modo-opcoes" role="radiogroup" aria-label="Dias já puxados">
+          {OPCOES_CONGELAR.map(({ valor, titulo, descricao, Icone }) => (
+            <label
+              key={String(valor)}
+              className={form.congelar_dados_passados === valor ? 'modo-opcao ativo' : 'modo-opcao'}
+            >
+              <input
+                type="radio"
+                name="congelar_dados_passados"
+                checked={form.congelar_dados_passados === valor}
+                onChange={() => alterar('congelar_dados_passados', valor)}
+              />
+              <span className="modo-opcao-icone" aria-hidden="true">
+                <Icone tamanho={20} />
+              </span>
+              <span className="modo-opcao-texto">
+                <span className="modo-opcao-titulo">
+                  {titulo}
+                  {config.congelar_dados_passados === valor && <span className="modo-opcao-atual">Em uso</span>}
+                </span>
+                <span className="modo-opcao-desc">{descricao}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {ligandoCongelar && (
+          <Aviso>
+            Vale a partir da próxima coleta: ela puxa só os dias depois da última fotografia publicada de cada
+            colaborador. O que já está no painel fica como está.
+            {tempoReal && ' No tempo real, a fotografia semanal volta a ser feita, porque é ela que congela a semana.'}
+          </Aviso>
+        )}
+      </fieldset>
+
+      <fieldset className="form-secao">
+        <legend>{semanal ? 'Dias e hora da atualização' : 'Fechamento do mês'}</legend>
+        <p className="form-nota">
+          {tempoReal && semanal
+            ? `Os números são atualizados continuamente e, toda semana no dia escolhido, a semana é fotografada e congelada. O fechamento do mês (dia ${config.dia_fechamento_mes}) é gravado no dia do mês escolhido abaixo.`
+            : tempoReal
             ? `Sem fotografia semanal: os números são atualizados continuamente e o histórico passa a ser por dia. O fechamento do mês (dia ${config.dia_fechamento_mes}) continua sendo gravado como registro oficial, no dia do mês escolhido abaixo.`
             : `Toda semana, no dia escolhido, os dados são puxados da FriPonto e publicados no painel. E uma vez por mês, no dia do mês escolhido, é puxado o mês fechado (até o dia ${config.dia_fechamento_mes}). Deixe tempo para o RH ajustar o ponto antes.`}
         </p>
         <div className="campos-grade">
-          {!tempoReal && (
+          {semanal && (
             <Campo rotulo="Dia da semana" erro={erros.dia_semana_extracao}>
               {(props) => (
                 <select {...props} value={form.dia_semana_extracao} onChange={(event) => alterar('dia_semana_extracao', event.target.value)}>
@@ -629,7 +708,7 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
             )}
           </Campo>
           <Campo
-            rotulo={tempoReal ? 'Horário da extração do fechamento do mês' : 'Hora'}
+            rotulo={semanal ? 'Hora' : 'Horário da extração do fechamento do mês'}
             erro={erros.hora_extracao}
             ajuda={nomeFuso(config.fuso_horario)}
           >

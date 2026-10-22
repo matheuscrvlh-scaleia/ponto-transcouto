@@ -26,6 +26,7 @@ function registro(parcial: Partial<RegistroGravado> & Pick<RegistroGravado, 'per
         colaborador_id: 7,
         fechamento_id: proximoId,
         publicado: true,
+        dados_desde: null,
         // valores gravados antes do recálculo (só usados quando o registro não pode ser recalculado)
         extra_periodo: 0,
         negativa_periodo: 0,
@@ -107,7 +108,9 @@ describe('recalcularHistorico', () => {
 
     it('recalcula o valor ao vivo e o histórico diário sobre as bases recalculadas', () => {
         const a = agosto()
-        const aoVivo: RegistroAoVivo = { colaborador_id: 7, periodo_inicio: '2026-09-26', dados_ate: '2026-10-15', dados: dados('15:00', '10:00') }
+        const aoVivo: RegistroAoVivo = {
+            colaborador_id: 7, periodo_inicio: '2026-09-26', dados_ate: '2026-10-15', dados_desde: null, dados: dados('15:00', '10:00'),
+        }
         const dia: DiaGravado = {
             colaborador_id: 7,
             dia: '2026-10-14',
@@ -122,6 +125,24 @@ describe('recalcularHistorico', () => {
         // agosto com teto: +5h; período atual: 5h para o banco − 10h
         expect(resultado.aoVivo[0].valores.saldo_banco_total).toBe(0)
         expect(resultado.dias[0].valores).toMatchObject({ pagas_periodo: 600, banco_periodo: 300, saldo_banco_total: 0 })
+    })
+
+    it('congelar dados passados: registro com só os dias novos soma à base recalculada', () => {
+        const semana1 = registro({ periodo_inicio: '2026-09-26', data_referencia: '2026-10-06', dados_desde: '2026-09-26', dados: dados('04:00') })
+        const semana2 = registro({ periodo_inicio: '2026-09-26', data_referencia: '2026-10-13', dados_desde: '2026-10-07', dados: dados('05:00', '01:00') })
+        const aoVivo: RegistroAoVivo = {
+            colaborador_id: 7, periodo_inicio: '2026-09-26', dados_ate: '2026-10-15', dados_desde: '2026-10-14', dados: dados('02:00'),
+        }
+        const resultado = recalcular([semana2, semana1], { origem: 'teto', teto_minutos: 180, periodicidade: 'semanal' }, { aoVivo: [aoVivo] })
+
+        const v = resultado.registros.find(r => r.id === semana2.id)!.valores
+        // semana 1: 4h, 3h pagas; semana 2: +5h (3h pagas pelo teto) e 1h de falta
+        expect(v).toMatchObject({
+            extra_periodo: 540, negativa_periodo: 60, pagas_periodo: 360, banco_periodo: 180,
+            extra_semana: 300, base_semana_registro_id: semana1.id,
+        })
+        // ao vivo: os 2h de 14 e 15/10 sobre a semana 2 (teto da semana: 2h pagas)
+        expect(resultado.aoVivo[0].valores).toMatchObject({ extra_periodo: 660, pagas_periodo: 480, banco_periodo: 180 })
     })
 
     it('cada colaborador tem a sua cadeia', () => {

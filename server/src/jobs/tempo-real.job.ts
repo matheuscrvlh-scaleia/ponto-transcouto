@@ -22,7 +22,7 @@ import {
     temFechamentoNaFila,
     type EmpresaTempoReal,
 } from '../models/tempo-real.models'
-import { periodoDeHoje } from '../services/calendario.service'
+import { inicioDaColeta, periodoDeHoje } from '../services/calendario.service'
 import { calcularHoras, mensagensErroMapeamento, type RegraPagas } from '../services/calculo-horas.service'
 import { diasOuNada } from '../services/horas-dia.service'
 import { clienteDaEmpresa } from './cliente-empresa'
@@ -125,9 +125,16 @@ async function atualizarEmpresa(empresa: EmpresaTempoReal, op: OpcoesTempoReal, 
         if (op.deveParar?.()) break
         const alvo = { colaboradorId: col.id, empresaId: empresa.empresa_id, unidadeId: col.unidade_id, periodoInicio, hoje }
 
+        const anterior = await buscarRegistroAnterior(
+            { colaboradorId: col.id, empresaId: empresa.empresa_id, periodoInicio, dataReferencia: hoje },
+            ex,
+        )
+        // congelar dados passados: só os dias depois da última fotografia publicada, somados a ela
+        const desde = inicioDaColeta(periodoInicio, anterior, empresa.congelar_dados_passados)
+
         let dados
         try {
-            dados = await calcularPeriodo(cliente, { cpf: col.cpf, dataInicial: periodoInicio, dataFinal: hoje })
+            dados = await calcularPeriodo(cliente, { cpf: col.cpf, dataInicial: desde, dataFinal: hoje })
         } catch (err) {
             if (err instanceof SemCota) break
             if (err instanceof SecullumError && ['rate_limit', 'auth', 'nao_encontrado', 'formato'].includes(err.tipo)) {
@@ -140,15 +147,13 @@ async function atualizarEmpresa(empresa: EmpresaTempoReal, op: OpcoesTempoReal, 
             continue
         }
 
-        const anterior = await buscarRegistroAnterior(
-            { colaboradorId: col.id, empresaId: empresa.empresa_id, periodoInicio, dataReferencia: hoje },
-            ex,
-        )
         const saldoAnterior = await saldoPeriodosAnteriores(
             { colaboradorId: col.id, empresaId: empresa.empresa_id, periodoInicio },
             ex,
         )
-        const resultado = calcularHoras({ dados, mapeamento, regra, anterior, saldoPeriodosAnteriores: saldoAnterior })
+        const resultado = calcularHoras({
+            dados, mapeamento, regra, anterior, saldoPeriodosAnteriores: saldoAnterior, somarAoAnterior: desde !== periodoInicio,
+        })
         if (!resultado.ok) {
             const mensagem = mensagensErroMapeamento(resultado.erro).join(' ')
             await registrarFalha(alvo, mensagem, ex)
@@ -160,8 +165,8 @@ async function atualizarEmpresa(empresa: EmpresaTempoReal, op: OpcoesTempoReal, 
         const valores = resultado.valores
         const lidos = dados
         await withTransaction(async client => {
-            await gravar(alvo, valores, lidos, client)
-            await gravarDias({ ...alvo, de: periodoInicio, ate: hoje }, dias, client)
+            await gravar({ ...alvo, dadosDesde: desde }, valores, lidos, client)
+            await gravarDias({ ...alvo, de: desde, ate: hoje }, dias, client)
         }, ex)
         atualizados++
     }

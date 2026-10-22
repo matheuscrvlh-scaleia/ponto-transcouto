@@ -43,7 +43,10 @@ export type RegistroAtual = {
     negativa_min: number
     pagas_min: number
     banco_min: number
+    /** banco acumulado: herda os períodos anteriores (só o perfil do colaborador mostra) */
     saldo_min: number
+    /** saldo do período: extras − negativas, o mesmo do painel */
+    saldo_periodo_min: number
 }
 
 export type SemanaHistorico = {

@@ -43,11 +43,12 @@ describe('dashboard da unidade', () => {
 
         const { alerta_pos, alerta_neg } = corpo.limites
         for (const l of linhas) {
+            // saldo do período: extras − negativas, sem herdar os períodos anteriores
+            expect(l.saldo_min).toBe(l.extra_min - l.negativa_min)
             const esperado = l.saldo_min >= alerta_pos ? 'positivo' : l.saldo_min <= -alerta_neg ? 'negativo' : null
             expect(l.fora_da_curva).toBe(esperado)
         }
         expect(linhas.some(l => l.fora_da_curva === 'positivo')).toBe(true)
-        expect(linhas.some(l => l.fora_da_curva === 'negativo')).toBe(true)
         expect(corpo.resumo.total).toBe(10)
         expect(corpo.proximo_fechamento_previsto).not.toBeNull()
     })
@@ -240,7 +241,7 @@ describe('tempo real no painel', () => {
             `INSERT INTO registros_tempo_real
                     (colaborador_id, empresa_id, unidade_id, periodo_inicio, dados_ate, extra_periodo,
                      negativa_periodo, pagas_periodo, banco_periodo, saldo_banco_total, extraido_em)
-             VALUES ($1, $2, $3, current_date - 10, current_date, 60, 0, 0, 60, 54321, now())`,
+             VALUES ($1, $2, $3, current_date - 10, current_date, 54321, 0, 0, 54321, 98765, now())`,
             [alvo.id, ctx.empresaId, ctx.unidades.GDR],
         )
 
@@ -261,7 +262,10 @@ describe('tempo real no painel', () => {
             url: `/api/v1/colaboradores/${alvo.id}`,
             headers: autorizado(ctx.tokens.gestor),
         })
-        expect(detalhe.json().resumo).toMatchObject({ fonte: 'tempo_real', saldo_min: 54321, fechamento_id: null })
+        // no perfil, o banco acumulado vem junto com o saldo do período
+        expect(detalhe.json().resumo).toMatchObject({
+            fonte: 'tempo_real', saldo_min: 98765, saldo_periodo_min: 54321, fora_da_curva: 'positivo', fechamento_id: null,
+        })
 
         // e o consolidado
         const geral = await ctx.app.inject({ method: 'GET', url: '/api/v1/dashboard', headers: autorizado(ctx.tokens.rh) })

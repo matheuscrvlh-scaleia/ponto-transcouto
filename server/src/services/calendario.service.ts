@@ -27,6 +27,19 @@ export function diaParaIso(n: number) {
     return new Date(n * MS_DIA).toISOString().slice(0, 10)
 }
 
+/** "2026-09-15" → "2026-09-16". */
+export function diaSeguinte(iso: string) {
+    return diaParaIso(Date.parse(iso) / MS_DIA + 1)
+}
+
+/**
+ * Primeiro dia que a coleta puxa. Com congelar dados passados, os dias até a última fotografia publicada do
+ * colaborador no período não são puxados de novo; sem ela (ou sem fotografia anterior), puxa o período inteiro.
+ */
+export function inicioDaColeta(periodoInicio: string, anterior: { data_referencia: string } | null, congelar: boolean) {
+    return congelar && anterior ? diaSeguinte(anterior.data_referencia) : periodoInicio
+}
+
 const diaDaSemana = (n: number) => new Date(n * MS_DIA).getUTCDay()
 
 function camposNoFuso(instante: number, fuso: string) {

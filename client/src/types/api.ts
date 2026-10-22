@@ -282,7 +282,10 @@ export interface ColaboradorDetalhe {
     negativa_min: Minutos
     pagas_min: Minutos
     banco_min: Minutos
+    /** Banco acumulado: herda os períodos anteriores (só o perfil mostra). */
     saldo_min: Minutos
+    /** Saldo do período (extras − negativas), o mesmo do painel; é por ele que vale a curva. */
+    saldo_periodo_min: Minutos
     fora_da_curva: ForaDaCurva
   } | null
   fora_da_curva: ForaDaCurva
@@ -458,6 +461,8 @@ export interface Configuracoes {
   empresa_id: number
   /** Modo, dia e hora: RH e equipe alteram; o resto do calendário é só da equipe. */
   modo_extracao: ModoExtracao
+  /** Cada coleta puxa só os dias depois da última fotografia publicada; os dias já fotografados não mudam. */
+  congelar_dados_passados: boolean
   /** 0 = domingo … 6 = sábado */
   dia_semana_extracao: number
   hora_extracao: string
@@ -567,6 +572,8 @@ export interface StatusIntegracao {
   }
   /** Unidades que este usuário pode puxar (gestor: só as dele). */
   unidades: { id: number; nome: string }[]
+  /** Último dia de mês fechado (congelado): RH e gestor só puxam a partir do dia seguinte. */
+  mes_fechado_ate: DataISO | null
 }
 
 /** Em colaboradores (uma chamada de cálculo por colaborador). */

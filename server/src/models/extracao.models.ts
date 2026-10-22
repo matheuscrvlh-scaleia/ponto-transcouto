@@ -4,7 +4,11 @@ import type { ItemMapeamento, RegistroBase, ValoresRegistro } from '../services/
 import { ROTAS_DA_COTA } from '../integrations/secullum/cliente'
 import type { TotaisSecullum } from '../integrations/secullum/tipos'
 
-export type EmpresaRegua = ConfigCalendario & { empresa_id: number; modo_extracao: 'semanal' | 'tempo_real' }
+export type EmpresaRegua = ConfigCalendario & {
+    empresa_id: number
+    modo_extracao: 'semanal' | 'tempo_real'
+    congelar_dados_passados: boolean
+}
 
 export type FechamentoReivindicado = {
     id: number
@@ -22,6 +26,7 @@ export type FechamentoReivindicado = {
 export type ConfigExtracao = {
     origem_horas_pagas: 'teto' | 'coluna_secullum'
     cota_calcular_por_hora: number
+    congelar_dados_passados: boolean
 }
 
 export type ColaboradorElegivel = {
@@ -42,7 +47,8 @@ const daPosse = `id = $1 AND status = 'processando' AND tentativas = $2`
 export async function empresasParaRegua(ex: Executor = db) {
     const result = await ex.query<EmpresaRegua>(
         `SELECT e.id AS empresa_id, cf.dia_semana_extracao, cf.hora_extracao::text AS hora_extracao,
-                cf.dia_fechamento_mes, cf.dias_apos_fechamento_mes, cf.fuso_horario, cf.modo_extracao
+                cf.dia_fechamento_mes, cf.dias_apos_fechamento_mes, cf.fuso_horario, cf.modo_extracao,
+                cf.congelar_dados_passados
            FROM empresas e
            JOIN configuracoes cf ON cf.empresa_id = e.id
           WHERE e.ativo AND e.secullum_usuario IS NOT NULL AND e.secullum_banco_id IS NOT NULL
@@ -142,7 +148,7 @@ export async function reivindicarFechamento(ex: Executor = db) {
 
 export async function buscarConfigExtracao(empresaId: number, ex: Executor = db) {
     const result = await ex.query<ConfigExtracao>(
-        'SELECT origem_horas_pagas, cota_calcular_por_hora FROM configuracoes WHERE empresa_id = $1',
+        'SELECT origem_horas_pagas, cota_calcular_por_hora, congelar_dados_passados FROM configuracoes WHERE empresa_id = $1',
         [empresaId],
     )
     return result.rows[0] ?? null
@@ -252,12 +258,16 @@ export async function concluirChamada(id: string, status: number | null, duracao
     await ex.query('UPDATE chamadas_api SET http_status = $2, duracao_ms = $3 WHERE id = $1', [id, status, duracaoMs])
 }
 
+/** Registro anterior do mesmo período, com o último dia que ele cobre (o congelamento puxa só depois dele). */
+export type RegistroAnterior = RegistroBase & { data_referencia: string }
+
 export async function buscarRegistroAnterior(
     filtro: { colaboradorId: number, empresaId: number, periodoInicio: string, dataReferencia: string },
     ex: Executor = db,
 ) {
-    const result = await ex.query<RegistroBase>(
-        `SELECT r.id, r.extra_periodo, r.negativa_periodo, r.pagas_periodo, r.banco_periodo
+    const result = await ex.query<RegistroAnterior>(
+        `SELECT r.id, r.extra_periodo, r.negativa_periodo, r.pagas_periodo, r.banco_periodo,
+                c.data_referencia::text AS data_referencia
            FROM registros_horas r
            JOIN fechamentos f ON f.id = r.fechamento_id AND f.status = 'sucesso'
            JOIN ciclos c      ON c.id = f.ciclo_id
@@ -290,25 +300,28 @@ export async function saldoPeriodosAnteriores(
 }
 
 export async function gravarRegistro(
-    fechamentoId: number, colaboradorId: number, valores: ValoresRegistro, dados: TotaisSecullum, ex: Executor = db,
+    fechamentoId: number, colaboradorId: number, valores: ValoresRegistro, dados: TotaisSecullum, dadosDesde: string,
+    ex: Executor = db,
 ) {
     await ex.query(
         `INSERT INTO registros_horas (fechamento_id, colaborador_id, extra_periodo, negativa_periodo, pagas_periodo,
                                       banco_periodo, extra_semana, negativa_semana, pagas_semana, banco_semana,
-                                      saldo_banco_total, base_semana_registro_id, dados_brutos)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                                      saldo_banco_total, base_semana_registro_id, dados_brutos, dados_desde)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          ON CONFLICT (fechamento_id, colaborador_id) DO UPDATE
             SET extra_periodo = EXCLUDED.extra_periodo, negativa_periodo = EXCLUDED.negativa_periodo,
                 pagas_periodo = EXCLUDED.pagas_periodo, banco_periodo = EXCLUDED.banco_periodo,
                 extra_semana = EXCLUDED.extra_semana, negativa_semana = EXCLUDED.negativa_semana,
                 pagas_semana = EXCLUDED.pagas_semana, banco_semana = EXCLUDED.banco_semana,
                 saldo_banco_total = EXCLUDED.saldo_banco_total,
-                base_semana_registro_id = EXCLUDED.base_semana_registro_id, dados_brutos = EXCLUDED.dados_brutos`,
+                base_semana_registro_id = EXCLUDED.base_semana_registro_id, dados_brutos = EXCLUDED.dados_brutos,
+                dados_desde = EXCLUDED.dados_desde`,
         [
             fechamentoId, colaboradorId, valores.extra_periodo, valores.negativa_periodo, valores.pagas_periodo,
             valores.banco_periodo, valores.extra_semana, valores.negativa_semana, valores.pagas_semana,
             valores.banco_semana, valores.saldo_banco_total, valores.base_semana_registro_id,
             JSON.stringify({ colunas: dados.colunas, totais: dados.totais }),
+            dadosDesde,
         ],
     )
 }

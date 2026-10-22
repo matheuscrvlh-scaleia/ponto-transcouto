@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { proximosCiclos, type CicloPrevisto, type ConfigCalendario } from '../../src/services/calendario.service'
+import {
+    inicioDaColeta,
+    proximosCiclos,
+    type CicloPrevisto,
+    type ConfigCalendario,
+} from '../../src/services/calendario.service'
 
 const config: ConfigCalendario = {
     dia_semana_extracao: 3,
@@ -173,5 +178,18 @@ describe('proximosCiclos', () => {
     it('usa a data local (não UTC) para decidir o dia', () => {
         const ciclos = proximosCiclos(config, new Date('2026-10-07T02:00:00Z'), 1)
         expect(ciclos[0].gatilho_em.toISOString()).toBe('2026-10-07T09:00:00.000Z')
+    })
+})
+
+describe('inicioDaColeta', () => {
+    it('com congelar dados passados, começa no dia seguinte à última fotografia do período', () => {
+        expect(inicioDaColeta('2026-09-26', { data_referencia: '2026-10-06' }, true)).toBe('2026-10-07')
+        // virada de mês e de ano
+        expect(inicioDaColeta('2026-12-26', { data_referencia: '2026-12-31' }, true)).toBe('2027-01-01')
+    })
+
+    it('sem fotografia anterior no período ou sem a flag, puxa o período inteiro', () => {
+        expect(inicioDaColeta('2026-09-26', null, true)).toBe('2026-09-26')
+        expect(inicioDaColeta('2026-09-26', { data_referencia: '2026-10-06' }, false)).toBe('2026-09-26')
     })
 })

@@ -157,6 +157,29 @@ describe('calcularHoras', () => {
         expect(resultado.ok).toBe(false)
     })
 
+    it('congelar dados passados: os dias novos somam ao registro anterior, que não muda', () => {
+        const anterior = { id: '41', extra_periodo: 870, negativa_periodo: 525, pagas_periodo: 600, banco_periodo: 270 }
+        const v = calcular({ dados: dados('02:00', '00:00', '01:00'), anterior, somarAoAnterior: true })
+        expect(v).toMatchObject({
+            extra_periodo: 990, negativa_periodo: 585, pagas_periodo: 600, banco_periodo: 390,
+            extra_semana: 120, negativa_semana: 60, pagas_semana: 0, banco_semana: 120, base_semana_registro_id: '41',
+        })
+        // sem a flag, os mesmos dados seriam o período inteiro (correção retroativa)
+        expect(calcular({ dados: dados('02:00'), anterior }).extra_semana).toBe(120 - 870)
+    })
+
+    it('congelar dados passados com a coluna de pagas da FriPonto: soma o já pago, limitado às extras novas', () => {
+        const anterior = { id: '41', extra_periodo: 600, negativa_periodo: 0, pagas_periodo: 420, banco_periodo: 180 }
+        const v = calcular({
+            mapeamento: [...mapeamento, { coluna_secullum: 'ExPagas', campo: 'pagas' }],
+            regra: { origem: 'coluna_secullum', teto_minutos: null, periodicidade: null },
+            dados: { colunas: [...colunas, 'ExPagas'], totais: ['', '40:00', '05:00', '', '', '', '07:00'] },
+            anterior,
+            somarAoAnterior: true,
+        })
+        expect(v).toMatchObject({ extra_periodo: 900, pagas_periodo: 720, banco_periodo: 180, pagas_semana: 300 })
+    })
+
     it('extra negativa é recusada (não gera número errado silencioso)', () => {
         expect(() => calcular({ dados: dados('-01:00') })).toThrow(/negativa/)
     })

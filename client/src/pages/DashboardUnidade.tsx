@@ -409,7 +409,7 @@ export function DashboardUnidade() {
               <div className="dash-card-topo">
                 <div>
                   <h2 id="titulo-faixas">Distribuição do saldo</h2>
-                  <p className="dash-card-sub">Colaboradores por faixa de saldo do banco de horas</p>
+                  <p className="dash-card-sub">Colaboradores por faixa de saldo do período (extras − negativas)</p>
                 </div>
               </div>
               {todos.length > 0 ? (
@@ -439,7 +439,7 @@ export function DashboardUnidade() {
                 {incompleto ? `Soma dos ${todos.length} colaboradores exibidos` : 'Soma de todos os colaboradores'}
               </p>
               <ul className="dash-resumo">
-                <ItemResumo icone={<IconeBanco />} rotulo="Saldo do banco" detalhe="acumulado" minutos={somas.saldo} sinal />
+                <ItemResumo icone={<IconeBanco />} rotulo="Saldo" detalhe="no período" minutos={somas.saldo} sinal />
                 <ItemResumo icone={<IconeMais />} rotulo="Extras" detalhe="no período" minutos={somas.extra} />
                 <ItemResumo icone={<IconeMenos />} rotulo="Negativas" detalhe="no período" minutos={somas.negativa} />
                 <ItemResumo icone={<IconeMoeda />} rotulo="Pagas" detalhe="no período" minutos={totalPagas} />

@@ -57,7 +57,7 @@ function montarFaixas({ alerta_neg: neg, alerta_pos: pos }: Limites): Faixa[] {
 export type FaixaSelecionada<T extends LinhaDashboard> = { descricao: string; linhas: T[] }
 
 /**
- * Distribuição dos colaboradores por faixa de saldo do banco (faixas derivadas dos limites
+ * Distribuição dos colaboradores por faixa de saldo do período (faixas derivadas dos limites
  * de alerta da unidade). A faixa ativa — a mais numerosa, ou a apontada — fica sólida.
  * Com onSelecionar, clicar numa barra entrega os colaboradores daquela faixa.
  */

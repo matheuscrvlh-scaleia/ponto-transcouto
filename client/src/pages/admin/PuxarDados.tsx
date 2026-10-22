@@ -62,7 +62,11 @@ export function PuxarDados({ status, query, bloqueio, semUnidades, onPedido }: P
   const tempoReal = Boolean(status.tempo_real?.ativo)
   const { usuario } = useAuth()
   const hoje = hojeISO()
-  const minimo = usuario?.tipo === 'cliente' ? somarDias(hoje, -JANELA_CLIENTE_DIAS) : undefined
+  const cliente = usuario?.tipo === 'cliente'
+  // mês fechado fica congelado como retrato do mês: o RH só puxa o mês aberto (o server confere)
+  const aberturaMes = cliente && status.mes_fechado_ate ? somarDias(status.mes_fechado_ate, 1) : undefined
+  const janela = cliente ? somarDias(hoje, -JANELA_CLIENTE_DIAS) : undefined
+  const minimo = aberturaMes && janela && aberturaMes > janela ? aberturaMes : janela
   const [inicio, setInicio] = useState(() => {
     const padrao = somarDias(hoje, -(tempoReal ? DIAS_PADRAO_TEMPO_REAL : DIAS_PADRAO))
     return minimo && padrao < minimo ? minimo : padrao
@@ -89,7 +93,9 @@ export function PuxarDados({ status, query, bloqueio, semUnidades, onPedido }: P
     if (inicio > fim) return 'A data de início precisa ser igual ou anterior à data de fim.'
     if (fim > hoje) return 'A data de fim não pode ser no futuro.'
     if (minimo && inicio < minimo) {
-      return `Você pode puxar dados a partir de ${formatarData(minimo)}. Para períodos mais antigos, fale com a equipe Scale IA.`
+      return minimo === aberturaMes
+        ? `O período até ${formatarData(status.mes_fechado_ate)} já foi fechado e fica congelado como retrato do mês. Escolha datas a partir de ${formatarData(minimo)}. Para refazer um mês fechado, fale com a equipe Scale IA.`
+        : `Você pode puxar dados a partir de ${formatarData(minimo)}. Para períodos mais antigos, fale com a equipe Scale IA.`
     }
     if (diasEntre(inicio, fim) > MAX_DIAS) return `O período pode ter no máximo ${MAX_DIAS} dias.`
     return null

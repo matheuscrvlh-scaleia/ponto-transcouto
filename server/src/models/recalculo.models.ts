@@ -50,7 +50,7 @@ export async function registrosDaEmpresa(empresaId: number, ex: Executor = db) {
     const { rows } = await ex.query<RegistroGravado>(
         `SELECT r.id, r.colaborador_id, r.fechamento_id, f.status = 'sucesso' AS publicado,
                 c.periodo_inicio::text AS periodo_inicio, c.data_referencia::text AS data_referencia,
-                r.dados_brutos AS dados,
+                r.dados_desde::text AS dados_desde, r.dados_brutos AS dados,
                 r.extra_periodo, r.negativa_periodo, r.pagas_periodo, r.banco_periodo
            FROM registros_horas r
            JOIN fechamentos f ON f.id = r.fechamento_id
@@ -64,7 +64,8 @@ export async function registrosDaEmpresa(empresaId: number, ex: Executor = db) {
 
 export async function aoVivoDaEmpresa(empresaId: number, ex: Executor = db) {
     const { rows } = await ex.query<RegistroAoVivo>(
-        `SELECT colaborador_id, periodo_inicio::text AS periodo_inicio, dados_ate::text AS dados_ate, dados_brutos AS dados
+        `SELECT colaborador_id, periodo_inicio::text AS periodo_inicio, dados_ate::text AS dados_ate,
+                dados_desde::text AS dados_desde, dados_brutos AS dados
            FROM registros_tempo_real
           WHERE empresa_id = $1 AND extraido_em IS NOT NULL AND dados_brutos IS NOT NULL`,
         [empresaId],

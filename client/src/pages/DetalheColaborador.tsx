@@ -134,8 +134,8 @@ export function DetalheColaborador() {
         {colaborador.resumo && (
           <div className="pc-banco">
             <div className="pc-banco-saldo">
-              <span className="pc-banco-rotulo">Banco acumulado atual</span>
-              <Horas minutos={colaborador.resumo.saldo_min} sinal destacar className="pc-banco-valor" />
+              <span className="pc-banco-rotulo">Saldo do período</span>
+              <Horas minutos={colaborador.resumo.saldo_periodo_min} sinal destacar className="pc-banco-valor" />
               <span className="pc-banco-ref">
                 {aoVivo && (
                   <>
@@ -146,10 +146,13 @@ export function DetalheColaborador() {
               </span>
             </div>
             <div className="pc-banco-estado">
-              <EstadoDoBanco saldo={colaborador.resumo.saldo_min} limites={colaborador.limites} />
+              <EstadoDoBanco saldo={colaborador.resumo.saldo_periodo_min} limites={colaborador.limites} />
             </div>
             <div className="pc-banco-pagas">
-              <span className="pc-banco-rotulo">Pagas no período</span>
+              {/* o acumulado herda os períodos anteriores: só aparece aqui, não no painel */}
+              <span className="pc-banco-rotulo">Banco acumulado</span>
+              <Horas minutos={colaborador.resumo.saldo_min} sinal className="pc-banco-pagas-valor" />
+              <span className="pc-banco-rotulo pc-banco-rotulo-seguinte">Pagas no período</span>
               <Horas minutos={colaborador.resumo.pagas_min} className="pc-banco-pagas-valor" />
             </div>
           </div>

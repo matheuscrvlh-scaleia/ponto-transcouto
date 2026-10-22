@@ -58,7 +58,10 @@ describe('tempo real sem fotografia semanal', () => {
                FROM ciclos WHERE empresa_id = $1 AND gatilho_em <= now()`,
             [ctx.empresaId],
         )
-        const res = await como('rh', 'GET', `/integracao/dados/previa?inicio=${rows[0].inicio}&fim=${rows[0].fim}`)
+        // o período pega meses já fechados: só a equipe refaz
+        const res = await como(
+            'admin', 'GET', `/integracao/dados/previa?inicio=${rows[0].inicio}&fim=${rows[0].fim}&empresa_id=${ctx.empresaId}`,
+        )
         expect(res.statusCode, res.body).toBe(200)
         const doPeriodo = res.json().semanas.filter((s: { dependente: boolean }) => !s.dependente)
         expect(doPeriodo.length).toBeGreaterThan(0)

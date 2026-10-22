@@ -95,9 +95,9 @@ export function GraficoSaldo({
             <g key={valor}>
               <line x1={MARGEM.esquerda} x2={largura - MARGEM.direita} y1={y(valor)} y2={y(valor)} className="grafico-limite" />
               <text
-                x={largura - MARGEM.direita - 2}
+                x={MARGEM.esquerda + 4}
                 y={y(valor) + (valor > 0 ? -4 : 12)}
-                textAnchor="end"
+                textAnchor="start"
                 className="grafico-limite-rotulo"
               >
                 {rotulo} {valor > 0 ? '+' : '−'}

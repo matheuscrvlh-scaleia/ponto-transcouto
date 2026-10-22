@@ -12,6 +12,10 @@ import type {
     UnidadeUsuario,
 } from '../types/unidades.types'
 
+/* Saldo do painel: só o período de apuração (do dia seguinte ao fechamento até o próximo), extras − negativas,
+   sem herdar os períodos anteriores. O banco acumulado (saldo_banco_total) fica só no perfil do colaborador. */
+const saldoDoPeriodoSql = (r: string) => `(${r}.extra_periodo - ${r}.negativa_periodo)`
+
 const foraDaCurvaSql = (saldo: string, pos: string, neg: string) =>
     `CASE WHEN ${saldo} >= ${pos} THEN 'positivo' WHEN ${saldo} <= -${neg} THEN 'negativo' END`
 
@@ -35,8 +39,8 @@ export async function listarDoUsuario(ator: Ator, empresaId: number | null, padr
            ) uf ON true
            LEFT JOIN LATERAL (
                 SELECT count(*)::int AS total,
-                       count(*) FILTER (WHERE r.saldo_banco_total >= coalesce(cf.alerta_saldo_positivo_minutos, $3)
-                                           OR r.saldo_banco_total <= -coalesce(cf.alerta_saldo_negativo_minutos, $4))::int AS fora
+                       count(*) FILTER (WHERE ${saldoDoPeriodoSql('r')} >= coalesce(cf.alerta_saldo_positivo_minutos, $3)
+                                           OR ${saldoDoPeriodoSql('r')} <= -coalesce(cf.alerta_saldo_negativo_minutos, $4))::int AS fora
                   FROM registros_horas r
                  WHERE r.fechamento_id = uf.id
            ) st ON true
@@ -77,7 +81,7 @@ export async function ultimoFechamentoPublicado(unidadeId: number) {
 /* Fonte dos números do painel (uma unidade ou várias):
    - tempo real: o valor ao vivo de cada colaborador (registros_tempo_real), para empresas nesse modo;
    - fotografia: o último fechamento publicado da unidade (registros_horas).
-   Cada colaborador aparece uma vez, com o dado mais recente (ao vivo ganha no empate).
+   Cada colaborador aparece uma vez, com o dado mais recente (ao vivo ganha no empate), e `saldo` é o do período.
    As unidades viram uma tabela (unnest) com os limites da empresa de cada uma,
    para que filtro e "fora da curva" usem o limite certo. */
 const fontePainel = `
@@ -90,7 +94,7 @@ const fontePainel = `
         SELECT DISTINCT ON (t.colaborador_id) t.*
           FROM (
                 SELECT rt.colaborador_id, rt.extra_periodo, rt.negativa_periodo, rt.pagas_periodo,
-                       rt.banco_periodo, rt.saldo_banco_total,
+                       rt.banco_periodo, ${saldoDoPeriodoSql('rt')} AS saldo,
                        'tempo_real'::text AS fonte, rt.extraido_em AS atualizado_em, rt.dados_ate, rt.periodo_inicio,
                        lim.pos, lim.neg, lim.unidade_id, lim.unidade_nome
                   FROM lim
@@ -98,7 +102,7 @@ const fontePainel = `
                                               AND rt.extraido_em IS NOT NULL
                 UNION ALL
                 SELECT rh.colaborador_id, rh.extra_periodo, rh.negativa_periodo, rh.pagas_periodo,
-                       rh.banco_periodo, rh.saldo_banco_total,
+                       rh.banco_periodo, ${saldoDoPeriodoSql('rh')},
                        'fechamento'::text, NULL::timestamptz, c.data_referencia, c.periodo_inicio,
                        lim.pos, lim.neg, lim.unidade_id, lim.unidade_nome
                   FROM lim
@@ -113,12 +117,12 @@ const filtrosDashboard: Record<DashboardQuery['filtro'], string> = {
     todos: 'true',
     extra: 'r.extra_periodo > 0',
     negativa: 'r.negativa_periodo > 0',
-    fora: '(r.saldo_banco_total >= r.pos OR r.saldo_banco_total <= -r.neg)',
+    fora: '(r.saldo >= r.pos OR r.saldo <= -r.neg)',
 }
 
 const ordensDashboard: Record<DashboardQuery['ordem'], string> = {
-    saldo_desc: 'r.saldo_banco_total DESC, col.nome',
-    saldo_asc: 'r.saldo_banco_total ASC, col.nome',
+    saldo_desc: 'r.saldo DESC, col.nome',
+    saldo_asc: 'r.saldo ASC, col.nome',
     nome: 'col.nome, col.id',
 }
 
@@ -176,8 +180,8 @@ export async function linhasPainel(unidades: UnidadePainel[], q: DashboardQuery)
          SELECT col.id, col.nome, col.funcao,
                 r.extra_periodo AS extra_min, r.negativa_periodo AS negativa_min,
                 r.pagas_periodo AS pagas_min, r.banco_periodo AS banco_min,
-                r.saldo_banco_total AS saldo_min,
-                ${foraDaCurvaSql('r.saldo_banco_total', 'r.pos', 'r.neg')} AS fora_da_curva,
+                r.saldo AS saldo_min,
+                ${foraDaCurvaSql('r.saldo', 'r.pos', 'r.neg')} AS fora_da_curva,
                 r.unidade_id, r.unidade_nome, r.pos AS alerta_pos, r.neg AS alerta_neg,
                 r.fonte, r.atualizado_em,
                 r.periodo_inicio::text AS periodo_inicio, r.dados_ate::text AS dados_ate,
@@ -207,8 +211,8 @@ export async function resumoPainel(unidades: UnidadePainel[]) {
     const { rows } = await db.query<ResumoDashboard>(
         `${fontePainel}
          SELECT count(*)::int AS total,
-                count(*) FILTER (WHERE r.saldo_banco_total >= r.pos)::int AS fora_positivo,
-                count(*) FILTER (WHERE r.saldo_banco_total <= -r.neg)::int AS fora_negativo,
+                count(*) FILTER (WHERE r.saldo >= r.pos)::int AS fora_positivo,
+                count(*) FILTER (WHERE r.saldo <= -r.neg)::int AS fora_negativo,
                 coalesce(sum(r.pagas_periodo), 0)::int AS pagas_total_min
            FROM r`,
         parametrosDoPainel(unidades),

@@ -71,13 +71,16 @@ export async function atualizar(req: FastifyRequest, res: FastifyReply) {
             'O teto semanal de horas pagas precisa da atualização semanal. Mude o teto para mensal antes de usar o tempo real.',
         )
     }
-    const virouTempoReal = campos.modo_extracao === 'tempo_real' && anterior.modo_extracao !== 'tempo_real'
+    // tempo real não tem fotografia semanal, a não ser com congelar dados passados (é ela que congela a semana)
+    const soMensal = (c: { modo_extracao: string, congelar_dados_passados: boolean }) =>
+        c.modo_extracao === 'tempo_real' && !c.congelar_dados_passados
+    const perdeuSemanal = soMensal(final) && !soMensal(anterior)
 
     const atualizada = await withTransaction(async client => {
         const config = await configuracoesModel.atualizar(empresaId, campos, req.usuario, client)
         const ciclosDescartados = mudouRegua
             ? await configuracoesModel.descartarCiclosNaoIniciados(empresaId, client)
-            : virouTempoReal
+            : perdeuSemanal
               ? await configuracoesModel.descartarCiclosNaoIniciados(empresaId, client, 'semanal')
               : 0
         if (mudouRegraPagas) await solicitarRecalculo(empresaId, client)

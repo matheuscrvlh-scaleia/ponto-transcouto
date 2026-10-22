@@ -18,7 +18,7 @@ interface Props<T extends LinhaDashboard> {
   link: (linha: T) => string
   complemento: (linha: T) => string
   limiteDe?: (linha: T) => Minutos | undefined
-  /** O que mostrar e ordenar em cada linha (ex.: extras do intervalo); sem isso, o saldo do banco com a curva. */
+  /** O que mostrar e ordenar em cada linha (ex.: extras do intervalo); sem isso, o saldo do período com a curva. */
   valor?: (linha: T) => Minutos
   /** Com `valor`: mostra o sinal e a cor (positivo/negativo). */
   sinal?: boolean
