@@ -37,6 +37,7 @@ const REDIRECIONAMENTOS: [string, string][] = [
   ['admin/acessos', '/configuracao/usuarios'],
   ['admin/permissoes', '/configuracao/permissoes'],
   ['admin/unidades', '/configuracao/unidades'],
+  ['admin/colunas', '/configuracao/colunas'],
   ['admin/configuracoes', '/configuracao/alertas'],
 ]
 

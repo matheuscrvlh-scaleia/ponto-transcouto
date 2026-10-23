@@ -51,6 +51,7 @@ export function RotasConfiguracao() {
             {itemConfiguracao('usuarios', <Usuarios />)}
             {itemConfiguracao('integracao', <IntegracaoFriPonto />)}
             {itemConfiguracao('atualizacao', <Configuracoes secao="atualizacao" />)}
+            {itemConfiguracao('colunas', <MapeamentoColunas />)}
             {itemConfiguracao('unidades', <Unidades />)}
             {itemConfiguracao('alertas', <Configuracoes secao="alertas" />)}
             {itemConfiguracao('permissoes', <Permissoes />)}
@@ -72,9 +73,8 @@ export function RotasAdministracao() {
         <Route path="empresas/*" element={<Empresas />} />
         <Route path="equipe/*" element={<Equipe />} />
         <Route element={<ComEmpresa />}>
-          {/* Configurações: abas Mapeamento de colunas e Calendário de extração */}
+          {/* Configurações: Calendário de extração (o mapeamento de colunas foi para Configuração → Integrações) */}
           <Route element={<AbasConfiguracao secao={SECAO_ADMINISTRACAO} />}>
-            <Route path="colunas/*" element={<MapeamentoColunas />} />
             <Route path="calendario/*" element={<Configuracoes secao="calendario" />} />
           </Route>
         </Route>

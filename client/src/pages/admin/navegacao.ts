@@ -5,6 +5,8 @@ export interface ItemMenu {
   rotulo: string
   /** Tela que o grupo de permissão precisa liberar (Configuração). */
   tela?: Tela
+  /** Perfis do item, no lugar dos da seção (ex.: só a equipe). */
+  perfis?: Perfil[]
 }
 
 /** Tela do menu que junta várias abas (cada aba continua sendo uma rota com seus perfis). */
@@ -38,13 +40,15 @@ export const SECAO_CONFIGURACAO: SecaoAdmin = {
     { caminho: 'usuarios', rotulo: 'Usuários', tela: 'usuarios' },
     { caminho: 'integracao', rotulo: 'Integração FriPonto', tela: 'integracao' },
     { caminho: 'atualizacao', rotulo: 'Atualização dos dados', tela: 'atualizacao' },
+    // de/para das colunas da FriPonto, um por empresa: só a equipe (salvar recalcula o histórico de saldos)
+    { caminho: 'colunas', rotulo: 'Mapeamento de colunas', perfis: ['admin'] },
     { caminho: 'unidades', rotulo: 'Unidades', tela: 'unidades' },
     { caminho: 'alertas', rotulo: 'Alertas e horas pagas', tela: 'alertas' },
     { caminho: 'permissoes', rotulo: 'Permissões', tela: 'permissoes' },
   ],
   grupos: [
     { id: 'usuarios', rotulo: 'Usuários', abas: ['usuarios', 'permissoes'] },
-    { id: 'integracoes', rotulo: 'Integrações', abas: ['integracao', 'atualizacao'] },
+    { id: 'integracoes', rotulo: 'Integrações', abas: ['integracao', 'atualizacao', 'colunas'] },
     { id: 'configuracoes', rotulo: 'Configurações', abas: ['unidades', 'alertas'] },
   ],
 }
@@ -58,13 +62,13 @@ export const SECAO_ADMINISTRACAO: SecaoAdmin = {
     { caminho: 'empresas', rotulo: 'Empresas' },
     // equipe Scale IA (tabela usuarios)
     { caminho: 'equipe', rotulo: 'Usuários gestão' },
-    { caminho: 'colunas', rotulo: 'Mapeamento de colunas' },
+    // o mapeamento de colunas foi para Configuração → Integrações
     { caminho: 'calendario', rotulo: 'Calendário de extração' },
   ],
   grupos: [
     { id: 'empresas', rotulo: 'Empresas', abas: ['empresas'] },
     { id: 'equipe', rotulo: 'Usuários gestão', abas: ['equipe'] },
-    { id: 'configuracoes', rotulo: 'Configurações', abas: ['colunas', 'calendario'] },
+    { id: 'configuracoes', rotulo: 'Configurações', abas: ['calendario'] },
   ],
 }
 
@@ -72,7 +76,7 @@ export const SECAO_ADMINISTRACAO: SecaoAdmin = {
 export function itemPermitido(secao: SecaoAdmin, item: ItemMenu, perfil: Perfil | null, telas: Tela[]) {
   if (!perfil) return false
   if (item.tela && !telas.includes(item.tela)) return false
-  return secao.perfis.includes(perfil)
+  return (item.perfis ?? secao.perfis).includes(perfil)
 }
 
 export function itensPermitidos(secao: SecaoAdmin, perfil: Perfil | null, telas: Tela[]): ItemMenu[] {
