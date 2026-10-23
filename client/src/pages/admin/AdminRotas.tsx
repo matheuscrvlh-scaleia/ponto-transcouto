@@ -54,6 +54,7 @@ export function RotasConfiguracao() {
             {itemConfiguracao('colunas', <MapeamentoColunas />)}
             {itemConfiguracao('unidades', <Unidades />)}
             {itemConfiguracao('alertas', <Configuracoes secao="alertas" />)}
+            {itemConfiguracao('dados', <Configuracoes secao="dados" />)}
             {itemConfiguracao('permissoes', <Permissoes />)}
           </Route>
         </Route>

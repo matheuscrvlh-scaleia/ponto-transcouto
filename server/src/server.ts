@@ -7,6 +7,7 @@ async function start() {
     const app = await buildApp()
 
     await db.query('SELECT 1')
+    console.log('Conectado ao Supabase.');
     await app.listen({ port: env.PORT, host: '0.0.0.0' })
     console.log(`API rodando na porta ${env.PORT}`)
 

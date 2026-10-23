@@ -44,12 +44,14 @@ export const SECAO_CONFIGURACAO: SecaoAdmin = {
     { caminho: 'colunas', rotulo: 'Mapeamento de colunas', perfis: ['admin'] },
     { caminho: 'unidades', rotulo: 'Unidades', tela: 'unidades' },
     { caminho: 'alertas', rotulo: 'Alertas e horas pagas', tela: 'alertas' },
+    // congelar dados passados: campo da tela Atualização dos dados no grupo de permissão
+    { caminho: 'dados', rotulo: 'Dados', tela: 'atualizacao' },
     { caminho: 'permissoes', rotulo: 'Permissões', tela: 'permissoes' },
   ],
   grupos: [
     { id: 'usuarios', rotulo: 'Usuários', abas: ['usuarios', 'permissoes'] },
     { id: 'integracoes', rotulo: 'Integrações', abas: ['integracao', 'atualizacao', 'colunas'] },
-    { id: 'configuracoes', rotulo: 'Configurações', abas: ['unidades', 'alertas'] },
+    { id: 'configuracoes', rotulo: 'Configurações', abas: ['unidades', 'alertas', 'dados'] },
   ],
 }
 

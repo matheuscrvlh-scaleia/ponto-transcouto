@@ -31,13 +31,14 @@ import type { Configuracoes as Config, ForcarSincronizacaoResposta, ModoExtracao
 import { PreviaCalendario } from './PreviaCalendario'
 import { TituloPagina } from '../../components/TituloPagina'
 
-/* As três telas usam GET/PATCH /configuracoes, cada uma com os seus campos:
+/* As quatro telas usam GET/PATCH /configuracoes, cada uma com os seus campos:
    - 'alertas' (Configuração, RH e equipe): horas pagas e limites "fora da curva";
    - 'atualizacao' (Configuração, RH e equipe): modo semanal ou tempo real, dia e hora da extração semanal
      (no tempo real não há fotografia semanal, a não ser com dados passados congelados: só a hora da extração do
-     fechamento do mês) e se os dias já fotografados são puxados de novo;
+     fechamento do mês);
+   - 'dados' (Configuração, RH e equipe): se os dias já fotografados são puxados de novo (congelar dados passados);
    - 'calendario' (Administração, só equipe): fechamento do mês, cota e prévia da régua. */
-export type SecaoConfiguracoes = 'alertas' | 'atualizacao' | 'calendario'
+export type SecaoConfiguracoes = 'alertas' | 'atualizacao' | 'dados' | 'calendario'
 
 const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
 
@@ -69,6 +70,12 @@ const TEXTOS: Record<SecaoConfiguracoes, { titulo: string; carregando: string; s
     titulo: 'Atualização dos dados',
     carregando: 'Carregando configurações...',
     salvo: 'Atualização dos dados salva.',
+    botao: 'Salvar',
+  },
+  dados: {
+    titulo: 'Dados',
+    carregando: 'Carregando configurações...',
+    salvo: 'Configuração dos dados salva.',
     botao: 'Salvar',
   },
   calendario: {
@@ -215,8 +222,6 @@ function validar(form: Formulario, original: Config, secao: SecaoConfiguracoes) 
     if (form.origem_horas_pagas !== original.origem_horas_pagas) alteracoes.origem_horas_pagas = form.origem_horas_pagas
   } else if (secao === 'atualizacao') {
     if (form.modo_extracao !== original.modo_extracao) alteracoes.modo_extracao = form.modo_extracao
-    if (form.congelar_dados_passados !== original.congelar_dados_passados)
-      alteracoes.congelar_dados_passados = form.congelar_dados_passados
     // no tempo real não há extração semanal (só com dados passados congelados): o dia da semana fica escondido
     if (temFotografiaSemanal(form)) {
       const dia = Number(form.dia_semana_extracao)
@@ -229,6 +234,9 @@ function validar(form: Formulario, original: Config, secao: SecaoConfiguracoes) 
     if (!Number.isInteger(diasApos) || diasApos < 0 || diasApos > DIAS_APOS_MAX)
       erros.dias_apos_fechamento_mes = 'Escolha um dia.'
     else if (diasApos !== original.dias_apos_fechamento_mes) alteracoes.dias_apos_fechamento_mes = diasApos
+  } else if (secao === 'dados') {
+    if (form.congelar_dados_passados !== original.congelar_dados_passados)
+      alteracoes.congelar_dados_passados = form.congelar_dados_passados
   } else {
     for (const campo of CAMPOS_CALENDARIO) {
       const valor = Number(form[campo])
@@ -261,22 +269,25 @@ function mudouRegraPagas(salva: Config, anterior: Config) {
 function mensagemSalvo(secao: SecaoConfiguracoes, salva: Config, anterior: Config) {
   if (secao === 'alertas' && mudouRegraPagas(salva, anterior))
     return 'Configurações salvas. A nova regra de horas pagas vale também para o histórico: o saldo de todos os fechamentos é recalculado em alguns minutos.'
+  const descartadas =
+    temFotografiaSemanal(anterior) && !temFotografiaSemanal(salva)
+      ? ' As fotografias semanais que ainda não tinham começado foram descartadas.'
+      : ''
+  if (secao === 'dados') {
+    const regra = salva.congelar_dados_passados
+      ? 'Dados passados congelados: a partir da próxima coleta, só os dias novos são puxados.'
+      : 'Cada coleta volta a puxar o período inteiro: correções na FriPonto entram na coleta seguinte.'
+    return `Salvo. ${regra}${descartadas}`
+  }
   if (secao !== 'atualizacao') return TEXTOS[secao].salvo
   const mes = quandoColetaMes(salva.dia_fechamento_mes, salva.dias_apos_fechamento_mes)
-  const congelados = salva.congelar_dados_passados
-    ? ' Dados passados congelados: cada coleta puxa só os dias novos.'
-    : ''
   if (salva.modo_extracao === 'tempo_real') {
-    const descartadas =
-      temFotografiaSemanal(anterior) && !temFotografiaSemanal(salva)
-        ? ' As fotografias semanais que ainda não tinham começado foram descartadas.'
-        : ''
     const semanal = temFotografiaSemanal(salva)
       ? `, a semana é fotografada ${quandoExtrai(salva.dia_semana_extracao, salva.hora_extracao)}`
       : ''
-    return `Salvo. Tempo real ativo: os colaboradores são atualizados continuamente${semanal} e o fechamento do mês (dia ${salva.dia_fechamento_mes}) é gravado ${mes} às ${salva.hora_extracao.slice(0, 5)}.${descartadas}${congelados}`
+    return `Salvo. Tempo real ativo: os colaboradores são atualizados continuamente${semanal} e o fechamento do mês (dia ${salva.dia_fechamento_mes}) é gravado ${mes} às ${salva.hora_extracao.slice(0, 5)}.${descartadas}`
   }
-  return `Salvo. Os dados serão atualizados ${quandoExtrai(salva.dia_semana_extracao, salva.hora_extracao)} e o mês fechado é puxado ${mes}.${congelados}`
+  return `Salvo. Os dados serão atualizados ${quandoExtrai(salva.dia_semana_extracao, salva.hora_extracao)} e o mês fechado é puxado ${mes}.`
 }
 
 export function Configuracoes({ secao }: { secao: SecaoConfiguracoes }) {
@@ -625,51 +636,14 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
       </fieldset>
 
       <fieldset className="form-secao">
-        <legend>Dias já puxados</legend>
-        <p className="form-nota">
-          O que acontece com os dias que já estão no painel quando alguém altera o ponto na FriPonto depois. Para puxar
-          de novo uma semana congelada, use{' '}
-          <Link to="/configuracao/integracao">Integração FriPonto → Puxar dados</Link>.
-        </p>
-        <div className="modo-opcoes" role="radiogroup" aria-label="Dias já puxados">
-          {OPCOES_CONGELAR.map(({ valor, titulo, descricao, Icone }) => (
-            <label
-              key={String(valor)}
-              className={form.congelar_dados_passados === valor ? 'modo-opcao ativo' : 'modo-opcao'}
-            >
-              <input
-                type="radio"
-                name="congelar_dados_passados"
-                checked={form.congelar_dados_passados === valor}
-                onChange={() => alterar('congelar_dados_passados', valor)}
-              />
-              <span className="modo-opcao-icone" aria-hidden="true">
-                <Icone tamanho={20} />
-              </span>
-              <span className="modo-opcao-texto">
-                <span className="modo-opcao-titulo">
-                  {titulo}
-                  {config.congelar_dados_passados === valor && <span className="modo-opcao-atual">Em uso</span>}
-                </span>
-                <span className="modo-opcao-desc">{descricao}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-        {ligandoCongelar && (
-          <Aviso>
-            Vale a partir da próxima coleta: ela puxa só os dias depois da última fotografia publicada de cada
-            colaborador. O que já está no painel fica como está.
-            {tempoReal && ' No tempo real, a fotografia semanal volta a ser feita, porque é ela que congela a semana.'}
-          </Aviso>
-        )}
-      </fieldset>
-
-      <fieldset className="form-secao">
         <legend>{semanal ? 'Dias e hora da atualização' : 'Fechamento do mês'}</legend>
         <p className="form-nota">
           {tempoReal && semanal
-            ? `Os números são atualizados continuamente e, toda semana no dia escolhido, a semana é fotografada e congelada. O fechamento do mês (dia ${config.dia_fechamento_mes}) é gravado no dia do mês escolhido abaixo.`
+            ? <>
+                Os números são atualizados continuamente e, toda semana no dia escolhido, a semana é fotografada e
+                congelada (os dados passados estão congelados em <Link to="/configuracao/dados">Configurações → Dados</Link>).
+                O fechamento do mês (dia {config.dia_fechamento_mes}) é gravado no dia do mês escolhido abaixo.
+              </>
             : tempoReal
             ? `Sem fotografia semanal: os números são atualizados continuamente e o histórico passa a ser por dia. O fechamento do mês (dia ${config.dia_fechamento_mes}) continua sendo gravado como registro oficial, no dia do mês escolhido abaixo.`
             : `Toda semana, no dia escolhido, os dados são puxados da FriPonto e publicados no painel. E uma vez por mês, no dia do mês escolhido, é puxado o mês fechado (até o dia ${config.dia_fechamento_mes}). Deixe tempo para o RH ajustar o ponto antes.`}
@@ -745,6 +719,61 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
     </>
   )
 
+  const camposDados = (
+    <fieldset className="config-bloco">
+      <legend className="sr-only">Dias já puxados</legend>
+      <div className="config-bloco-topo">
+        <span className="config-bloco-icone" aria-hidden="true">
+          <IconeCadeado tamanho={20} />
+        </span>
+        <div>
+          <h2 className="config-bloco-titulo">Dias já puxados</h2>
+          <p className="config-bloco-sub">
+            O que acontece com os dias que já estão no painel quando alguém altera o ponto na FriPonto depois. Para puxar
+            de novo uma semana congelada, use{' '}
+            <Link to="/configuracao/integracao">Integração FriPonto → Puxar dados</Link>.
+          </p>
+        </div>
+      </div>
+
+      <div className="modo-opcoes" role="radiogroup" aria-label="Dias já puxados">
+        {OPCOES_CONGELAR.map(({ valor, titulo, descricao, Icone }) => (
+          <label key={String(valor)} className={form.congelar_dados_passados === valor ? 'modo-opcao ativo' : 'modo-opcao'}>
+            <input
+              type="radio"
+              name="congelar_dados_passados"
+              checked={form.congelar_dados_passados === valor}
+              onChange={() => alterar('congelar_dados_passados', valor)}
+            />
+            <span className="modo-opcao-icone" aria-hidden="true">
+              <Icone tamanho={20} />
+            </span>
+            <span className="modo-opcao-texto">
+              <span className="modo-opcao-titulo">
+                {titulo}
+                {config.congelar_dados_passados === valor && <span className="modo-opcao-atual">Em uso</span>}
+              </span>
+              <span className="modo-opcao-desc">{descricao}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {ligandoCongelar && (
+        <Aviso>
+          Vale a partir da próxima coleta: ela puxa só os dias depois da última fotografia publicada de cada colaborador.
+          O que já está no painel fica como está.
+          {tempoReal && ' No tempo real, a fotografia semanal volta a ser feita, porque é ela que congela a semana.'}
+        </Aviso>
+      )}
+      {perdeSemanal && (
+        <Aviso>
+          No tempo real, sem dados congelados, não há fotografia semanal: ao salvar, as fotografias semanais que ainda não
+          começaram são descartadas.
+        </Aviso>
+      )}
+    </fieldset>
+  )
+
   const camposCalendario = (
     <fieldset className="form-secao">
       <legend>Régua de extração</legend>
@@ -800,14 +829,16 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
     </fieldset>
   )
 
-  const campos = { alertas: camposAlertas, atualizacao: camposAtualizacao, calendario: camposCalendario }[secao]
+  const campos = { alertas: camposAlertas, atualizacao: camposAtualizacao, dados: camposDados, calendario: camposCalendario }[
+    secao
+  ]
 
   return (
     <section className="pagina">
       <TituloPagina>{textos.titulo}</TituloPagina>
 
-      {/* Alertas: cada assunto num bloco próprio; as outras seções seguem num cartão só */}
-      <form className={secao === 'alertas' ? 'config-form' : 'card'} onSubmit={salvar} noValidate>
+      {/* Alertas e Dados: cada assunto num bloco próprio; as outras seções seguem num cartão só */}
+      <form className={secao === 'alertas' || secao === 'dados' ? 'config-form' : 'card'} onSubmit={salvar} noValidate>
         {campos}
 
         {/* fica grudada no rodapé da tela enquanto houver alteração por salvar */}

@@ -20,7 +20,7 @@ export const TELAS: InfoTela[] = [
   { id: 'usuarios', rotulo: 'Usuários', secao: 'Configuração', caminho: '/configuracao/usuarios', descricao: 'Cadastrar usuários, escolher o grupo, vincular unidades e redefinir senha' },
   { id: 'permissoes', rotulo: 'Permissões', secao: 'Configuração', caminho: '/configuracao/permissoes', descricao: 'Criar grupos de permissão e escolher as telas de cada um' },
   { id: 'integracao', rotulo: 'Integração FriPonto', secao: 'Configuração', caminho: '/configuracao/integracao', descricao: 'Situação da conexão, puxar dados e histórico de pedidos' },
-  { id: 'atualizacao', rotulo: 'Atualização dos dados', secao: 'Configuração', caminho: '/configuracao/atualizacao', descricao: 'Semanal ou tempo real, dia e hora, e forçar sincronização' },
+  { id: 'atualizacao', rotulo: 'Atualização dos dados', secao: 'Configuração', caminho: '/configuracao/atualizacao', descricao: 'Semanal ou tempo real, dia e hora, forçar sincronização e congelar dados passados (Configurações → Dados)' },
   { id: 'unidades', rotulo: 'Unidades', secao: 'Configuração', caminho: '/configuracao/unidades', descricao: 'Nome de exibição e ativação das unidades' },
   { id: 'alertas', rotulo: 'Alertas e horas pagas', secao: 'Configuração', caminho: '/configuracao/alertas', descricao: 'Teto de horas pagas e limites de fora da curva' },
 ]
