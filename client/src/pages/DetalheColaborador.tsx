@@ -160,7 +160,13 @@ export function DetalheColaborador() {
       </header>
 
       <div className="pc-filtro nao-imprimir">
-        <FiltroPeriodo escolhido={periodo.escolhido} de={periodo.deParam} ate={periodo.ateParam} onMudar={periodo.mudar} />
+        <FiltroPeriodo
+          escolhido={periodo.escolhido}
+          atual={intervalo}
+          de={periodo.deParam}
+          ate={periodo.ateParam}
+          onMudar={periodo.mudar}
+        />
       </div>
 
       <PerfilIntervalo

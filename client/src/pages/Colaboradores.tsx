@@ -428,6 +428,7 @@ export function Colaboradores() {
               <LinhaFiltros>
                 <FiltroPeriodo
                   escolhido={intervaloEscolhido}
+                  atual={intervalo.periodoAtual}
                   de={intervalo.deParam}
                   ate={intervalo.ateParam}
                   onMudar={intervalo.mudar}

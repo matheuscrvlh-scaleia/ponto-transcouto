@@ -13,6 +13,8 @@ interface Props {
   onMudar: (novo: Partial<Intervalo>) => void
   /** Rótulo da opção sem datas: "Período atual" (Dashboard, Colaboradores) ou "Qualquer data" (Batidas). */
   rotuloVazio?: string
+  /** Datas do período atual, mostradas nos campos quando nenhuma data foi escolhida. */
+  atual?: Intervalo | null
 }
 
 /** Clicar em qualquer ponto do campo abre o calendário (o ícone nativo fica escondido). */
@@ -28,8 +30,11 @@ function abrirCalendario(event: MouseEvent<HTMLInputElement>) {
  * Barra de período: atalhos (sem datas, hoje, ontem, esta semana, este mês) e o intervalo De → Até.
  * Datas escolhidas à mão deixam nenhum atalho marcado e o intervalo em destaque.
  */
-export function FiltroPeriodo({ escolhido, de, ate, onMudar, rotuloVazio = 'Período atual' }: Props) {
+export function FiltroPeriodo({ escolhido, de, ate, onMudar, rotuloVazio = 'Período atual', atual }: Props) {
   const hoje = hojeISO()
+  // sem datas escolhidas, os campos mostram o período atual; mexer numa ponta mantém a outra
+  const mostrado = escolhido ?? atual ?? null
+  const base = escolhido ? { de, ate } : { de: atual?.de, ate: atual?.ate }
   const rapido = escolhido ? periodoRapidoDe(escolhido.de, escolhido.ate, hoje) : null
   // 'livre': datas escolhidas à mão, nenhum atalho marcado
   type Atalho = PeriodoRapido | 'vazio' | 'livre'
@@ -54,11 +59,11 @@ export function FiltroPeriodo({ escolhido, de, ate, onMudar, rotuloVazio = 'Per�
           <span className="sr-only">De</span>
           <input
             type="date"
-            className={escolhido ? undefined : 'vazio'}
-            value={escolhido?.de ?? ''}
-            max={escolhido?.ate ?? hoje}
+            className={mostrado ? undefined : 'vazio'}
+            value={mostrado?.de ?? ''}
+            max={mostrado?.ate ?? hoje}
             onClick={abrirCalendario}
-            onChange={(event) => onMudar({ de: event.target.value || undefined, ate })}
+            onChange={(event) => onMudar({ de: event.target.value || undefined, ate: base.ate })}
           />
         </label>
         <span className="filtro-periodo-seta" aria-hidden="true">
@@ -68,12 +73,12 @@ export function FiltroPeriodo({ escolhido, de, ate, onMudar, rotuloVazio = 'Per�
           <span className="sr-only">Até</span>
           <input
             type="date"
-            className={escolhido ? undefined : 'vazio'}
-            value={escolhido?.ate ?? ''}
-            min={escolhido?.de}
+            className={mostrado ? undefined : 'vazio'}
+            value={mostrado?.ate ?? ''}
+            min={mostrado?.de}
             max={hoje}
             onClick={abrirCalendario}
-            onChange={(event) => onMudar({ de, ate: event.target.value || undefined })}
+            onChange={(event) => onMudar({ de: base.de, ate: event.target.value || undefined })}
           />
         </label>
         {escolhido && (

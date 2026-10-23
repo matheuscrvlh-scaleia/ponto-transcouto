@@ -79,5 +79,5 @@ export function useHorasNoIntervalo(unidadeId: string | undefined, linhas: Linha
   )
   const porColaborador = useMemo(() => new Map((horas.dados?.colaboradores ?? []).map((c) => [c.id, c])), [horas.dados])
 
-  return { escolhido, deParam, ateParam, horas, porColaborador, mudar }
+  return { escolhido, periodoAtual, deParam, ateParam, horas, porColaborador, mudar }
 }

@@ -299,7 +299,13 @@ export function DashboardUnidade() {
           </p>
         )}
         <div className="dash-filtro-periodo">
-          <FiltroPeriodo escolhido={escolhido} de={intervalo.deParam} ate={intervalo.ateParam} onMudar={intervalo.mudar} />
+          <FiltroPeriodo
+            escolhido={escolhido}
+            atual={intervalo.periodoAtual}
+            de={intervalo.deParam}
+            ate={intervalo.ateParam}
+            onMudar={intervalo.mudar}
+          />
         </div>
       </header>
 
