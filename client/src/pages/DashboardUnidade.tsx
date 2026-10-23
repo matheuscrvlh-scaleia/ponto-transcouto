@@ -27,6 +27,7 @@ import { formatarData, formatarDataHora, formatarDiaSemana, formatarMinutos, ini
 import { textoDoIntervalo, useHorasNoIntervalo } from '../lib/intervalo'
 import {
   caminhoColaboradores,
+  linhasNoIntervalo,
   ORDEM_PADRAO,
   SEM_TEMPO_REAL,
   textoAte,
@@ -35,8 +36,8 @@ import {
   type LinhaPainel as Linha,
 } from '../lib/painel'
 import { caminhoFechamentos } from './admin/navegacao'
-import { PainelIntervalo } from './PainelIntervalo'
-import type { FiltroDashboard } from '../types/api'
+import { ListasDoIntervalo } from './ListasDoIntervalo'
+import type { FiltroDashboard, Minutos } from '../types/api'
 import './dashboard.css'
 import { TituloPagina } from '../components/TituloPagina'
 
@@ -52,17 +53,30 @@ export function DashboardUnidade() {
   const linkFechamentos = caminhoFechamentos(telas)
   const location = useLocation()
   const navigate = useNavigate()
-  // grupo de colaboradores aberto a partir de um gráfico (faixa de saldo ou parte do medidor)
+  // grupo de colaboradores aberto a partir de um gráfico (faixa de saldo ou parte do medidor) ou de um total do resumo
   const [grupoAberto, setGrupoAberto] = useState<{
     titulo: string
     descricao: string
     linhas: Linha[]
     ordem: 'asc' | 'desc'
+    /** O número de cada linha no modal (sem isso, o saldo com a curva). */
+    valor?: (linha: Linha) => Minutos
+    sinal?: boolean
   } | null>(null)
   const { dados, erro, carregando, recarregar } = usePainel(unidadeId)
-  // intervalo de datas: com ele o painel mostra só aquele intervalo (PainelIntervalo)
+  // intervalo de datas: com ele, saldo, extras, negativas e curva são os do intervalo (a mesma tela, outros números)
   const intervalo = useHorasNoIntervalo(unidadeId, dados?.colaboradores)
   const { escolhido, porColaborador } = intervalo
+  const comIntervalo = escolhido !== null
+  const linhasPainel = useMemo(
+    () =>
+      !dados
+        ? []
+        : comIntervalo
+          ? linhasNoIntervalo(dados.colaboradores, porColaborador, dados.limites)
+          : dados.colaboradores,
+    [dados, porColaborador, comIntervalo],
+  )
 
   useEffect(() => {
     const nome = dados ? (dados.unidade?.nome ?? 'Todas as unidades') : null
@@ -75,8 +89,7 @@ export function DashboardUnidade() {
   }
 
   const somas = useMemo(() => {
-    const lista = dados?.colaboradores ?? []
-    return lista.reduce(
+    return linhasPainel.reduce(
       (soma, linha) => {
         const doIntervalo = porColaborador.get(linha.id)
         const acimaNoDia = (doIntervalo?.dias_extra_acima ?? 0) + (doIntervalo?.dias_negativa_acima ?? 0) > 0
@@ -89,14 +102,14 @@ export function DashboardUnidade() {
       },
       { saldo: 0, extra: 0, negativa: 0, acimaDoLimiteDiario: 0 },
     )
-  }, [dados, porColaborador])
+  }, [linhasPainel, porColaborador])
 
   const emAtencao = useMemo(
     () =>
-      (dados?.colaboradores ?? [])
+      linhasPainel
         .filter((linha) => linha.fora_da_curva !== null)
         .sort((a, b) => Math.abs(b.saldo_min) - Math.abs(a.saldo_min) || a.nome.localeCompare(b.nome, 'pt-BR')),
-    [dados],
+    [linhasPainel],
   )
 
   // com uma unidade só, "todas" é a própria unidade
@@ -120,9 +133,12 @@ export function DashboardUnidade() {
       item.fechamento?.periodo_inicio === fechamento?.periodo_inicio,
   )
   const limitesVariam = Boolean(dados.limites_variam)
-  const todos = dados.colaboradores
-  const acima = dados.resumo?.fora_positivo ?? todos.filter((linha) => linha.fora_da_curva === 'positivo').length
-  const abaixo = dados.resumo?.fora_negativo ?? todos.filter((linha) => linha.fora_da_curva === 'negativo').length
+  const todos = linhasPainel
+  // o resumo do servidor é do período: com intervalo, a curva sai das linhas do intervalo
+  const resumo = comIntervalo ? null : dados.resumo
+  const acima = resumo?.fora_positivo ?? todos.filter((linha) => linha.fora_da_curva === 'positivo').length
+  const abaixo = resumo?.fora_negativo ?? todos.filter((linha) => linha.fora_da_curva === 'negativo').length
+  // horas pagas só existem por período: não mudam com o intervalo
   const totalPagas = dados.resumo?.pagas_total_min ?? todos.reduce((soma, linha) => soma + linha.pagas_min, 0)
   const totalColaboradores = dados.resumo?.total ?? dados.total
   const dentro = Math.max(0, totalColaboradores - acima - abaixo)
@@ -190,6 +206,18 @@ export function DashboardUnidade() {
   const previsto = rotuloProxima.startsWith('Próximo ') ? 'previsto' : 'prevista'
   const nenhumColaborador = aoVivo || !fechamento ? 'Nenhum colaborador com dados' : 'Nenhum colaborador neste fechamento'
   const textoIntervalo = escolhido ? textoDoIntervalo(escolhido) : null
+  // complemento dos títulos: o intervalo escolhido ou o período dos números
+  const quando = textoIntervalo ? `de ${textoIntervalo}` : 'no período'
+  const detalheResumo = comIntervalo ? 'no intervalo' : 'no período'
+  const porNome = (a: Linha, b: Linha) => a.nome.localeCompare(b.nome, 'pt-BR')
+  const comExtras = todos.filter((l) => l.extra_min > 0).sort((a, b) => b.extra_min - a.extra_min || porNome(a, b))
+  const comNegativas = todos.filter((l) => l.negativa_min > 0).sort((a, b) => b.negativa_min - a.negativa_min || porNome(a, b))
+  const comHoras = todos.filter((l) => l.extra_min > 0 || l.negativa_min > 0)
+
+  /** Colaboradores por trás de um total do resumo, com o número de cada um. */
+  function abrirTotal(titulo: string, descricao: string, linhas: Linha[], valor: (linha: Linha) => Minutos, sinal = false) {
+    setGrupoAberto({ titulo, descricao, linhas, ordem: 'desc', valor, sinal })
+  }
 
   const cardUnidades = consolidado ? (
     <article className="dash-card dash-area-atualizacao" aria-labelledby="titulo-unidades">
@@ -337,21 +365,6 @@ export function DashboardUnidade() {
             </Link>
           )}
         </EstadoVazio>
-      ) : textoIntervalo ? (
-        <>
-          <PainelIntervalo
-            linhas={todos}
-            porColaborador={porColaborador}
-            intervalo={textoIntervalo}
-            cardUnidades={cardUnidades}
-            incompleto={incompleto}
-            abrirLista={abrirLista}
-            linkColaborador={linkColaborador}
-            complemento={complemento}
-            origem={origem}
-          />
-          <p className="rodape-nota">Somente leitura. Ajustes de ponto são feitos pelo RH na FriPonto.</p>
-        </>
       ) : (
         <>
           <div className="dash-kpis">
@@ -396,13 +409,15 @@ export function DashboardUnidade() {
               rotulo="Pagas no período"
               valor={<Horas minutos={totalPagas} />}
               contexto={
-                aoVivo
-                  ? `Período atual, até ${dadosAte}`
-                  : periodo
-                    ? `Período de ${periodo}`
-                    : consolidado
-                      ? 'Soma de todas as unidades'
-                      : 'Soma de todos os colaboradores'
+                comIntervalo
+                  ? 'Do período: não muda com o filtro de datas'
+                  : aoVivo
+                    ? `Período atual, até ${dadosAte}`
+                    : periodo
+                      ? `Período de ${periodo}`
+                      : consolidado
+                        ? 'Soma de todas as unidades'
+                        : 'Soma de todos os colaboradores'
               }
               icone={<IconeRelogio tamanho={14} />}
               acao="Ver colaboradores ordenados por horas pagas"
@@ -415,7 +430,7 @@ export function DashboardUnidade() {
               <div className="dash-card-topo">
                 <div>
                   <h2 id="titulo-faixas">Distribuição do saldo</h2>
-                  <p className="dash-card-sub">Colaboradores por faixa de saldo do período (extras − negativas)</p>
+                  <p className="dash-card-sub">Colaboradores por faixa de saldo {quando} (extras − negativas)</p>
                 </div>
               </div>
               {todos.length > 0 ? (
@@ -443,12 +458,49 @@ export function DashboardUnidade() {
               <h2 id="titulo-resumo">Resumo de horas</h2>
               <p className="dash-card-sub">
                 {incompleto ? `Soma dos ${todos.length} colaboradores exibidos` : 'Soma de todos os colaboradores'}
+                {textoIntervalo && `, de ${textoIntervalo}`}
               </p>
               <ul className="dash-resumo">
-                <ItemResumo icone={<IconeBanco />} rotulo="Saldo" detalhe="no período" minutos={somas.saldo} sinal />
-                <ItemResumo icone={<IconeMais />} rotulo="Extras" detalhe="no período" minutos={somas.extra} />
-                <ItemResumo icone={<IconeMenos />} rotulo="Negativas" detalhe="no período" minutos={somas.negativa} />
-                <ItemResumo icone={<IconeMoeda />} rotulo="Pagas" detalhe="no período" minutos={totalPagas} />
+                <ItemResumo
+                  icone={<IconeBanco />}
+                  rotulo="Saldo"
+                  detalhe={detalheResumo}
+                  minutos={somas.saldo}
+                  sinal
+                  onAbrir={() =>
+                    abrirTotal('Saldo', `Extras − negativas ${quando}`, comHoras, (l) => l.saldo_min, true)
+                  }
+                />
+                <ItemResumo
+                  icone={<IconeMais />}
+                  rotulo="Extras"
+                  detalhe={detalheResumo}
+                  minutos={somas.extra}
+                  onAbrir={() => abrirTotal('Extras', `Quem fez extras ${quando}`, comExtras, (l) => l.extra_min)}
+                />
+                <ItemResumo
+                  icone={<IconeMenos />}
+                  rotulo="Negativas"
+                  detalhe={detalheResumo}
+                  minutos={somas.negativa}
+                  onAbrir={() =>
+                    abrirTotal('Negativas', `Quem teve negativas (faltas e atrasos) ${quando}`, comNegativas, (l) => l.negativa_min)
+                  }
+                />
+                <ItemResumo
+                  icone={<IconeMoeda />}
+                  rotulo="Pagas"
+                  detalhe={comIntervalo ? 'do período (sem filtro)' : 'no período'}
+                  minutos={totalPagas}
+                  onAbrir={() =>
+                    abrirTotal(
+                      'Pagas',
+                      'Horas pagas do período (não mudam com o filtro de datas)',
+                      todos.filter((l) => l.pagas_min > 0),
+                      (l) => l.pagas_min,
+                    )
+                  }
+                />
                 {todos.length > 0 && (
                   <ItemResumo
                     icone={<IconeMedia />}
@@ -458,14 +510,23 @@ export function DashboardUnidade() {
                     sinal
                   />
                 )}
+                {comExtras.length > 0 && (
+                  <ItemResumo
+                    icone={<IconeMedia />}
+                    rotulo="Extras por pessoa"
+                    detalhe="média de quem fez"
+                    minutos={Math.round(somas.extra / comExtras.length)}
+                    onAbrir={() => abrirTotal('Extras por pessoa', `Quem fez extras ${quando}`, comExtras, (l) => l.extra_min)}
+                  />
+                )}
               </ul>
               {somas.acimaDoLimiteDiario > 0 && (
                 <button type="button" className="dash-limite-diario" onClick={() => abrirLista('limite')}>
                   <IconeAlerta tamanho={16} />
                   <span>
                     <strong>{somas.acimaDoLimiteDiario}</strong>{' '}
-                    {somas.acimaDoLimiteDiario === 1 ? 'colaborador passou' : 'colaboradores passaram'} do limite diário
-                    no período
+                    {somas.acimaDoLimiteDiario === 1 ? 'colaborador passou' : 'colaboradores passaram'} do limite diário{' '}
+                    {quando}
                   </span>
                   <IconeSetaDiagonal tamanho={14} />
                 </button>
@@ -478,6 +539,7 @@ export function DashboardUnidade() {
                   <h2 id="titulo-atencao">Fora da curva</h2>
                   <p className="dash-card-sub">
                     {consolidado ? 'Maiores saldos fora dos limites, em todas as unidades' : 'Maiores saldos fora dos limites da unidade'}
+                    {textoIntervalo && `, de ${textoIntervalo}`}
                   </p>
                 </div>
                 {emAtencao.length > 0 && (
@@ -487,7 +549,9 @@ export function DashboardUnidade() {
                 )}
               </div>
               {emAtencao.length === 0 ? (
-                <p className="dash-vazio">Nenhum colaborador fora da curva no momento.</p>
+                <p className="dash-vazio">
+                  {textoIntervalo ? `Nenhum colaborador fora da curva de ${textoIntervalo}.` : 'Nenhum colaborador fora da curva no momento.'}
+                </p>
               ) : (
                 <ul className="dash-pessoas dash-pessoas-rolagem">
                   {emAtencao.map((linha) => (
@@ -513,12 +577,23 @@ export function DashboardUnidade() {
 
             <article className="dash-card dash-area-medidor" aria-labelledby="titulo-medidor">
               <h2 id="titulo-medidor">Dentro da curva</h2>
+              {textoIntervalo && <p className="dash-card-sub">Saldo de {textoIntervalo}</p>}
               {totalColaboradores > 0 ? (
                 <MedidorCurva dentro={dentro} acima={acima} abaixo={abaixo} onSelecionar={abrirGrupoCurva} />
               ) : (
                 <p className="dash-vazio">Sem colaboradores para calcular.</p>
               )}
             </article>
+
+            <ListasDoIntervalo
+              linhas={todos}
+              porColaborador={porColaborador}
+              quando={quando}
+              abrirLista={abrirLista}
+              linkColaborador={linkColaborador}
+              complemento={complemento}
+              origem={origem}
+            />
           </div>
 
           {incompleto && (
@@ -541,6 +616,8 @@ export function DashboardUnidade() {
           link={linkColaborador}
           complemento={complemento}
           limiteDe={limiteDe}
+          valor={grupoAberto.valor}
+          sinal={grupoAberto.sinal}
           origem={origem}
           onFechar={() => setGrupoAberto(null)}
         />

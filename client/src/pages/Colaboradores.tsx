@@ -16,6 +16,7 @@ import { formatarData, formatarDataHora, hojeISO, iniciais, normalizarBusca } fr
 import { textoDoIntervalo, useHorasNoIntervalo } from '../lib/intervalo'
 import {
   caminhoColaboradores,
+  linhasNoIntervalo,
   ORDEM_PADRAO,
   SEM_TEMPO_REAL,
   textoAte,
@@ -210,25 +211,20 @@ export function Colaboradores() {
   const { porColaborador } = intervalo
   const comIntervalo = intervaloEscolhido !== null
 
-  // com intervalo escolhido, extras e negativas são a soma dos dias; sem ele, os números do período
-  const todasLinhas = useMemo<LinhaTela[]>(
-    () =>
-      (dados?.colaboradores ?? []).map((linha) => {
-        const doIntervalo = porColaborador.get(linha.id)
-        return {
-          ...linha,
-          ...(comIntervalo && {
-            extra_min: doIntervalo?.extra_min ?? 0,
-            negativa_min: doIntervalo?.negativa_min ?? 0,
-            saldo_min: (doIntervalo?.extra_min ?? 0) - (doIntervalo?.negativa_min ?? 0),
-            fora_da_curva: null,
-          }),
-          dias_extra_acima: doIntervalo?.dias_extra_acima ?? 0,
-          dias_negativa_acima: doIntervalo?.dias_negativa_acima ?? 0,
-        }
-      }),
-    [dados, porColaborador, comIntervalo],
-  )
+  // com intervalo escolhido, extras, negativas e saldo são a soma dos dias (e a curva, pelo saldo do intervalo);
+  // sem ele, os números do período
+  const todasLinhas = useMemo<LinhaTela[]>(() => {
+    if (!dados) return []
+    const base = comIntervalo ? linhasNoIntervalo(dados.colaboradores, porColaborador, dados.limites) : dados.colaboradores
+    return base.map((linha) => {
+      const doIntervalo = porColaborador.get(linha.id)
+      return {
+        ...linha,
+        dias_extra_acima: doIntervalo?.dias_extra_acima ?? 0,
+        dias_negativa_acima: doIntervalo?.dias_negativa_acima ?? 0,
+      }
+    })
+  }, [dados, porColaborador, comIntervalo])
 
   const linhas = useMemo(() => {
     const termo = normalizarBusca(busca)
@@ -290,8 +286,8 @@ export function Colaboradores() {
         coluna.campo === 'saldo_min' ? { ...coluna, rotulo: 'Saldo do intervalo' } : coluna,
       )
     : COLUNAS
-  // "Fora da curva" olha o saldo do período inteiro: some com intervalo de datas
-  const filtrosVisiveis = comIntervalo ? FILTROS.filter((item) => item.valor !== 'fora') : FILTROS
+  // com intervalo, "Fora da curva" olha o saldo do intervalo (mesmos limites do período)
+  const filtrosVisiveis = FILTROS
   const textoIntervalo = intervaloEscolhido ? textoDoIntervalo(intervaloEscolhido) : null
   // período de cada linha aberta: o intervalo escolhido ou o período dos números dela
   const diasDe = (linha: Linha) => intervaloEscolhido ?? { de: linha.periodo_inicio, ate: linha.dados_ate }

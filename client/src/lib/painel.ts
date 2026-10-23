@@ -3,7 +3,16 @@ import { useEmpresaAdmin } from '../context/EmpresaAdminContext'
 import { api } from './api'
 import { dataDoInstante, formatarData, formatarHoraOuData, hojeISO } from './formato'
 import { useRecurso } from './useRecurso'
-import type { DashboardUnidade, DataHoraISO, DataISO, FiltroDashboard, TempoRealDashboard } from '../types/api'
+import type {
+  DashboardUnidade,
+  DataHoraISO,
+  DataISO,
+  FiltroDashboard,
+  ForaDaCurva,
+  HorasNoIntervalo,
+  Limites,
+  TempoRealDashboard,
+} from '../types/api'
 
 /* Dados do painel de banco de horas, usados pelo Dashboard e pela tela de Colaboradores. */
 
@@ -92,4 +101,24 @@ export function textoAtualizados(de: DataHoraISO | null, ate: DataHoraISO | null
   const a = formatarHoraOuData(inicio, { comData })
   const b = formatarHoraOuData(fim, { comData })
   return a === b ? `atualizados às ${a}` : `atualizados entre ${a} e ${b}`
+}
+
+type HorasDoColaborador = HorasNoIntervalo['colaboradores'][number]
+
+/**
+ * Linhas com os números de um intervalo de datas: extras e negativas somadas dos dias, saldo = extras − negativas
+ * e fora da curva pelos mesmos limites do período (no consolidado, os da empresa de cada linha).
+ * As horas pagas não existem por intervalo e continuam as do período.
+ */
+export function linhasNoIntervalo<T extends LinhaPainel>(linhas: T[], porColaborador: Map<number, HorasDoColaborador>, limites: Limites): T[] {
+  return linhas.map((linha) => {
+    const doIntervalo = porColaborador.get(linha.id)
+    const extra = doIntervalo?.extra_min ?? 0
+    const negativa = doIntervalo?.negativa_min ?? 0
+    const saldo = extra - negativa
+    const pos = linha.alerta_pos ?? limites.alerta_pos
+    const neg = linha.alerta_neg ?? limites.alerta_neg
+    const foraDaCurva: ForaDaCurva = saldo >= pos ? 'positivo' : saldo <= -neg ? 'negativo' : null
+    return { ...linha, extra_min: extra, negativa_min: negativa, saldo_min: saldo, fora_da_curva: foraDaCurva }
+  })
 }

@@ -191,7 +191,8 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-areas:
     'faixas faixas atualizacao resumo'
-    'atencao atencao medidor resumo';
+    'atencao atencao medidor resumo'
+    'extras extras negativas limite';
   gap: 16px;
   align-items: stretch;
 }
@@ -218,6 +219,19 @@
 
 .dash-area-lista {
   grid-area: lista;
+}
+
+/* listas sobre as horas de cada dia (ListasDoIntervalo) */
+.dash-area-extras {
+  grid-area: extras;
+}
+
+.dash-area-negativas {
+  grid-area: negativas;
+}
+
+.dash-area-limite {
+  grid-area: limite;
 }
 
 .dash-card {
@@ -870,7 +884,9 @@
     grid-template-areas:
       'faixas faixas'
       'atualizacao medidor'
-      'atencao resumo';
+      'atencao resumo'
+      'extras extras'
+      'negativas limite';
   }
 }
 
@@ -913,7 +929,10 @@
       'medidor'
       'atencao'
       'atualizacao'
-      'resumo';
+      'resumo'
+      'extras'
+      'negativas'
+      'limite';
     gap: 12px;
   }
 
