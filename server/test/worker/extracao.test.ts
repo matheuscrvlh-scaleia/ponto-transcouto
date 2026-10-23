@@ -556,6 +556,28 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
             .rejects.toThrow(/congelado/)
         await client.query('ROLLBACK TO SAVEPOINT congelado')
     })
+
+    it('grava as colunas da FriPonto em cada dia e o recálculo refaz as extras do dia pelo mapeamento novo', async () => {
+        await sincronizarSoUnidadeA()
+        totaisPorCpf.set(CPF_ANA, [resposta('02:00', '01:00', '00:30', '')])
+        totaisPorCpf.set(CPF_BRUNO, [resposta('', '', '', '')])
+        await criarCiclo('semanal', '2026-08-26', '2026-09-15', '2001-01-01T09:00:00Z')
+        expect(await processar()).toBe(true)
+
+        const diaAna = async () => um<{ extra_min: number, negativa_min: number, colunas: Record<string, string> }>(
+            `SELECT hd.extra_min, hd.negativa_min, hd.colunas FROM horas_dia hd JOIN colaboradores c ON c.id = hd.colaborador_id
+              WHERE c.cpf = $1 AND hd.dia = '2026-09-01'`, [CPF_ANA],
+        )
+        expect(await diaAna()).toEqual({
+            extra_min: 180, negativa_min: 30, colunas: { Normais: '08:00', 'Ex50%': '02:00', 'Ex100%': '01:00', Faltas: '00:30' },
+        })
+
+        await client.query(`UPDATE mapeamento_colunas SET campo = 'ignorar' WHERE empresa_id = $1 AND coluna_secullum = 'Ex100%'`, [empresaId])
+        const resultado = await recalcularEmpresa(empresaId, null, client)
+        expect(resultado.falhas).toEqual([])
+        expect(resultado.alterados.horasDia).toBe(1)
+        expect(await diaAna()).toMatchObject({ extra_min: 120, negativa_min: 30 })
+    })
 })
 
 describe('tempo real (transação desfeita)', () => {

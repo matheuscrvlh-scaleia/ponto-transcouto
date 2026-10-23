@@ -4,6 +4,7 @@ import { Segmentado } from '../components/BarraFiltros'
 import { Carregando, ErroCarregamento } from '../components/Estados'
 import { Horas } from '../components/Horas'
 import { IconeAlerta, IconeCalendario, IconeMais, IconeMenos, IconeRelogio } from '../components/Icones'
+import { Modal } from '../components/Modal'
 import { api } from '../lib/api'
 import { ehHorario, marcacoesParaExibir, origemDa, situacaoDa, textoInclusao } from '../lib/batidas'
 import { formatarData, formatarDiaPorExtenso, formatarMinutos } from '../lib/formato'
@@ -23,6 +24,8 @@ const DIA_SUSPEITO_MIN = 16 * 60
 
 type Dia = DiasDetalhe['dias'][number]
 type Aba = 'dias' | 'batidas' | 'historico'
+/** Card aberto no modal de detalhe. */
+type Detalhe = 'extras' | 'negativas' | 'saldo' | 'limite' | 'batidas'
 
 function diaDaSemana(data: DataISO) {
   const [a, m, d] = data.split('-').map(Number)
@@ -56,6 +59,23 @@ export function analisarDia(todas: string[]): { trabalhado: Minutos | null; conf
   return { trabalhado, conferir: null }
 }
 
+type Campo = 'extra' | 'negativa'
+type ColunasPorCampo = DiasDetalhe['colunas']
+
+/** Minutos da coluna da FriPonto no dia; negativa sempre sem sinal, como na soma do servidor. */
+function minutosDaColuna(dia: Dia, coluna: string, campo: Campo) {
+  const valor = dia.colunas[coluna] ?? 0
+  return campo === 'negativa' ? Math.abs(valor) : valor
+}
+
+const totalDoCampo = (dia: Dia, campo: Campo) => (campo === 'extra' ? dia.extra_min : dia.negativa_min)
+
+/** Com uma coluna só, a soma é a própria coluna: a tabela abre as colunas só quando há mais de uma. */
+const colunasAbertas = (colunas: ColunasPorCampo) => ({
+  extra: colunas.extra.length > 1 ? colunas.extra : [],
+  negativa: colunas.negativa.length > 1 ? colunas.negativa : [],
+})
+
 interface Props {
   colaboradorId: number
   intervalo: Intervalo
@@ -65,6 +85,7 @@ interface Props {
 
 export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) {
   const [aba, setAba] = useState<Aba>('dias')
+  const [detalhe, setDetalhe] = useState<Detalhe | null>(null)
   const { dados, erro, carregando, recarregar } = useRecurso(
     (signal) => api<DiasDetalhe>(`/colaboradores/${colaboradorId}/dias-detalhe`, { signal, query: intervalo }),
     `pc-dias-${colaboradorId}-${intervalo.de}-${intervalo.ate}`,
@@ -113,6 +134,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
               : 'nenhum dia'
           }
           tom="positivo"
+          onAbrir={() => setDetalhe('extras')}
         />
         <Indicador
           icone={<IconeMenos tamanho={16} />}
@@ -120,15 +142,18 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
           valor={<Horas minutos={negativa} />}
           detalhe={diasComNegativa ? `em ${diasComNegativa} ${diasComNegativa === 1 ? 'dia' : 'dias'}` : 'nenhum dia'}
           tom="negativo"
+          onAbrir={() => setDetalhe('negativas')}
         />
         <Indicador
           icone={<IconeRelogio tamanho={16} />}
           rotulo="Saldo do intervalo"
           valor={<Horas minutos={extra - negativa} sinal destacar />}
           detalhe="extras − negativas"
+          onAbrir={() => setDetalhe('saldo')}
         />
         <Indicador
           icone={<IconeAlerta tamanho={16} />}
+          onAbrir={() => setDetalhe('limite')}
           rotulo="Limite diário"
           valor={
             semLimite ? (
@@ -165,8 +190,20 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
                 : 'sem batidas'
           }
           tom={aConferir ? 'aviso' : undefined}
+          onAbrir={() => setDetalhe('batidas')}
         />
       </div>
+
+      {detalhe && (
+        <ModalDetalhe
+          detalhe={detalhe}
+          dias={dias}
+          colunas={dados.colunas}
+          limites={dados.limites}
+          intervalo={texto}
+          onFechar={() => setDetalhe(null)}
+        />
+      )}
 
       {dias.length > 0 && (
         <section className="dash-card pc-grafico-card" aria-labelledby="titulo-grafico-dias">
@@ -195,7 +232,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
           valor={aba}
           onEscolher={setAba}
         />
-        {aba === 'dias' && <TabelaDias dias={dias} intervalo={texto} />}
+        {aba === 'dias' && <TabelaDias dias={dias} colunas={dados.colunas} intervalo={texto} />}
         {aba === 'batidas' && <BatidasDoIntervalo colaboradorId={colaboradorId} intervalo={intervalo} dias={dias} />}
         {aba === 'historico' && <div className="pc-historico">{historico}</div>}
       </section>
@@ -203,30 +240,253 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
   )
 }
 
+/** Card de número do intervalo; clicar abre o detalhe (de que colunas sai a soma, que dias contam). */
 function Indicador({
   icone,
   rotulo,
   valor,
   detalhe,
   tom,
+  onAbrir,
 }: {
   icone: ReactNode
   rotulo: string
   valor: ReactNode
   detalhe: string
   tom?: 'positivo' | 'negativo' | 'aviso'
+  onAbrir: () => void
 }) {
   return (
-    <div className={tom ? `pc-kpi ${tom}` : 'pc-kpi'}>
-      <p className="pc-kpi-rotulo">
+    <button type="button" className={tom ? `pc-kpi ${tom}` : 'pc-kpi'} onClick={onAbrir} aria-haspopup="dialog">
+      <span className="pc-kpi-rotulo">
         <span className="pc-kpi-icone" aria-hidden="true">
           {icone}
         </span>
         {rotulo}
-      </p>
-      <p className="pc-kpi-valor">{valor}</p>
-      <p className="pc-kpi-detalhe">{detalhe}</p>
+      </span>
+      <span className="pc-kpi-valor">{valor}</span>
+      <span className="pc-kpi-detalhe">{detalhe}</span>
+    </button>
+  )
+}
+
+/** Soma de um campo no intervalo, coluna por coluna da FriPonto. */
+function composicao(dias: Dia[], colunas: string[], campo: Campo) {
+  const linhas = colunas.map((coluna) => ({
+    coluna,
+    minutos: dias.reduce((soma, d) => soma + minutosDaColuna(d, coluna, campo), 0),
+  }))
+  const total = dias.reduce((soma, d) => soma + totalDoCampo(d, campo), 0)
+  // dias coletados antes do detalhe por coluna (ou mapeamento mudado, à espera do recálculo)
+  const semDetalhe = total - linhas.reduce((soma, l) => soma + l.minutos, 0)
+  return { linhas, total, semDetalhe }
+}
+
+function TabelaComposicao({ dias, colunas, campo, rotulo }: { dias: Dia[]; colunas: string[]; campo: Campo; rotulo: string }) {
+  const { linhas, total, semDetalhe } = composicao(dias, colunas, campo)
+  return (
+    <table className="pc-composicao">
+      <caption className="sr-only">Colunas da FriPonto que somam {rotulo.toLowerCase()}</caption>
+      <tbody>
+        {linhas.map((l) => (
+          <tr key={l.coluna}>
+            <th scope="row">{l.coluna}</th>
+            <td className="num">
+              <Horas minutos={l.minutos} />
+            </td>
+          </tr>
+        ))}
+        {semDetalhe !== 0 && (
+          <tr className="pc-composicao-sem-detalhe">
+            <th scope="row">Sem detalhe por coluna</th>
+            <td className="num">
+              <Horas minutos={semDetalhe} />
+            </td>
+          </tr>
+        )}
+        {linhas.length === 0 && semDetalhe === 0 && (
+          <tr>
+            <td colSpan={2} className="texto-suave">
+              Nenhuma coluna da FriPonto com {rotulo.toLowerCase()} no intervalo.
+            </td>
+          </tr>
+        )}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row">{rotulo}</th>
+          <td className="num">
+            <Horas minutos={total} />
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  )
+}
+
+/** Colunas da FriPonto que vieram nos dias e não entram nas extras nem nas negativas. */
+function ColunasFora({ dias, colunas }: { dias: Dia[]; colunas: string[] }) {
+  if (colunas.length === 0) return null
+  return (
+    <div className="pc-fora">
+      <p className="pc-fora-titulo">Não entram na conta</p>
+      <ul>
+        {colunas.map((coluna) => (
+          <li key={coluna}>
+            {coluna} <Horas minutos={dias.reduce((soma, d) => soma + (d.colunas[coluna] ?? 0), 0)} />
+          </li>
+        ))}
+      </ul>
     </div>
+  )
+}
+
+const NOTA_SEM_DETALHE =
+  '“Sem detalhe por coluna” são dias coletados antes de o Copiloto guardar as colunas da FriPonto de cada dia: o detalhe aparece quando o dia for coletado de novo.'
+
+/** Detalhe de um card: de que colunas da FriPonto sai cada número e que dias contam. */
+function ModalDetalhe({
+  detalhe,
+  dias,
+  colunas,
+  limites,
+  intervalo,
+  onFechar,
+}: {
+  detalhe: Detalhe
+  dias: DiaAnalisado[]
+  colunas: ColunasPorCampo
+  limites: DiasDetalhe['limites']
+  intervalo: string
+  onFechar: () => void
+}) {
+  const extra = composicao(dias, colunas.extra, 'extra')
+  const negativa = composicao(dias, colunas.negativa, 'negativa')
+  const semDetalhe = {
+    extras: extra.semDetalhe !== 0,
+    negativas: negativa.semDetalhe !== 0,
+    saldo: extra.semDetalhe !== 0 || negativa.semDetalhe !== 0,
+    limite: false,
+    batidas: false,
+  }[detalhe]
+  const recentes = [...dias].sort((a, b) => b.dia.localeCompare(a.dia))
+  const diaCurto = (d: Dia) => `${diaDaSemana(d.dia)} ${formatarData(d.dia, { ano: false })}`
+
+  const titulos: Record<Detalhe, string> = {
+    extras: 'Como as extras são somadas',
+    negativas: 'Como as negativas são somadas',
+    saldo: 'Como o saldo do intervalo é calculado',
+    limite: 'Dias acima do limite diário',
+    batidas: 'Dias com batida',
+  }
+
+  let conteudo: ReactNode
+  if (detalhe === 'extras' || detalhe === 'negativas') {
+    const campo: Campo = detalhe === 'extras' ? 'extra' : 'negativa'
+    conteudo = (
+      <>
+        <p className="pc-modal-texto">
+          {detalhe === 'extras' ? 'As extras' : 'As negativas'} de {intervalo} são a soma destas colunas da FriPonto, dia a dia:
+        </p>
+        <TabelaComposicao dias={dias} colunas={colunas[campo]} campo={campo} rotulo={detalhe === 'extras' ? 'Extras' : 'Negativas'} />
+        <ColunasFora dias={dias} colunas={colunas.fora} />
+      </>
+    )
+  } else if (detalhe === 'saldo') {
+    conteudo = (
+      <>
+        <p className="pc-modal-texto">O saldo de {intervalo} é o total das extras menos o total das negativas.</p>
+        <TabelaComposicao dias={dias} colunas={colunas.extra} campo="extra" rotulo="Extras" />
+        <TabelaComposicao dias={dias} colunas={colunas.negativa} campo="negativa" rotulo="Negativas" />
+        <p className="pc-saldo-conta">
+          <Horas minutos={extra.total} /> − <Horas minutos={negativa.total} /> ={' '}
+          <Horas minutos={extra.total - negativa.total} sinal destacar />
+        </p>
+      </>
+    )
+  } else if (detalhe === 'limite') {
+    const acima = recentes.filter((d) => d.extra_acima || d.negativa_acima)
+    conteudo =
+      !limites.extra_dia && !limites.negativa_dia ? (
+        <p className="pc-modal-texto">A empresa não tem limite diário configurado.</p>
+      ) : (
+        <>
+          <p className="pc-modal-texto">
+            Dia que passou de{' '}
+            {[
+              limites.extra_dia ? `${formatarMinutos(limites.extra_dia)} de extras` : null,
+              limites.negativa_dia ? `${formatarMinutos(limites.negativa_dia)} de negativas` : null,
+            ]
+              .filter(Boolean)
+              .join(' ou de ')}
+            .
+          </p>
+          {acima.length === 0 ? (
+            <p className="dash-vazio">Nenhum dia acima do limite em {intervalo}.</p>
+          ) : (
+            <ul className="pc-modal-lista">
+              {acima.map((d) => (
+                <li key={d.dia}>
+                  <span>{diaCurto(d)}</span>
+                  {d.extra_acima && (
+                    <span className="limite-dia-indicador mais">
+                      ▲ <Horas minutos={d.extra_min} /> de extras
+                    </span>
+                  )}
+                  {d.negativa_acima && (
+                    <span className="limite-dia-indicador menos">
+                      ▼ <Horas minutos={d.negativa_min} /> de negativas
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )
+  } else {
+    const conferir = recentes.filter((d) => d.conferir)
+    const semBatida = recentes.filter((d) => !d.marcacoes.some(ehHorario))
+    conteudo = (
+      <>
+        <p className="pc-modal-texto">
+          {dias.length - semBatida.length} de {dias.length} dias de {intervalo} têm batida.
+        </p>
+        {conferir.length > 0 && (
+          <>
+            <p className="pc-fora-titulo">Para conferir</p>
+            <ul className="pc-modal-lista">
+              {conferir.map((d) => (
+                <li key={d.dia}>
+                  <span>{diaCurto(d)}</span>
+                  <span className="texto-suave">{d.conferir}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {semBatida.length > 0 && (
+          <>
+            <p className="pc-fora-titulo">Sem batida</p>
+            <ul className="pc-modal-lista">
+              {semBatida.map((d) => (
+                <li key={d.dia}>
+                  <span>{diaCurto(d)}</span>
+                  <span className="texto-suave">{d.marcacoes.join(' · ') || 'sem marcação'}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </>
+    )
+  }
+
+  return (
+    <Modal titulo={titulos[detalhe]} onFechar={onFechar}>
+      {conteudo}
+      {semDetalhe && <p className="pc-nota">{NOTA_SEM_DETALHE}</p>}
+    </Modal>
   )
 }
 
@@ -278,8 +538,30 @@ function GraficoDiasPerfil({ dias }: { dias: DiaAnalisado[] }) {
   )
 }
 
+/** Valor de uma coluna da FriPonto na tabela: traço quando o dia não tem a coluna (ou não tem o detalhe). */
+function CelulaColuna({ dia, coluna, campo }: { dia: Dia; coluna: string; campo: Campo }) {
+  const minutos = minutosDaColuna(dia, coluna, campo)
+  return (
+    <td className="num pc-col-friponto">
+      {minutos ? <Horas minutos={minutos} /> : <span className="texto-suave">—</span>}
+    </td>
+  )
+}
+
+/** Cabeçalho do total: com uma coluna só, o nome dela embaixo; com várias, "soma" (as colunas vêm antes). */
+function CabecalhoTotal({ rotulo, colunas }: { rotulo: string; colunas: string[] }) {
+  return (
+    <th scope="col" className="num pc-col-total">
+      {rotulo}
+      {colunas.length > 0 && (
+        <span className="pc-col-origem">{colunas.length === 1 ? colunas[0] : 'soma'}</span>
+      )}
+    </th>
+  )
+}
+
 /** Dia a dia: batidas lado a lado para comparar os dias, tempo entre elas, extras, negativas e alertas. */
-function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: string }) {
+function TabelaDias({ dias, colunas, intervalo }: { dias: DiaAnalisado[]; colunas: ColunasPorCampo; intervalo: string }) {
   const [soComHoras, setSoComHoras] = useState(false)
   if (dias.length === 0) return <p className="dash-vazio">Ainda não há horas por dia de {intervalo}.</p>
 
@@ -290,6 +572,14 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
   const maxBatidas = Math.max(2, ...visiveis.map((d) => d.marcacoes.filter(ehHorario).length))
   const extra = visiveis.reduce((soma, d) => soma + d.extra_min, 0)
   const negativa = visiveis.reduce((soma, d) => soma + d.negativa_min, 0)
+  const abertas = colunasAbertas(colunas)
+  const somaDaColuna = (coluna: string, campo: Campo) => visiveis.reduce((soma, d) => soma + minutosDaColuna(d, coluna, campo), 0)
+  const explicacao = [
+    abertas.extra.length ? `${abertas.extra.join(', ')} são colunas da FriPonto e “Extras” é a soma delas.` : null,
+    abertas.negativa.length ? `${abertas.negativa.join(', ')} são colunas da FriPonto e “Negativas” é a soma delas.` : null,
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className="pc-dias">
@@ -313,12 +603,18 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
               <th scope="col" className="num">
                 Entre batidas
               </th>
-              <th scope="col" className="num">
-                Extras
-              </th>
-              <th scope="col" className="num">
-                Negativas
-              </th>
+              {abertas.extra.map((coluna) => (
+                <th key={coluna} scope="col" className="num pc-col-friponto" title="Coluna da FriPonto que soma nas extras">
+                  {coluna}
+                </th>
+              ))}
+              <CabecalhoTotal rotulo="Extras" colunas={colunas.extra} />
+              {abertas.negativa.map((coluna) => (
+                <th key={coluna} scope="col" className="num pc-col-friponto" title="Coluna da FriPonto que soma nas negativas">
+                  {coluna}
+                </th>
+              ))}
+              <CabecalhoTotal rotulo="Negativas" colunas={colunas.negativa} />
               <th scope="col">
                 <span className="sr-only">Alertas</span>
               </th>
@@ -352,9 +648,15 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
                     )}
                   </td>
                   <td className="num">{d.trabalhado !== null ? <Horas minutos={d.trabalhado} /> : <span className="texto-suave">—</span>}</td>
+                  {abertas.extra.map((coluna) => (
+                    <CelulaColuna key={coluna} dia={d} coluna={coluna} campo="extra" />
+                  ))}
                   <td className={d.extra_acima ? 'num forte texto-aviso' : 'num'}>
                     {d.extra_min ? <Horas minutos={d.extra_min} /> : <span className="texto-suave">—</span>}
                   </td>
+                  {abertas.negativa.map((coluna) => (
+                    <CelulaColuna key={coluna} dia={d} coluna={coluna} campo="negativa" />
+                  ))}
                   <td className={d.negativa_acima ? 'num forte texto-aviso' : 'num'}>
                     {d.negativa_min ? <Horas minutos={d.negativa_min} /> : <span className="texto-suave">—</span>}
                   </td>
@@ -386,9 +688,19 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
               <th scope="row" colSpan={3}>
                 Total
               </th>
+              {abertas.extra.map((coluna) => (
+                <td key={coluna} className="num pc-col-friponto">
+                  <Horas minutos={somaDaColuna(coluna, 'extra')} />
+                </td>
+              ))}
               <td className="num">
                 <Horas minutos={extra} />
               </td>
+              {abertas.negativa.map((coluna) => (
+                <td key={coluna} className="num pc-col-friponto">
+                  <Horas minutos={somaDaColuna(coluna, 'negativa')} />
+                </td>
+              ))}
               <td className="num">
                 <Horas minutos={negativa} />
               </td>
@@ -398,6 +710,7 @@ function TabelaDias({ dias, intervalo }: { dias: DiaAnalisado[]; intervalo: stri
         </table>
       </div>
       <p className="pc-nota">
+        {explicacao && `${explicacao} `}
         “Entre batidas” soma o tempo de cada entrada até a saída seguinte. “Conferir ponto” marca dia com número ímpar de
         batidas ou com mais de 16h entre elas (batida esquecida ou fora de ordem na FriPonto).
       </p>

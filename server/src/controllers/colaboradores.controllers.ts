@@ -2,7 +2,9 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import * as colaboradoresModel from '../models/colaboradores.models'
 import * as configuracoesModel from '../models/configuracoes.models'
 import * as horasDiaModel from '../models/horas-dia.models'
+import * as mapeamentoModel from '../models/admin-mapeamento.models'
 import { foraDaCurva, LIMITES_PADRAO } from '../services/dashboard.service'
+import { colunasEmMinutos } from '../services/horas-dia.service'
 import { historicoDiarioQuerySchema, historicoQuerySchema } from '../types/colaboradores.types'
 import { idParamSchema } from '../types/comum.types'
 import { diasColaboradorQuerySchema } from '../types/horas-dia.types'
@@ -74,18 +76,22 @@ export async function dias(req: FastifyRequest, res: FastifyReply) {
 /**
  * Dia a dia para a tela de detalhe: as horas de cada dia (como em /dias) mais as batidas do log, com os limites
  * diários da empresa. Dias fora da janela da coleta (ou do log de batidas) simplesmente não vêm na lista.
+ * Cada dia traz as colunas da FriPonto em minutos e `colunas` diz quais delas somam nas extras e nas negativas.
  */
 export async function diasDetalhe(req: FastifyRequest, res: FastifyReply) {
     const { de, ate } = diasColaboradorQuerySchema.parse(req.query)
     const colaborador = await buscarColaborador(req)
-    const [config, lista] = await Promise.all([
+    const [config, lista, mapeamento] = await Promise.all([
         configuracoesModel.buscar(colaborador.empresa_id),
         horasDiaModel.diasDetalhados(req.usuario, colaborador.id, colaborador.empresa_id, de, ate),
+        mapeamentoModel.listar(colaborador.empresa_id),
     ])
+    const { minutos, colunas } = colunasEmMinutos(lista.map(d => d.colunas), mapeamento)
     res.send({
         de,
         ate,
         limites: { extra_dia: config?.alerta_extra_dia_minutos ?? 0, negativa_dia: config?.alerta_negativa_dia_minutos ?? 0 },
-        dias: lista,
+        colunas,
+        dias: lista.map((dia, i) => ({ ...dia, colunas: minutos[i] })),
     })
 }

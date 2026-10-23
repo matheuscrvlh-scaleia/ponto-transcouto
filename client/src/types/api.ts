@@ -191,6 +191,8 @@ export interface DiasDetalhe {
   ate: DataISO
   /** 0 = sem alerta diário. */
   limites: { extra_dia: Minutos; negativa_dia: Minutos }
+  /** Colunas da FriPonto que aparecem nos dias: as que somam nas extras, nas negativas e as que ficam fora da conta. */
+  colunas: { extra: string[]; negativa: string[]; fora: string[] }
   dias: {
     dia: DataISO
     /** false: o dia só tem batidas, ainda sem horas calculadas pela coleta. */
@@ -202,6 +204,8 @@ export interface DiasDetalhe {
     extra_acima: boolean
     negativa_acima: boolean
     batidas: BatidaDoDia[]
+    /** Minutos de cada coluna de horas da FriPonto no dia; vazio em dia coletado antes do detalhe por coluna. */
+    colunas: Record<string, Minutos>
   }[]
 }
 

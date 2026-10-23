@@ -15,9 +15,9 @@ export async function gravarDias(alvo: AlvoDias, dias: HorasDoDia[], ex: Executo
         alvo.ate,
     ])
     await ex.query(
-        `INSERT INTO horas_dia (colaborador_id, dia, empresa_id, unidade_id, extra_min, negativa_min, marcacoes)
-         SELECT $1, d.dia, $4, $5, d.extra, d.negativa, d.marcacoes
-           FROM jsonb_to_recordset($6::jsonb) AS d(dia date, extra int, negativa int, marcacoes text[])
+        `INSERT INTO horas_dia (colaborador_id, dia, empresa_id, unidade_id, extra_min, negativa_min, marcacoes, colunas)
+         SELECT $1, d.dia, $4, $5, d.extra, d.negativa, d.marcacoes, coalesce(d.colunas, '{}')
+           FROM jsonb_to_recordset($6::jsonb) AS d(dia date, extra int, negativa int, marcacoes text[], colunas jsonb)
           WHERE d.dia BETWEEN $2 AND $3`,
         [alvo.colaboradorId, alvo.de, alvo.ate, alvo.empresaId, alvo.unidadeId, JSON.stringify(dias)],
     )
@@ -76,7 +76,7 @@ export async function diasDetalhados(ator: Ator, colaboradorId: number, empresaI
     const permitidas = `unidade_id IN (SELECT ${unidadesPermitidasSql(ator)})`
     const { rows } = await db.query<DiaDetalhado>(
         `WITH calc AS (
-            SELECT hd.dia, hd.extra_min, hd.negativa_min, hd.marcacoes
+            SELECT hd.dia, hd.extra_min, hd.negativa_min, hd.marcacoes, hd.colunas
               FROM horas_dia hd
              WHERE hd.colaborador_id = $2 AND hd.dia BETWEEN $3 AND $4 AND hd.${permitidas}
          ), marc AS (
@@ -92,7 +92,7 @@ export async function diasDetalhados(ator: Ator, colaboradorId: number, empresaI
          )
          SELECT d.dia::text AS dia, (c.dia IS NOT NULL) AS tem_calculo,
                 coalesce(c.extra_min, 0) AS extra_min, coalesce(c.negativa_min, 0) AS negativa_min,
-                coalesce(c.marcacoes, '{}') AS marcacoes,
+                coalesce(c.marcacoes, '{}') AS marcacoes, coalesce(c.colunas, '{}'::jsonb) AS colunas,
                 coalesce(cf.alerta_extra_dia_minutos > 0 AND c.extra_min > cf.alerta_extra_dia_minutos, false) AS extra_acima,
                 coalesce(cf.alerta_negativa_dia_minutos > 0 AND c.negativa_min > cf.alerta_negativa_dia_minutos, false) AS negativa_acima,
                 coalesce(m.batidas, '[]'::json) AS batidas

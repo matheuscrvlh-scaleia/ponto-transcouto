@@ -1,6 +1,6 @@
 import { db, type Executor } from '../db/database'
 import type { RegraPagas, ValoresRegistro } from '../services/calculo-horas.service'
-import type { DiaGravado, RegistroAoVivo, RegistroGravado } from '../services/recalculo.service'
+import type { DiaGravado, HoraDiaGravada, RegistroAoVivo, RegistroGravado } from '../services/recalculo.service'
 
 export type PedidoRecalculo = { empresa_id: number, solicitado_em: string }
 
@@ -168,6 +168,30 @@ export async function gravarDias(lista: Array<{ colaborador_id: number, dia: str
             lista.map(d => d.valores.banco_periodo),
             lista.map(d => d.valores.saldo_banco_total),
         ],
+    )
+    return rowCount ?? 0
+}
+
+/** Dias com as colunas da FriPonto gravadas (os coletados antes da migration 014 não têm e ficam como estão). */
+export async function horasDiaDaEmpresa(empresaId: number, ex: Executor = db) {
+    const { rows } = await ex.query<HoraDiaGravada>(
+        `SELECT colaborador_id, dia::text AS dia, colunas
+           FROM horas_dia
+          WHERE empresa_id = $1 AND colunas <> '{}'::jsonb`,
+        [empresaId],
+    )
+    return rows
+}
+
+export async function gravarHorasDia(lista: Array<{ colaborador_id: number, dia: string, extra: number, negativa: number }>, ex: Executor = db) {
+    if (lista.length === 0) return 0
+    const { rowCount } = await ex.query(
+        `UPDATE horas_dia hd
+            SET extra_min = v.extra, negativa_min = v.negativa, atualizado_em = now()
+           FROM unnest($1::int[], $2::date[], $3::int[], $4::int[]) AS v(colaborador_id, dia, extra, negativa)
+          WHERE hd.colaborador_id = v.colaborador_id AND hd.dia = v.dia
+            AND (hd.extra_min, hd.negativa_min) IS DISTINCT FROM (v.extra, v.negativa)`,
+        [lista.map(d => d.colaborador_id), lista.map(d => d.dia), lista.map(d => d.extra), lista.map(d => d.negativa)],
     )
     return rowCount ?? 0
 }

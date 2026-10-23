@@ -54,4 +54,6 @@ export type DiaDetalhado = DiaColaborador & {
     /** false: o dia só tem batidas (ainda não passou por uma coleta de horas). */
     tem_calculo: boolean
     batidas: BatidaDoDia[]
+    /** Colunas de horas da FriPonto no dia, como vieram ("Ex50%": "01:45"). */
+    colunas: Record<string, string>
 }

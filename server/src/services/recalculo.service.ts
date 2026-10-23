@@ -8,6 +8,7 @@ import {
     type RegraPagas,
     type ValoresRegistro,
 } from './calculo-horas.service'
+import { somarColunasDoDia, type ColunasDoDia } from './horas-dia.service'
 
 /*
  * Recálculo do histórico: a regra de horas pagas e o mapeamento de colunas valem para todos
@@ -53,6 +54,13 @@ export type DiaGravado = {
     negativa_periodo: number
     pagas_periodo: number
     saldo_banco_total: number
+}
+
+/** Dia de horas_dia com as colunas da FriPonto, como a coleta gravou. */
+export type HoraDiaGravada = {
+    colaborador_id: number
+    dia: string
+    colunas: ColunasDoDia
 }
 
 export type FalhaRecalculo = { colaborador_id: number, referencia: string, mensagem: string }
@@ -197,5 +205,22 @@ export function recalcularHistorico(entrada: {
         resultado.dias.push({ colaborador_id: d.colaborador_id, dia: d.dia, valores: valoresDoRegistro(soma, regra, anterior, saldo) })
     }
 
+    return resultado
+}
+
+/** Extras e negativas de cada dia de horas_dia pelo mapeamento atual, a partir das colunas que a coleta gravou. */
+export function recalcularHorasDia(dias: HoraDiaGravada[], mapeamento: ItemMapeamento[]) {
+    const resultado = {
+        dias: [] as Array<{ colaborador_id: number, dia: string, extra: number, negativa: number }>,
+        falhas: [] as FalhaRecalculo[],
+    }
+    for (const d of dias) {
+        try {
+            resultado.dias.push({ colaborador_id: d.colaborador_id, dia: d.dia, ...somarColunasDoDia(d.colunas, mapeamento) })
+        } catch (err) {
+            // dia que a regra atual não consegue somar fica como estava
+            resultado.falhas.push({ colaborador_id: d.colaborador_id, referencia: d.dia, mensagem: (err as Error).message })
+        }
+    }
     return resultado
 }

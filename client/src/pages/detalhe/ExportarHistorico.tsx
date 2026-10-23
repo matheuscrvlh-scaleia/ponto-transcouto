@@ -23,13 +23,29 @@ const valoresPeriodo = (item: SemanaHistorico | DiaHistorico): CelulaCsv[] => [
 /** Um dia por linha: batidas usadas no cálculo, o que o dia teve de extra e negativa e se passou do limite diário. */
 function linhasDosDias(detalhe: DiasDetalhe): CelulaCsv[][] {
   const dias = [...detalhe.dias].sort((a, b) => b.dia.localeCompare(a.dia))
+  // como na tela: com mais de uma coluna da FriPonto somando, cada uma vem antes do total
+  const extras = detalhe.colunas.extra.length > 1 ? detalhe.colunas.extra : []
+  const negativas = detalhe.colunas.negativa.length > 1 ? detalhe.colunas.negativa : []
+  const colunaCsv = (bruto: DiasDetalhe['dias'][number], coluna: string) =>
+    bruto.tem_calculo && coluna in bruto.colunas ? minutosCsv(Math.abs(bruto.colunas[coluna])) : ''
   return [
     [],
     ['Horas de cada dia'],
     [
       `Limite diário: extras acima de ${minutosCsv(detalhe.limites.extra_dia) || '00:00'}, negativas acima de ${minutosCsv(detalhe.limites.negativa_dia) || '00:00'} (00:00 = sem limite)`,
     ],
-    ['Dia', 'Batidas usadas no cálculo', 'Situação', 'Trabalhadas pelas batidas', 'Extra do dia', 'Negativa do dia', 'Acima do limite diário', 'Conferir'],
+    [
+      'Dia',
+      'Batidas usadas no cálculo',
+      'Situação',
+      'Trabalhadas pelas batidas',
+      ...extras.map((c) => `${c} (FriPonto)`),
+      'Extra do dia',
+      ...negativas.map((c) => `${c} (FriPonto)`),
+      'Negativa do dia',
+      'Acima do limite diário',
+      'Conferir',
+    ],
     ...dias.map((bruto) => {
       const dia = analisarDia(bruto)
       return [
@@ -37,7 +53,9 @@ function linhasDosDias(detalhe: DiasDetalhe): CelulaCsv[][] {
         dia.marcacoes.map((m) => m.hora).join(' '),
         dia.situacao ?? '',
         dia.temCalculo ? minutosCsv(dia.trabalhado) : '',
+        ...extras.map((c) => colunaCsv(bruto, c)),
         dia.temCalculo ? minutosCsv(dia.extra) : '',
+        ...negativas.map((c) => colunaCsv(bruto, c)),
         dia.temCalculo ? minutosCsv(dia.negativa) : '',
         dia.extraAcima || dia.negativaAcima ? 'Sim' : 'Não',
         dia.avisos.join(' '),
