@@ -377,13 +377,33 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* barras fora de destaque: a contagem aparece, mas sem competir com a faixa ativa */
+.faixa-bolha.discreta {
+  min-width: 28px;
+  padding: 2px 7px;
+  font-weight: 600;
+  color: var(--text);
+  box-shadow: none;
+}
+
 .faixa-rotulo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   font-size: 11px;
   line-height: 1.25;
   font-weight: 500;
   text-align: center;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+.faixa-pct {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text);
+  opacity: 0.75;
 }
 
 .faixa.ativa .faixa-rotulo {

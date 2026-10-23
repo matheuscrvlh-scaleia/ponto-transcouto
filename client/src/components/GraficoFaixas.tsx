@@ -102,15 +102,15 @@ export function GraficoFaixas<T extends LinhaDashboard>({
               >
                 <span className="faixa-trilho">
                   <span className={n === 0 ? 'faixa-barra vazia' : 'faixa-barra'} style={{ height: `${altura}%` }}>
-                    {i === ativa && (
-                      <span className="faixa-bolha" aria-hidden="true">
-                        {n}
-                      </span>
-                    )}
+                    {/* contagem em todas as barras, sem precisar apontar uma por uma */}
+                    <span className={i === ativa ? 'faixa-bolha' : 'faixa-bolha discreta'} aria-hidden="true">
+                      {n}
+                    </span>
                   </span>
                 </span>
                 <span className="faixa-rotulo" aria-hidden="true">
                   {faixa.rotulo}
+                  <span className="faixa-pct">{percentual(n)}%</span>
                 </span>
               </button>
             </li>
