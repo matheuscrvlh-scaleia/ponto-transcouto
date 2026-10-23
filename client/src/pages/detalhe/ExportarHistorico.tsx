@@ -24,10 +24,11 @@ const valoresPeriodo = (item: SemanaHistorico | DiaHistorico): CelulaCsv[] => [
 function linhasDosDias(detalhe: DiasDetalhe): CelulaCsv[][] {
   const dias = [...detalhe.dias].sort((a, b) => b.dia.localeCompare(a.dia))
   // como na tela: com mais de uma coluna da FriPonto somando, cada uma vem antes do total
-  const extras = detalhe.colunas.extra.length > 1 ? detalhe.colunas.extra : []
-  const negativas = detalhe.colunas.negativa.length > 1 ? detalhe.colunas.negativa : []
+  // API anterior ao detalhe por coluna não manda as colunas
+  const extras = (detalhe.colunas?.extra.length ?? 0) > 1 ? detalhe.colunas.extra : []
+  const negativas = (detalhe.colunas?.negativa.length ?? 0) > 1 ? detalhe.colunas.negativa : []
   const colunaCsv = (bruto: DiasDetalhe['dias'][number], coluna: string) =>
-    bruto.tem_calculo && coluna in bruto.colunas ? minutosCsv(Math.abs(bruto.colunas[coluna])) : ''
+    bruto.tem_calculo && bruto.colunas && coluna in bruto.colunas ? minutosCsv(Math.abs(bruto.colunas[coluna])) : ''
   return [
     [],
     ['Horas de cada dia'],

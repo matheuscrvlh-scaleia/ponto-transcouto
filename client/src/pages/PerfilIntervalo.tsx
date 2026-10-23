@@ -62,6 +62,8 @@ export function analisarDia(todas: string[]): { trabalhado: Minutos | null; conf
 type Campo = 'extra' | 'negativa'
 type ColunasPorCampo = DiasDetalhe['colunas']
 
+const SEM_COLUNAS: ColunasPorCampo = { extra: [], negativa: [], fora: [] }
+
 /** Minutos da coluna da FriPonto no dia; negativa sempre sem sinal, como na soma do servidor. */
 function minutosDaColuna(dia: Dia, coluna: string, campo: Campo) {
   const valor = dia.colunas[coluna] ?? 0
@@ -96,7 +98,8 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
       (dados?.dias ?? []).map((dia) => {
         // sem cálculo da coleta ainda: as batidas válidas do log fazem o papel das marcações
         const marcacoes = dia.tem_calculo ? dia.marcacoes : dia.batidas.filter((b) => b.tipo !== 3).map((b) => b.hora)
-        return { ...dia, marcacoes, ...analisarDia(marcacoes) }
+        // API anterior ao detalhe por coluna (ex.: front publicado antes da API) não manda as colunas
+        return { ...dia, colunas: dia.colunas ?? {}, marcacoes, ...analisarDia(marcacoes) }
       }),
     [dados],
   )
@@ -118,6 +121,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
     : null
   const diasComBatida = dias.filter((d) => d.marcacoes.some(ehHorario)).length
   const aConferir = dias.filter((d) => d.conferir).length
+  const colunas = dados.colunas ?? SEM_COLUNAS
   const { extra_dia: limiteExtra, negativa_dia: limiteNegativa } = dados.limites
   const semLimite = !limiteExtra && !limiteNegativa
 
@@ -198,7 +202,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
         <ModalDetalhe
           detalhe={detalhe}
           dias={dias}
-          colunas={dados.colunas}
+          colunas={colunas}
           limites={dados.limites}
           intervalo={texto}
           onFechar={() => setDetalhe(null)}
@@ -232,7 +236,7 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
           valor={aba}
           onEscolher={setAba}
         />
-        {aba === 'dias' && <TabelaDias dias={dias} colunas={dados.colunas} intervalo={texto} />}
+        {aba === 'dias' && <TabelaDias dias={dias} colunas={colunas} intervalo={texto} />}
         {aba === 'batidas' && <BatidasDoIntervalo colaboradorId={colaboradorId} intervalo={intervalo} dias={dias} />}
         {aba === 'historico' && <div className="pc-historico">{historico}</div>}
       </section>
