@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { withTransaction } from '../db/database'
+import { colunaInformativa } from '../integrations/secullum/parser'
 import * as mapeamentoModel from '../models/admin-mapeamento.models'
 import * as auditoria from '../models/auditoria.models'
 import { solicitarRecalculo } from '../models/recalculo.models'
@@ -19,7 +20,10 @@ export async function obter(req: FastifyRequest, res: FastifyReply) {
     ])
 
     const colunasErro = colunasDasMensagensDeErro(mensagens)
-    const colunas_detectadas = [...new Set([...colunasRegistros, ...colunasErro])].sort((a, b) => a.localeCompare(b))
+    // Data e Entrada/Saída N (batidas) não têm horas: o cálculo já ignora, não precisam de mapeamento
+    const colunas_detectadas = [...new Set([...colunasRegistros, ...colunasErro])]
+        .filter(coluna => !colunaInformativa(coluna))
+        .sort((a, b) => a.localeCompare(b))
     res.send({ mapeamento, colunas_detectadas })
 }
 
