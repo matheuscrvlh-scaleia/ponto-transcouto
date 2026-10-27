@@ -112,6 +112,19 @@ export async function gravarMarcacoes(empresaId: number, marcacoes: MarcacaoSecu
     return result.rowCount ?? 0
 }
 
+/**
+ * Releitura por data: apaga do log as marcações de [de, ate] que não vieram mais da FonteDados
+ * (excluídas na Secullum, ex.: pré-assinalada removida pelo RH). `ids` é tudo o que veio no intervalo.
+ */
+export async function removerAusentes(empresaId: number, de: string, ate: string, ids: number[], ex: Executor = db) {
+    const result = await ex.query(
+        `DELETE FROM batidas
+          WHERE empresa_id = $1 AND data BETWEEN $2 AND $3 AND NOT (fonte_dados_id = ANY($4::bigint[]))`,
+        [empresaId, de, ate, ids],
+    )
+    return result.rowCount ?? 0
+}
+
 /** Batidas de funcionários que ainda não tinham chegado pela sincronização de cadastros. */
 export async function vincularPendentes(empresaId: number, ex: Executor = db) {
     const result = await ex.query(

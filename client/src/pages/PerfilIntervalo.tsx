@@ -98,8 +98,9 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
       (dados?.dias ?? []).map((dia) => {
         // sem cálculo da coleta ainda: as batidas válidas do log fazem o papel das marcações
         const marcacoes = dia.tem_calculo ? dia.marcacoes : dia.batidas.filter((b) => b.tipo !== 3).map((b) => b.hora)
+        const preAssinaladas = dia.batidas.filter((b) => b.tipo === 2).map((b) => b.hora)
         // API anterior ao detalhe por coluna (ex.: front publicado antes da API) não manda as colunas
-        return { ...dia, colunas: dia.colunas ?? {}, marcacoes, ...analisarDia(marcacoes) }
+        return { ...dia, colunas: dia.colunas ?? {}, marcacoes, preAssinaladas, ...analisarDia(marcacoes) }
       }),
     [dados],
   )
@@ -494,15 +495,24 @@ function ModalDetalhe({
   )
 }
 
-type DiaAnalisado = Dia & ReturnType<typeof analisarDia>
+type DiaAnalisado = Dia & ReturnType<typeof analisarDia> & { preAssinaladas: string[] }
 
-/** Horários alternam entrada/saída; textos da FriPonto (FOLGA, FALTA…) aparecem uma vez, em destaque. */
-function classificarMarcacoes(marcacoes: string[]) {
+const TITULO_PRE =
+  'Pré-assinalada: intervalo do horário que a FriPonto grava sozinha quando o colaborador bate a entrada. Não é batida feita no relógio.'
+
+/**
+ * Horários alternam entrada/saída; textos da FriPonto (FOLGA, FALTA…) aparecem uma vez, em destaque.
+ * Horário que casa com uma pré-assinalada do log ganha a marca `pre` (cada uma casa uma vez só).
+ */
+function classificarMarcacoes(marcacoes: string[], preAssinaladas: string[]) {
+  const pre = [...preAssinaladas]
   let horarios = 0
-  return marcacoesParaExibir(marcacoes).map((texto) => ({
-    texto,
-    classe: !ehHorario(texto) ? 'texto' : horarios++ % 2 === 0 ? 'entrada' : 'saida',
-  }))
+  return marcacoesParaExibir(marcacoes).map((texto) => {
+    if (!ehHorario(texto)) return { texto, classe: 'texto', pre: false }
+    const achada = pre.indexOf(texto.padStart(5, '0'))
+    if (achada >= 0) pre.splice(achada, 1)
+    return { texto, classe: horarios++ % 2 === 0 ? 'entrada' : 'saida', pre: achada >= 0 }
+  })
 }
 
 /** Barras por dia: extras para cima (azul), negativas para baixo (vermelho), na mesma escala. */
@@ -643,8 +653,8 @@ function TabelaDias({ dias, colunas, intervalo }: { dias: DiaAnalisado[]; coluna
                       <span className="texto-suave">sem batidas</span>
                     ) : (
                       <span className="pc-batidas" style={{ gridTemplateColumns: `repeat(${maxBatidas}, auto)` }}>
-                        {classificarMarcacoes(d.marcacoes).map(({ texto, classe }, i) => (
-                          <span key={i} className={`pc-batida ${classe}`}>
+                        {classificarMarcacoes(d.marcacoes, d.preAssinaladas).map(({ texto, classe, pre }, i) => (
+                          <span key={i} className={`pc-batida ${classe}${pre ? ' pre' : ''}`} title={pre ? TITULO_PRE : undefined}>
                             {texto}
                           </span>
                         ))}
@@ -716,7 +726,8 @@ function TabelaDias({ dias, colunas, intervalo }: { dias: DiaAnalisado[]; coluna
       <p className="pc-nota">
         {explicacao && `${explicacao} `}
         “Entre batidas” soma o tempo de cada entrada até a saída seguinte. “Conferir ponto” marca dia com número ímpar de
-        batidas ou com mais de 16h entre elas (batida esquecida ou fora de ordem na FriPonto).
+        batidas ou com mais de 16h entre elas (batida esquecida ou fora de ordem na FriPonto). Horário com borda
+        tracejada é pré-assinalado: o intervalo que a FriPonto grava sozinha na entrada, não uma batida feita.
       </p>
     </div>
   )

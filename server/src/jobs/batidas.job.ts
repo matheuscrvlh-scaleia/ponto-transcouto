@@ -8,6 +8,7 @@ import {
     marcarTentativa,
     registrarErro,
     registrarSucesso,
+    removerAusentes,
     vincularPendentes,
     type ImportacaoBatidas,
 } from '../models/batidas.models'
@@ -21,7 +22,7 @@ import type { Log } from './log'
  * - carga inicial: os últimos DIAS_CARGA_INICIAL dias, por data;
  * - depois, incremental: FonteDados/APartirDoId a partir do maior Id já visto;
  * - uma vez por dia relê os últimos DIAS_REVISAO dias por data, para pegar marcações
- *   alteradas na Secullum sem Id novo (ex.: batida desconsiderada pelo RH).
+ *   alteradas na Secullum sem Id novo (ex.: batida desconsiderada pelo RH) e apagar as que foram excluídas.
  * A FonteDados não entra na cota de /Calcular.
  */
 
@@ -51,6 +52,10 @@ async function importarPeriodo(cliente: ClienteSecullum, empresaId: number, inic
         const ate = Math.min(de + DIAS_POR_CHAMADA - 1, fim)
         const marcacoes = await marcacoesDoPeriodo(cliente, diaParaIso(de), diaParaIso(ate))
         await gravarMarcacoes(empresaId, marcacoes, ex)
+        // atalho: resposta vazia não apaga nada (uma semana inteira sem marcação é mais provável falha da API que exclusão)
+        if (marcacoes.length > 0) {
+            await removerAusentes(empresaId, diaParaIso(de), diaParaIso(ate), marcacoes.map(m => m.id), ex)
+        }
         maior = Math.max(maior, maiorId(marcacoes))
     }
     return maior

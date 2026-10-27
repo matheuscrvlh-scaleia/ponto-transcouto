@@ -444,6 +444,14 @@
   border: 1px solid var(--border);
 }
 
+/* pré-assinalada: intervalo que a FriPonto grava sozinha, não é batida feita */
+.pc-batida.pre {
+  border: 1px dashed currentColor;
+  opacity: 0.75;
+  font-style: italic;
+  cursor: help;
+}
+
 .pc-batida.texto {
   color: var(--aviso);
   background: var(--aviso-bg);

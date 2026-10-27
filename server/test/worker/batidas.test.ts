@@ -175,6 +175,27 @@ describe('importação de batidas (transação desfeita)', () => {
         expect((await batidas())[0].tipo).toBe(3)
     })
 
+    it('a releitura apaga do log a marcação excluída na Secullum', async () => {
+        porData = [
+            marcacao(400, '2026-10-01', '08:00'),
+            marcacao(401, '2026-10-01', '15:00', { Tipo: 2, Origem: 3 }),
+            marcacao(402, '2026-10-01', '16:00', { Tipo: 2, Origem: 3 }),
+        ]
+        await importar()
+
+        // RH excluiu as pré-assinaladas; o resto da semana segue igual
+        porData = [marcacao(400, '2026-10-01', '08:00')]
+        await liberarProximaRodada()
+        await importar(new Date(AGORA.getTime() + 25 * 3600_000))
+        expect((await batidas()).map(b => b.id)).toEqual([400])
+
+        // resposta vazia não apaga nada
+        porData = []
+        await liberarProximaRodada()
+        await importar(new Date(AGORA.getTime() + 50 * 3600_000))
+        expect((await batidas()).map(b => b.id)).toEqual([400])
+    })
+
     it('falha da Secullum fica registrada e não avança o cursor', async () => {
         porData = [marcacao(300, '2026-10-01', '08:00')]
         await importar()
