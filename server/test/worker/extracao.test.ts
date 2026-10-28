@@ -464,7 +464,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
         expect(ana).toEqual({ extra_semana: 120, base_semana_registro_id: base.id, unidade_id: unidadeB.id })
     })
 
-    it('congelar dados passados: cada coleta puxa só os dias novos e os dias já fotografados não mudam', async () => {
+    it('congelar dados passados: a semanal puxa o mês inteiro e só o fechamento do mês soma os dias novos', async () => {
         await sincronizarSoUnidadeA()
         await client.query('UPDATE configuracoes SET congelar_dados_passados = true WHERE empresa_id = $1', [empresaId])
         const anaDe = async (fechamentoId: number) => um<Record<string, unknown>>(
@@ -487,24 +487,25 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
         expect(await anaDe(semana1.id)).toMatchObject({ extra_periodo: 600, dados_desde: '2026-08-26' })
         expect((await diaAna()).extra_min).toBe(600)
 
-        // 2) semana seguinte: só de 16 a 22/09, somado à semana 1 (o dia 01/09 que a FriPonto devolve fica de fora)
+        // 2) semana seguinte: puxa de novo desde o início do período, e a correção do RH em 01/09 entra
         chamadas = []
-        totaisPorCpf.set(CPF_ANA, [resposta('03:00', '', '', '')])
+        totaisPorCpf.set(CPF_ANA, [resposta('13:00', '', '', '')])
         const semana2 = await criarCiclo('semanal', '2026-08-26', '2026-09-22', '2001-01-02T09:00:00Z')
         expect(await processar()).toBe(true)
-        expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-09-16', DataFinal: '2026-09-22' })
+        expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-08-26', DataFinal: '2026-09-22' })
         expect(await anaDe(semana2.id)).toEqual({
-            extra_periodo: 780, pagas_periodo: 600, banco_periodo: 180, extra_semana: 180, saldo_banco_total: 180, dados_desde: '2026-09-16',
+            extra_periodo: 780, pagas_periodo: 600, banco_periodo: 180, extra_semana: 180, saldo_banco_total: 180, dados_desde: '2026-08-26',
         })
-        expect((await diaAna()).extra_min).toBe(600)
+        expect((await diaAna()).extra_min).toBe(780)
 
-        // 3) fechamento do mês: só de 23 a 25/09
+        // 3) fechamento do mês: só de 23 a 25/09, somado à semana 2 (o mês não é puxado de novo, nem o 01/09 que vem junto)
         chamadas = []
         totaisPorCpf.set(CPF_ANA, [resposta('01:00', '', '', '')])
         const mensal = await criarCiclo('fechamento_mes', '2026-08-26', '2026-09-25', '2001-01-03T09:00:00Z')
         expect(await processar()).toBe(true)
         expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-09-23', DataFinal: '2026-09-25' })
         expect(await anaDe(mensal.id)).toMatchObject({ extra_periodo: 840, banco_periodo: 240, saldo_banco_total: 240 })
+        expect((await diaAna()).extra_min).toBe(780)
 
         // 4) o recálculo refaz a cadeia somando os mesmos dias
         await client.query('UPDATE configuracoes SET teto_horas_pagas_minutos = 0 WHERE empresa_id = $1', [empresaId])
@@ -649,7 +650,7 @@ describe('tempo real (transação desfeita)', () => {
         expect(chamadasCalcular()).toHaveLength(0)
     })
 
-    it('com congelar dados passados, puxa só depois da última fotografia e soma a ela', async () => {
+    it('com congelar dados passados, continua puxando o período inteiro (só o fechamento do mês congela)', async () => {
         await sincronizarSoUnidadeA()
         totaisPorCpf.set(CPF_ANA, [resposta('12:30', '02:00', '08:00', '00:45')])
         totaisPorCpf.set(CPF_BRUNO, [resposta('01:00', '', '', '')])
@@ -658,18 +659,17 @@ describe('tempo real (transação desfeita)', () => {
 
         await ativarTempoReal()
         await client.query('UPDATE configuracoes SET congelar_dados_passados = true WHERE empresa_id = $1', [empresaId])
-        totaisPorCpf.set(CPF_ANA, [resposta('07:30', '', '', '')])
+        totaisPorCpf.set(CPF_ANA, [resposta('20:00', '02:00', '08:00', '00:45')])
         chamadas = []
         expect(await tempoReal()).toBe(2)
 
-        expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-09-16', DataFinal: '2026-09-20' })
+        expect(chamadasCalcular()[0].corpo).toEqual({ FuncionarioCpf: CPF_ANA, DataInicial: '2026-08-26', DataFinal: '2026-09-20' })
         const ana = await um<Record<string, unknown>>(
             `SELECT rt.extra_periodo, rt.negativa_periodo, rt.saldo_banco_total, rt.dados_desde::text AS dados_desde
                FROM registros_tempo_real rt JOIN colaboradores c ON c.id = rt.colaborador_id WHERE c.cpf = $1`,
             [CPF_ANA],
         )
-        // mesmo resultado do período inteiro (20:00 + 02:00 de extras), mas sem puxar de novo até 15/09
-        expect(ana).toEqual({ extra_periodo: 1320, negativa_periodo: 525, saldo_banco_total: 195, dados_desde: '2026-09-16' })
+        expect(ana).toEqual({ extra_periodo: 1320, negativa_periodo: 525, saldo_banco_total: 195, dados_desde: '2026-08-26' })
     })
 
     it('espera fechamento na fila e deixa a reserva da cota livre', async () => {

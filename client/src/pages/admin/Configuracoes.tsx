@@ -36,7 +36,7 @@ import { TituloPagina } from '../../components/TituloPagina'
    - 'atualizacao' (Configuração, RH e equipe): modo semanal ou tempo real, dia e hora da extração semanal
      (no tempo real não há fotografia semanal, a não ser com dados passados congelados: só a hora da extração do
      fechamento do mês);
-   - 'dados' (Configuração, RH e equipe): se os dias já fotografados são puxados de novo (congelar dados passados);
+   - 'dados' (Configuração, RH e equipe): se o fechamento do mês puxa o mês de novo (congelar dados passados: só os dias novos);
    - 'calendario' (Administração, só equipe): fechamento do mês, cota e prévia da régua. */
 export type SecaoConfiguracoes = 'alertas' | 'atualizacao' | 'dados' | 'calendario'
 
@@ -108,14 +108,14 @@ const OPCOES_CONGELAR: { valor: boolean; titulo: string; descricao: string; Icon
     valor: false,
     titulo: 'Atualizar dias já puxados',
     descricao:
-      'Cada coleta puxa de novo o período inteiro: se o RH corrigir na FriPonto um dia que já estava no painel, a correção entra na coleta seguinte.',
+      'Cada coleta puxa de novo o período inteiro, inclusive a do fechamento do mês: se o RH corrigir na FriPonto um dia que já estava no painel, a correção entra na coleta seguinte.',
     Icone: IconeSincronizar,
   },
   {
     valor: true,
-    titulo: 'Congelar dados passados',
+    titulo: 'Congelar o mês no fechamento',
     descricao:
-      'Cada coleta puxa só os dias depois da última fotografia e soma ao que já estava. Os dias já fotografados não mudam, mesmo que alguém altere na FriPonto depois.',
+      'Durante o mês, cada coleta puxa de novo desde o último fechamento, e as correções do RH entram. No fechamento do mês, só os dias depois da última coleta são puxados e somados: o mês fecha como estava, mesmo que o RH zere as horas na FriPonto.',
     Icone: IconeCadeado,
   },
 ]
@@ -249,7 +249,7 @@ function validar(form: Formulario, original: Config, secao: SecaoConfiguracoes) 
   return { erros, alteracoes: alteracoes as Alteracoes }
 }
 
-/** Tempo real só mantém a fotografia semanal com dados passados congelados: é ela que congela a semana. */
+/** Tempo real só mantém a fotografia semanal com dados passados congelados: é a base que o fechamento do mês soma. */
 function temFotografiaSemanal(config: Pick<Config, 'modo_extracao' | 'congelar_dados_passados'>) {
   return config.modo_extracao === 'semanal' || config.congelar_dados_passados
 }
@@ -275,7 +275,7 @@ function mensagemSalvo(secao: SecaoConfiguracoes, salva: Config, anterior: Confi
       : ''
   if (secao === 'dados') {
     const regra = salva.congelar_dados_passados
-      ? 'Dados passados congelados: a partir da próxima coleta, só os dias novos são puxados.'
+      ? 'Durante o mês as correções do RH entram; no fechamento, o mês congela como estava na última coleta.'
       : 'Cada coleta volta a puxar o período inteiro: correções na FriPonto entram na coleta seguinte.'
     return `Salvo. ${regra}${descartadas}`
   }
@@ -640,8 +640,8 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
         <p className="form-nota">
           {tempoReal && semanal
             ? <>
-                Os números são atualizados continuamente e, toda semana no dia escolhido, a semana é fotografada e
-                congelada (os dados passados estão congelados em <Link to="/configuracao/dados">Configurações → Dados</Link>).
+                Os números são atualizados continuamente e, toda semana no dia escolhido, a semana é fotografada (o mês
+                congela no fechamento, em <Link to="/configuracao/dados">Configurações → Dados</Link>).
                 O fechamento do mês (dia {config.dia_fechamento_mes}) é gravado no dia do mês escolhido abaixo.
               </>
             : tempoReal
@@ -730,7 +730,7 @@ function FormConfiguracoes({ inicial, secao, query }: FormProps) {
           <h2 className="config-bloco-titulo">Dias já puxados</h2>
           <p className="config-bloco-sub">
             O que acontece com os dias que já estão no painel quando alguém altera o ponto na FriPonto depois. Para puxar
-            de novo uma semana congelada, use{' '}
+            de novo um mês já fechado, use{' '}
             <Link to="/configuracao/integracao">Integração FriPonto → Puxar dados</Link>.
           </p>
         </div>

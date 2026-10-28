@@ -129,8 +129,8 @@ async function atualizarEmpresa(empresa: EmpresaTempoReal, op: OpcoesTempoReal, 
             { colaboradorId: col.id, empresaId: empresa.empresa_id, periodoInicio, dataReferencia: hoje },
             ex,
         )
-        // congelar dados passados: só os dias depois da última fotografia publicada, somados a ela
-        const desde = inicioDaColeta(periodoInicio, anterior, empresa.congelar_dados_passados)
+        // o período inteiro, mesmo com congelar dados passados: só o fechamento do mês congela
+        const desde = inicioDaColeta(periodoInicio, anterior, empresa.congelar_dados_passados, 'semanal')
 
         let dados
         try {

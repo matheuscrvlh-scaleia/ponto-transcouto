@@ -173,8 +173,8 @@ async function extrairColaboradores(ctx: Contexto, pendentes: ColaboradorElegive
         const anterior = await buscarRegistroAnterior({
             colaboradorId: col.id, empresaId: f.empresa_id, periodoInicio: f.periodo_inicio, dataReferencia: f.data_referencia,
         }, ex)
-        // congelar dados passados: puxa só os dias depois da última fotografia publicada do colaborador
-        const desde = inicioDaColeta(f.periodo_inicio, anterior, config.congelar_dados_passados)
+        // congelar dados passados: no fechamento do mês, só os dias depois da última fotografia publicada do colaborador
+        const desde = inicioDaColeta(f.periodo_inicio, anterior, config.congelar_dados_passados, f.tipo)
 
         const chamada = await calcularColaborador(ctx, cliente, col, desde)
         if ('desfecho' in chamada) return chamada.desfecho

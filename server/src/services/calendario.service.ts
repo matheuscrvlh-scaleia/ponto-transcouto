@@ -33,11 +33,18 @@ export function diaSeguinte(iso: string) {
 }
 
 /**
- * Primeiro dia que a coleta puxa. Com congelar dados passados, os dias até a última fotografia publicada do
- * colaborador no período não são puxados de novo; sem ela (ou sem fotografia anterior), puxa o período inteiro.
+ * Primeiro dia que a coleta puxa. A semanal puxa sempre o período inteiro (do dia seguinte ao último fechamento do
+ * mês), então as correções do RH durante o mês entram na coleta seguinte. Com congelar dados passados, o fechamento
+ * do mês puxa só os dias depois da última fotografia do colaborador e soma a ela: o RH zera as horas no fechamento,
+ * e puxar o mês inteiro de novo traria tudo zerado. Sem fotografia anterior, puxa o período inteiro.
  */
-export function inicioDaColeta(periodoInicio: string, anterior: { data_referencia: string } | null, congelar: boolean) {
-    return congelar && anterior ? diaSeguinte(anterior.data_referencia) : periodoInicio
+export function inicioDaColeta(
+    periodoInicio: string,
+    anterior: { data_referencia: string } | null,
+    congelar: boolean,
+    tipo: 'semanal' | 'fechamento_mes',
+) {
+    return congelar && tipo === 'fechamento_mes' && anterior ? diaSeguinte(anterior.data_referencia) : periodoInicio
 }
 
 const diaDaSemana = (n: number) => new Date(n * MS_DIA).getUTCDay()

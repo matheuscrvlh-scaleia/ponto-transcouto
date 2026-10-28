@@ -182,14 +182,18 @@ describe('proximosCiclos', () => {
 })
 
 describe('inicioDaColeta', () => {
-    it('com congelar dados passados, começa no dia seguinte à última fotografia do período', () => {
-        expect(inicioDaColeta('2026-09-26', { data_referencia: '2026-10-06' }, true)).toBe('2026-10-07')
+    it('com congelar dados passados, o fechamento do mês começa no dia seguinte à última fotografia do período', () => {
+        expect(inicioDaColeta('2026-09-26', { data_referencia: '2026-10-20' }, true, 'fechamento_mes')).toBe('2026-10-21')
         // virada de mês e de ano
-        expect(inicioDaColeta('2026-12-26', { data_referencia: '2026-12-31' }, true)).toBe('2027-01-01')
+        expect(inicioDaColeta('2026-12-26', { data_referencia: '2026-12-31' }, true, 'fechamento_mes')).toBe('2027-01-01')
     })
 
-    it('sem fotografia anterior no período ou sem a flag, puxa o período inteiro', () => {
-        expect(inicioDaColeta('2026-09-26', null, true)).toBe('2026-09-26')
-        expect(inicioDaColeta('2026-09-26', { data_referencia: '2026-10-06' }, false)).toBe('2026-09-26')
+    it('a semanal puxa sempre o período inteiro, mesmo com congelar dados passados', () => {
+        expect(inicioDaColeta('2026-09-26', { data_referencia: '2026-10-06' }, true, 'semanal')).toBe('2026-09-26')
+    })
+
+    it('sem fotografia anterior no período ou sem a flag, o fechamento do mês puxa o período inteiro', () => {
+        expect(inicioDaColeta('2026-09-26', null, true, 'fechamento_mes')).toBe('2026-09-26')
+        expect(inicioDaColeta('2026-09-26', { data_referencia: '2026-10-20' }, false, 'fechamento_mes')).toBe('2026-09-26')
     })
 })
