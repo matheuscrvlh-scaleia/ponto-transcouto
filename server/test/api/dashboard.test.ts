@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { db } from '../../src/db/database'
+import { inicioPeriodoAtualSql } from '../../src/models/unidades.models'
 import { autorizado, encerrar, prepararContexto, type Contexto } from './helpers'
 
 vi.mock('../../src/db/database', () => import('./banco-transacional'))
@@ -15,8 +16,31 @@ type Linha = {
 
 let ctx: Contexto
 
+/*
+ * O painel só mostra o período atual, e o seed data os ciclos pelo dia em que rodou: dentro da transação dos testes
+ * (desfeita no fim), os ciclos da Demo andam juntos até o último período publicado ser o de hoje.
+ * atalho: um deslocamento igual à distância entre duas referências da Demo (até ~3 semanas) bateria na chave única.
+ */
+async function moverDemoParaOPeriodoAtual(empresaId: number) {
+    await db.query(
+        `WITH d AS (
+            SELECT ${inicioPeriodoAtualSql('cf')} - max(c.periodo_inicio) AS dias
+              FROM ciclos c
+              JOIN fechamentos f ON f.ciclo_id = c.id AND f.status = 'sucesso'
+              JOIN configuracoes cf ON cf.empresa_id = c.empresa_id
+             WHERE c.empresa_id = $1
+             GROUP BY cf.dia_fechamento_mes, cf.fuso_horario
+         )
+         UPDATE ciclos SET periodo_inicio = periodo_inicio + d.dias, data_referencia = data_referencia + d.dias
+           FROM d
+          WHERE ciclos.empresa_id = $1`,
+        [empresaId],
+    )
+}
+
 beforeAll(async () => {
     ctx = await prepararContexto()
+    await moverDemoParaOPeriodoAtual(ctx.empresaId)
 })
 
 afterAll(() => encerrar(ctx))
@@ -241,7 +265,11 @@ describe('tempo real no painel', () => {
             `INSERT INTO registros_tempo_real
                     (colaborador_id, empresa_id, unidade_id, periodo_inicio, dados_ate, extra_periodo,
                      negativa_periodo, pagas_periodo, banco_periodo, saldo_banco_total, extraido_em)
-             VALUES ($1, $2, $3, current_date - 10, current_date, 54321, 0, 0, 54321, 98765, now())`,
+             SELECT $1, $2, $3, ${inicioPeriodoAtualSql('cf')},
+                    -- ao vivo mais recente que a fotografia (os ciclos movidos podem ter referência depois de hoje)
+                    (SELECT max(c.data_referencia) + 1 FROM ciclos c WHERE c.empresa_id = $2),
+                    54321, 0, 0, 54321, 98765, now()
+               FROM configuracoes cf WHERE cf.empresa_id = $2`,
             [alvo.id, ctx.empresaId, ctx.unidades.GDR],
         )
 

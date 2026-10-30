@@ -347,13 +347,14 @@ export function DashboardUnidade() {
 
       {!fechamento && !aoVivo ? (
         <EstadoVazio
-          titulo={consolidado ? 'Ainda não há dados publicados nas suas unidades' : 'Ainda não há dados consolidados para esta unidade'}
+          titulo={consolidado ? 'Ainda não há dados do período atual nas suas unidades' : 'Ainda não há dados do período atual para esta unidade'}
         >
           <p>
             {tempoReal.ativo
               ? 'A atualização em tempo real está ligada: os dados aparecem aqui conforme cada colaborador for atualizado.'
               : 'Os dados são atualizados uma vez por semana, no dia e na hora definidos para a empresa, depois que o RH ajusta o ponto.'}
           </p>
+          <p>Esta tela mostra só o período atual. Os meses anteriores e o banco acumulado ficam no perfil de cada colaborador.</p>
           {dados.proximo_fechamento_previsto && (
             <p>
               {rotuloProxima} {previsto}: <strong>{formatarDiaSemana(dados.proximo_fechamento_previsto)}</strong>

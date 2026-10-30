@@ -16,6 +16,15 @@ import type {
    sem herdar os períodos anteriores. O banco acumulado (saldo_banco_total) fica só no perfil do colaborador. */
 const saldoDoPeriodoSql = (r: string) => `(${r}.extra_periodo - ${r}.negativa_periodo)`
 
+/* Início do período de apuração que contém hoje, no fuso da empresa (dia_fechamento_mes vai de 1 a 28): hoje menos o
+   dia do fechamento cai no mês do último fechamento, e o período começa no dia seguinte a ele. Mesma conta de
+   inicioDoPeriodo (calendario.service). O painel só mostra fechamentos desse período. */
+export const inicioPeriodoAtualSql = (cf: string) => {
+    const dia = `coalesce(${cf}.dia_fechamento_mes, 25)`
+    const hoje = `(now() AT TIME ZONE coalesce(${cf}.fuso_horario, 'America/Sao_Paulo'))::date`
+    return `(date_trunc('month', (${hoje} - ${dia})::timestamp) + ${dia} * interval '1 day')::date`
+}
+
 const foraDaCurvaSql = (saldo: string, pos: string, neg: string) =>
     `CASE WHEN ${saldo} >= ${pos} THEN 'positivo' WHEN ${saldo} <= -${neg} THEN 'negativo' END`
 
@@ -64,13 +73,16 @@ export async function buscarPermitida(ator: Ator, unidadeId: number) {
     return rows[0] ?? null
 }
 
+/** Último fechamento publicado da unidade no período atual (de um mês já encerrado não entra no painel). */
 export async function ultimoFechamentoPublicado(unidadeId: number) {
     const { rows } = await db.query<FechamentoPublicado>(
         `SELECT f.id, c.periodo_inicio::text, c.data_referencia::text, f.publicado_em,
                 c.tipo = 'fechamento_mes' AS semana_fechamento_mes
            FROM fechamentos f
            JOIN ciclos c ON c.id = f.ciclo_id
+           LEFT JOIN configuracoes cf ON cf.empresa_id = f.empresa_id
           WHERE f.unidade_id = $1 AND f.status = 'sucesso'
+            AND c.periodo_inicio = ${inicioPeriodoAtualSql('cf')}
           ORDER BY c.data_referencia DESC, f.publicado_em DESC
           LIMIT 1`,
         [unidadeId],
@@ -80,7 +92,7 @@ export async function ultimoFechamentoPublicado(unidadeId: number) {
 
 /* Fonte dos números do painel (uma unidade ou várias):
    - tempo real: o valor ao vivo de cada colaborador (registros_tempo_real), para empresas nesse modo;
-   - fotografia: o último fechamento publicado da unidade (registros_horas).
+   - fotografia: o último fechamento publicado da unidade no período atual (registros_horas).
    Cada colaborador aparece uma vez, com o dado mais recente (ao vivo ganha no empate), e `saldo` é o do período.
    As unidades viram uma tabela (unnest) com os limites da empresa de cada uma,
    para que filtro e "fora da curva" usem o limite certo. */
@@ -100,6 +112,9 @@ const fontePainel = `
                   FROM lim
                   JOIN registros_tempo_real rt ON rt.unidade_id = lim.unidade_id AND lim.tempo_real
                                               AND rt.extraido_em IS NOT NULL
+                  -- logo depois da virada do mês, o valor ao vivo ainda pode ser do período anterior
+                  JOIN configuracoes cf ON cf.empresa_id = rt.empresa_id
+                                       AND rt.periodo_inicio = ${inicioPeriodoAtualSql('cf')}
                 UNION ALL
                 SELECT rh.colaborador_id, rh.extra_periodo, rh.negativa_periodo, rh.pagas_periodo,
                        rh.banco_periodo, ${saldoDoPeriodoSql('rh')},
@@ -126,7 +141,7 @@ const ordensDashboard: Record<DashboardQuery['ordem'], string> = {
     nome: 'col.nome, col.id',
 }
 
-/** Unidades visíveis no painel, cada uma com o último fechamento publicado, os limites e o modo da empresa dela. */
+/** Unidades visíveis no painel, cada uma com o último fechamento publicado do período atual, os limites e o modo da empresa dela. */
 export async function unidadesDoPainel(ator: Ator, empresaId: number | null, padrao: Limites) {
     const { rows } = await db.query<UnidadePainel>(
         `SELECT un.id, un.nome_exibicao AS nome, un.empresa_id,
@@ -145,6 +160,7 @@ export async function unidadesDoPainel(ator: Ator, empresaId: number | null, pad
                   FROM fechamentos f
                   JOIN ciclos c ON c.id = f.ciclo_id
                  WHERE f.unidade_id = un.id AND f.status = 'sucesso'
+                   AND c.periodo_inicio = ${inicioPeriodoAtualSql('cf')}
                  ORDER BY c.data_referencia DESC, f.publicado_em DESC
                  LIMIT 1
            ) uf ON true
