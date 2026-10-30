@@ -236,9 +236,10 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
             `SELECT r.* FROM registros_horas r JOIN colaboradores c ON c.id = r.colaborador_id
               WHERE r.fechamento_id = $1 AND c.cpf = $2`, [semanal.id, CPF_ANA],
         )
+        // saldo 14:30 − 08:45 = 05:45, abaixo do teto de 10h: tudo pago, banco zerado
         expect(ana1).toMatchObject({
-            extra_periodo: 870, negativa_periodo: 525, pagas_periodo: 600, banco_periodo: 270,
-            extra_semana: 870, banco_semana: 270, saldo_banco_total: -255, base_semana_registro_id: null,
+            extra_periodo: 870, negativa_periodo: 525, pagas_periodo: 345, banco_periodo: 0,
+            extra_semana: 870, banco_semana: 0, saldo_banco_total: 0, base_semana_registro_id: null,
         })
         expect(ana1.dados_brutos).toEqual({ colunas, totais: ['', '176:00', '12:30', '02:00', '08:00', '00:45', '99:00'] })
 
@@ -278,10 +279,11 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
             `SELECT r.* FROM registros_horas r JOIN colaboradores c ON c.id = r.colaborador_id
               WHERE r.fechamento_id = $1 AND c.cpf = $2`, [mensal.id, CPF_ANA],
         )
+        // saldo 22:00 − 08:45 = 13:15: 10h pagas e 03:15 para o banco
         expect(ana2).toMatchObject({
-            extra_periodo: 1320, pagas_periodo: 600, banco_periodo: 720,
-            extra_semana: 450, negativa_semana: 0, pagas_semana: 0, banco_semana: 450,
-            saldo_banco_total: 720 - 525, base_semana_registro_id: ana1.id,
+            extra_periodo: 1320, pagas_periodo: 600, banco_periodo: 195,
+            extra_semana: 450, negativa_semana: 0, pagas_semana: 255, banco_semana: 195,
+            saldo_banco_total: 195, base_semana_registro_id: ana1.id,
         })
 
         // 3) novo período: saldo acumula o fechamento anterior; coluna nova bloqueia e não gasta cota com os demais
@@ -309,7 +311,7 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
             `SELECT r.extra_periodo, r.banco_periodo, r.saldo_banco_total, r.extra_semana FROM registros_horas r
                JOIN colaboradores c ON c.id = r.colaborador_id WHERE r.fechamento_id = $1 AND c.cpf = $2`, [novo.id, CPF_ANA],
         )
-        expect(ana3).toEqual({ extra_periodo: 90, banco_periodo: 0, saldo_banco_total: 720 - 525, extra_semana: 90 })
+        expect(ana3).toEqual({ extra_periodo: 90, banco_periodo: 0, saldo_banco_total: 195, extra_semana: 90 })
         expect((await um<{ status: string }>('SELECT status FROM fechamentos WHERE id = $1', [novo.id])).status).toBe('sucesso')
 
         // 5) cota esgotada: devolve para a fila sem gastar tentativa e sem chamar a Secullum
@@ -532,8 +534,8 @@ describe('worker com Secullum mockada (transação desfeita)', () => {
               WHERE col.empresa_id = $1 AND col.cpf = $2
               ORDER BY c.data_referencia`, [empresaId, CPF_ANA],
         )).rows
-        // teto de 10h: agosto 2h para o banco − 2h; setembro herda 0, nada para o banco − 1h
-        expect((await saldosAna()).map(r => [r.saldo_banco_total, r.teto_aplicado_minutos])).toEqual([[0, 600], [-60, 600]])
+        // teto de 10h sobre o saldo: agosto 12h − 2h = 10h, tudo pago; setembro 5h − 1h = 4h, tudo pago
+        expect((await saldosAna()).map(r => [r.saldo_banco_total, r.teto_aplicado_minutos])).toEqual([[0, 600], [0, 600]])
 
         // fora do recálculo, fechamento publicado continua congelado
         const [agosto] = await saldosAna()
@@ -623,7 +625,7 @@ describe('tempo real (transação desfeita)', () => {
             [CPF_ANA],
         )
         expect(ana).toMatchObject({
-            extra_periodo: 1320, negativa_periodo: 525, pagas_periodo: 600, banco_periodo: 720,
+            extra_periodo: 1320, negativa_periodo: 525, pagas_periodo: 600, banco_periodo: 195,
             saldo_banco_total: 195, base_registro_id: base.id, ultimo_erro: null,
         })
         expect(ana.extraido_em).not.toBeNull()

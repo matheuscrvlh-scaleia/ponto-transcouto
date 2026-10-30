@@ -287,8 +287,8 @@ export async function saldoPeriodosAnteriores(
     ex: Executor = db,
 ) {
     const result = await ex.query<{ saldo: number }>(
-        `SELECT coalesce(sum(x.banco_periodo - x.negativa_periodo), 0)::int AS saldo
-           FROM (SELECT DISTINCT ON (c.periodo_inicio) r.banco_periodo, r.negativa_periodo
+        `SELECT coalesce(sum(x.banco_periodo), 0)::int AS saldo
+           FROM (SELECT DISTINCT ON (c.periodo_inicio) r.banco_periodo
                    FROM registros_horas r
                    JOIN fechamentos f ON f.id = r.fechamento_id AND f.status = 'sucesso'
                    JOIN ciclos c      ON c.id = f.ciclo_id

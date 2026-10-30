@@ -124,7 +124,8 @@ const ORIGENS: { valor: Config['origem_horas_pagas']; titulo: string; descricao:
   {
     valor: 'teto',
     titulo: 'Teto definido aqui',
-    descricao: 'As extras até o teto são pagas e o que passar vai para o banco de horas.',
+    descricao:
+      'Primeiro desconta as negativas das extras. O saldo até o teto é pago e o que passar vai para o banco de horas; saldo negativo não paga nada e fica no banco.',
     Icone: IconeMoeda,
   },
   {

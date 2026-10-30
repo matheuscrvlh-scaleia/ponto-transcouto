@@ -36,16 +36,17 @@ function calcular(parcial: Partial<EntradaCalculoHoras>) {
 }
 
 describe('calcularHoras', () => {
-    it('soma colunas de extra/negativa e aplica teto mensal', () => {
+    it('soma colunas de extra/negativa e aplica o teto mensal sobre o saldo (extras − negativas)', () => {
         const v = calcular({ dados: dados('12:30', '02:00', '08:00', '-00:45') })
+        // saldo 14:30 − 08:45 = 05:45, abaixo do teto de 10h: tudo pago, banco zerado
         expect(v).toMatchObject({
             extra_periodo: 870,
             negativa_periodo: 525,
-            pagas_periodo: 600,
-            banco_periodo: 270,
+            pagas_periodo: 345,
+            banco_periodo: 0,
             extra_semana: 870,
-            banco_semana: 270,
-            saldo_banco_total: 270 - 525,
+            banco_semana: 0,
+            saldo_banco_total: 0,
             base_semana_registro_id: null,
         })
     })
@@ -56,17 +57,29 @@ describe('calcularHoras', () => {
         expect(v.banco_periodo).toBe(0)
     })
 
+    it('saldo acima do teto: paga o teto e o excedente vai para o banco (exemplo do Renato)', () => {
+        const v = calcular({ regra: { ...tetoMensal, teto_minutos: 2400 }, dados: dados('58:43', '00:00', '16:58') })
+        // 58:43 − 16:58 = 41:45 de saldo: 40:00 pagas e 01:45 para o banco
+        expect(v).toMatchObject({ pagas_periodo: 2400, banco_periodo: 105, saldo_banco_total: 105 })
+    })
+
+    it('saldo negativo: nada pago e o negativo fica no banco', () => {
+        const v = calcular({ dados: dados('05:00', '00:00', '08:00'), saldoPeriodosAnteriores: 60 })
+        expect(v).toMatchObject({ pagas_periodo: 0, banco_periodo: -180, saldo_banco_total: 60 - 180 })
+    })
+
     it('*_semana é a diferença para o registro anterior do mesmo período', () => {
-        const anterior = { id: '41', extra_periodo: 870, negativa_periodo: 525, pagas_periodo: 600, banco_periodo: 270 }
+        const anterior = { id: '41', extra_periodo: 870, negativa_periodo: 525, pagas_periodo: 345, banco_periodo: 0 }
         const v = calcular({ dados: dados('20:00', '02:00', '08:00', '00:45'), anterior })
+        // saldo 22:00 − 08:45 = 13:15: 10h pagas e 03:15 para o banco
         expect(v).toMatchObject({
             extra_periodo: 1320,
             pagas_periodo: 600,
-            banco_periodo: 720,
+            banco_periodo: 195,
             extra_semana: 450,
             negativa_semana: 0,
-            pagas_semana: 0,
-            banco_semana: 450,
+            pagas_semana: 255,
+            banco_semana: 195,
             base_semana_registro_id: '41',
         })
     })
@@ -111,9 +124,10 @@ describe('calcularHoras', () => {
         expect(v.saldo_banco_total).toBe(-2110)
     })
 
-    it('sem coluna de saldo, acumula (banco − negativa) dos períodos anteriores + atual', () => {
+    it('sem coluna de saldo, acumula o banco dos períodos anteriores + atual', () => {
+        // saldo 12:00 − 01:00 = 11:00: 10h pagas, 01:00 para o banco
         const v = calcular({ dados: dados('12:00', '00:00', '01:00'), saldoPeriodosAnteriores: -300 })
-        expect(v.saldo_banco_total).toBe(-300 + 120 - 60)
+        expect(v.saldo_banco_total).toBe(-300 + 60)
     })
 
     it('sinaliza coluna nova não mapeada', () => {
@@ -158,11 +172,12 @@ describe('calcularHoras', () => {
     })
 
     it('congelar dados passados: os dias novos somam ao registro anterior, que não muda', () => {
-        const anterior = { id: '41', extra_periodo: 870, negativa_periodo: 525, pagas_periodo: 600, banco_periodo: 270 }
+        const anterior = { id: '41', extra_periodo: 870, negativa_periodo: 525, pagas_periodo: 345, banco_periodo: 0 }
         const v = calcular({ dados: dados('02:00', '00:00', '01:00'), anterior, somarAoAnterior: true })
+        // saldo 16:30 − 09:45 = 06:45, abaixo do teto: tudo pago
         expect(v).toMatchObject({
-            extra_periodo: 990, negativa_periodo: 585, pagas_periodo: 600, banco_periodo: 390,
-            extra_semana: 120, negativa_semana: 60, pagas_semana: 0, banco_semana: 120, base_semana_registro_id: '41',
+            extra_periodo: 990, negativa_periodo: 585, pagas_periodo: 405, banco_periodo: 0,
+            extra_semana: 120, negativa_semana: 60, pagas_semana: 60, banco_semana: 0, base_semana_registro_id: '41',
         })
         // sem a flag, os mesmos dados seriam o período inteiro (correção retroativa)
         expect(calcular({ dados: dados('02:00'), anterior }).extra_semana).toBe(120 - 870)

@@ -222,8 +222,8 @@ export function secoesSemanais(historico: SemanaHistorico[], dias: DiaApi[], hoj
     const mesmoPeriodo = anterior?.periodo_inicio === semana.periodo_inicio
     const inicio = mesmoPeriodo ? somarDias(anterior.data_referencia, 1) : semana.periodo_inicio
     const fim = semana.data_referencia
-    // saldo(semana) = saldo(anterior) + banco(semana) - negativas(semana); sem anterior, faz a conta ao contrário
-    const abertura = anterior ? anterior.saldo_total : semana.saldo_total - (semana.banco_semana - semana.negativa_semana)
+    // saldo(semana) = saldo(anterior) + banco(semana) (o banco já desconta as negativas); sem anterior, faz a conta ao contrário
+    const abertura = anterior ? anterior.saldo_total : semana.saldo_total - semana.banco_semana
     const brutos = noIntervalo(dias, inicio > fim ? fim : inicio, fim)
     return montarSecao(
       {

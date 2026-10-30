@@ -99,16 +99,22 @@ export function somarPorCampo(dados: TotaisSecullum, mapeamento: ItemMapeamento[
     return { ...soma, temSaldo }
 }
 
-export function calcularPagas(extra: number, regra: RegraPagas, colunaPagas: number, anterior: RegistroBase | null) {
+/**
+ * Pagas pelo teto: primeiro o saldo do período (extras − negativas), depois o teto. Saldo até o teto: tudo pago;
+ * acima, paga o teto e o excedente vai para o banco; negativo: nada pago. No teto semanal, o teto vale para o
+ * saldo que entrou na semana, acumulando o já pago.
+ */
+export function calcularPagas(extra: number, negativa: number, regra: RegraPagas, colunaPagas: number, anterior: RegistroBase | null) {
     if (regra.origem === 'coluna_secullum') return Math.min(colunaPagas, extra)
 
     const teto = regra.teto_minutos ?? 0
+    const saldo = Math.max(extra - negativa, 0)
     if (regra.periodicidade === 'semanal') {
-        const pagasAntes = anterior?.pagas_periodo ?? 0
-        const extraDaSemana = Math.max(extra - (anterior?.extra_periodo ?? 0), 0)
-        return Math.min(extra, pagasAntes + Math.min(extraDaSemana, teto))
+        const saldoAntes = (anterior?.extra_periodo ?? 0) - (anterior?.negativa_periodo ?? 0)
+        const saldoDaSemana = Math.max(extra - negativa - saldoAntes, 0)
+        return Math.min(saldo, (anterior?.pagas_periodo ?? 0) + Math.min(saldoDaSemana, teto))
     }
-    return Math.min(extra, teto)
+    return Math.min(saldo, teto)
 }
 
 export type SomaPorCampo = ReturnType<typeof somarPorCampo>
@@ -133,8 +139,9 @@ export function valoresDoRegistro(
 ): ValoresRegistro {
     const extra = soma.extra
     const negativa = soma.negativa
-    const pagas = calcularPagas(extra, regra, soma.pagas, anterior)
-    const banco = Math.max(extra - pagas, 0)
+    const pagas = calcularPagas(extra, negativa, regra, soma.pagas, anterior)
+    // o que o período deixa no banco: o saldo que não foi pago (negativo quando as negativas passam das extras)
+    const banco = extra - negativa - pagas
 
     return {
         extra_periodo: extra,
@@ -145,7 +152,7 @@ export function valoresDoRegistro(
         negativa_semana: negativa - (anterior?.negativa_periodo ?? 0),
         pagas_semana: pagas - (anterior?.pagas_periodo ?? 0),
         banco_semana: banco - (anterior?.banco_periodo ?? 0),
-        saldo_banco_total: soma.temSaldo ? soma.saldo_banco : saldoPeriodosAnteriores + banco - negativa,
+        saldo_banco_total: soma.temSaldo ? soma.saldo_banco : saldoPeriodosAnteriores + banco,
         base_semana_registro_id: anterior?.id ?? null,
     }
 }

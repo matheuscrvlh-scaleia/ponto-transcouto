@@ -108,7 +108,7 @@ class Bases {
         return melhor
     }
 
-    /** Mesma regra de saldoPeriodosAnteriores: banco − negativas do último registro de cada período anterior. */
+    /** Mesma regra de saldoPeriodosAnteriores: banco do último registro de cada período anterior. */
     saldoAnterior(colaboradorId: number, periodoInicio: string) {
         const ultimoDoPeriodo = new Map<string, Base>()
         for (const b of this.porColaborador.get(colaboradorId) ?? []) {
@@ -117,7 +117,7 @@ class Bases {
             if (!atual || b.data_referencia >= atual.data_referencia) ultimoDoPeriodo.set(b.periodo_inicio, b)
         }
         let saldo = 0
-        for (const b of ultimoDoPeriodo.values()) saldo += b.banco_periodo - b.negativa_periodo
+        for (const b of ultimoDoPeriodo.values()) saldo += b.banco_periodo
         return saldo
     }
 }

@@ -53,9 +53,9 @@ describe('recalcularHistorico', () => {
         const s = setembro()
 
         const comTeto = recalcular([s, a], teto10h)
-        // agosto: 10h para o banco − 5h = +5h; setembro: herda +5h, 5h para o banco − 10h = 0
+        // agosto: saldo 15h, 10h pagas, +5h no banco; setembro: saldo 5h, tudo pago, herda +5h
         expect(saldoDe(comTeto, a.id)).toBe(300)
-        expect(saldoDe(comTeto, s.id)).toBe(0)
+        expect(saldoDe(comTeto, s.id)).toBe(300)
 
         const tudoNoBanco = recalcular([a, s], semTeto)
         // agosto: 20h − 5h = +15h; setembro: +15h + 15h − 10h = +20h
@@ -92,7 +92,7 @@ describe('recalcularHistorico', () => {
             periodo_inicio: '2026-08-26',
             data_referencia: '2026-09-25',
             dados: { colunas: [...colunas, 'Nova'], totais: ['', '176:00', '20:00', '05:00', '01:00'] },
-            banco_periodo: 600,
+            banco_periodo: 300,
             negativa_periodo: 300,
         })
         const s = setembro()
@@ -102,7 +102,7 @@ describe('recalcularHistorico', () => {
         expect(resultado.falhas).toEqual([
             { colaborador_id: 7, referencia: '2026-09-25', mensagem: 'Coluna não mapeada: Nova' },
         ])
-        // herda o gravado: 10h − 5h = +5h; setembro: +5h + 15h − 10h
+        // herda o banco gravado (+5h, já sem as negativas); setembro: +5h + 15h − 10h
         expect(saldoDe(resultado, s.id)).toBe(600)
     })
 
@@ -122,9 +122,9 @@ describe('recalcularHistorico', () => {
         }
         const resultado = recalcular([a], teto10h, { aoVivo: [aoVivo], dias: [dia] })
 
-        // agosto com teto: +5h; período atual: 5h para o banco − 10h
-        expect(resultado.aoVivo[0].valores.saldo_banco_total).toBe(0)
-        expect(resultado.dias[0].valores).toMatchObject({ pagas_periodo: 600, banco_periodo: 300, saldo_banco_total: 0 })
+        // agosto com teto: +5h; período atual: saldo 15h − 10h = 5h, tudo pago
+        expect(resultado.aoVivo[0].valores.saldo_banco_total).toBe(300)
+        expect(resultado.dias[0].valores).toMatchObject({ pagas_periodo: 300, banco_periodo: 0, saldo_banco_total: 300 })
     })
 
     it('congelar dados passados: registro com só os dias novos soma à base recalculada', () => {
@@ -136,13 +136,13 @@ describe('recalcularHistorico', () => {
         const resultado = recalcular([semana2, semana1], { origem: 'teto', teto_minutos: 180, periodicidade: 'semanal' }, { aoVivo: [aoVivo] })
 
         const v = resultado.registros.find(r => r.id === semana2.id)!.valores
-        // semana 1: 4h, 3h pagas; semana 2: +5h (3h pagas pelo teto) e 1h de falta
+        // semana 1: 4h, 3h pagas; semana 2: +5h e 1h de falta = 4h de saldo novo (3h pagas pelo teto)
         expect(v).toMatchObject({
-            extra_periodo: 540, negativa_periodo: 60, pagas_periodo: 360, banco_periodo: 180,
+            extra_periodo: 540, negativa_periodo: 60, pagas_periodo: 360, banco_periodo: 120,
             extra_semana: 300, base_semana_registro_id: semana1.id,
         })
         // ao vivo: os 2h de 14 e 15/10 sobre a semana 2 (teto da semana: 2h pagas)
-        expect(resultado.aoVivo[0].valores).toMatchObject({ extra_periodo: 660, pagas_periodo: 480, banco_periodo: 180 })
+        expect(resultado.aoVivo[0].valores).toMatchObject({ extra_periodo: 660, pagas_periodo: 480, banco_periodo: 120 })
     })
 
     it('cada colaborador tem a sua cadeia', () => {
