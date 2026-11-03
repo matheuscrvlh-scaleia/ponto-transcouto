@@ -125,6 +125,16 @@ export async function removerAusentes(empresaId: number, de: string, ate: string
     return result.rowCount ?? 0
 }
 
+/** Horários pré-assinalados do colaborador por dia ("15:00"), para refazer os dias da coleta. */
+export async function preAssinaladasPorDia(colaboradorId: number, de: string, ate: string, ex: Executor = db) {
+    const { rows } = await ex.query<{ dia: string, horas: string[] }>(
+        `SELECT data::text AS dia, array_agg(to_char(hora, 'HH24:MI')) AS horas
+           FROM batidas WHERE colaborador_id = $1 AND tipo = 2 AND data BETWEEN $2 AND $3 GROUP BY data`,
+        [colaboradorId, de, ate],
+    )
+    return new Map(rows.map(r => [r.dia, r.horas]))
+}
+
 /** Batidas de funcionários que ainda não tinham chegado pela sincronização de cadastros. */
 export async function vincularPendentes(empresaId: number, ex: Executor = db) {
     const result = await ex.query(

@@ -96,8 +96,12 @@ export function PerfilIntervalo({ colaboradorId, intervalo, historico }: Props) 
   const dias = useMemo(
     () =>
       (dados?.dias ?? []).map((dia) => {
-        // sem cálculo da coleta ainda: as batidas válidas do log fazem o papel das marcações
-        const marcacoes = dia.tem_calculo ? dia.marcacoes : dia.batidas.filter((b) => b.tipo !== 3).map((b) => b.hora)
+        // sem cálculo da coleta ainda: as batidas válidas do log fazem o papel das marcações; com intervalo
+        // real batido, o pré-assinalado sai (a coleta faz o mesmo)
+        const validas = dia.batidas.filter((b) => b.tipo !== 3)
+        const reais = validas.filter((b) => b.tipo !== 2)
+        const doLog = (reais.length >= 4 && reais.length % 2 === 0 ? reais : validas).map((b) => b.hora)
+        const marcacoes = dia.tem_calculo ? dia.marcacoes : doLog
         const preAssinaladas = dia.batidas.filter((b) => b.tipo === 2).map((b) => b.hora)
         // API anterior ao detalhe por coluna (ex.: front publicado antes da API) não manda as colunas
         return { ...dia, colunas: dia.colunas ?? {}, marcacoes, preAssinaladas, ...analisarDia(marcacoes) }

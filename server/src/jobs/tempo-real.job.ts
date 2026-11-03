@@ -10,6 +10,7 @@ import {
     saldoPeriodosAnteriores,
     travarEmpresa,
 } from '../models/extracao.models'
+import { preAssinaladasPorDia } from '../models/batidas.models'
 import { gravarDias } from '../models/horas-dia.models'
 import { buscarCredenciais, registrarChamadaApi } from '../models/sincronizacao.models'
 import {
@@ -24,6 +25,7 @@ import {
 } from '../models/tempo-real.models'
 import { inicioDaColeta, periodoDeHoje } from '../services/calendario.service'
 import { calcularHoras, mensagensErroMapeamento, type RegraPagas } from '../services/calculo-horas.service'
+import { corrigirDias } from '../services/correcao-batidas.service'
 import { diasOuNada } from '../services/horas-dia.service'
 import { clienteDaEmpresa } from './cliente-empresa'
 import type { Log } from './log'
@@ -146,6 +148,8 @@ async function atualizarEmpresa(empresa: EmpresaTempoReal, op: OpcoesTempoReal, 
             await registrarFalha(alvo, (err as Error).message, ex)
             continue
         }
+
+        dados = corrigirDias(dados, await preAssinaladasPorDia(col.id, desde, hoje, ex), mapeamento).dados
 
         const saldoAnterior = await saldoPeriodosAnteriores(
             { colaboradorId: col.id, empresaId: empresa.empresa_id, periodoInicio },

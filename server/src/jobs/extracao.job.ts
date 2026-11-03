@@ -28,10 +28,12 @@ import {
     type EtapaErro,
     type FechamentoReivindicado,
 } from '../models/extracao.models'
+import { preAssinaladasPorDia } from '../models/batidas.models'
 import { gravarDias } from '../models/horas-dia.models'
 import { buscarCredenciais, registrarChamadaApi } from '../models/sincronizacao.models'
 import { calcularHoras, mensagensErroMapeamento, type ItemMapeamento, type RegraPagas } from '../services/calculo-horas.service'
 import { inicioDaColeta } from '../services/calendario.service'
+import { corrigirDias } from '../services/correcao-batidas.service'
 import { diasOuNada } from '../services/horas-dia.service'
 import { decidirPublicacao } from '../services/publicacao.service'
 import { clienteDaEmpresa } from './cliente-empresa'
@@ -186,6 +188,9 @@ async function extrairColaboradores(ctx: Contexto, pendentes: ColaboradorElegive
             await somarProgresso(ctx.execucaoId, 1, 0, ex)
             continue
         }
+
+        const pre = await preAssinaladasPorDia(col.id, desde, f.data_referencia, ex)
+        chamada.dados = corrigirDias(chamada.dados, pre, mapeamento).dados
 
         let resultado: ReturnType<typeof calcularHoras>
         try {
