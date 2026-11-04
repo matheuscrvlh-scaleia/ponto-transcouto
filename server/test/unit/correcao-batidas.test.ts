@@ -61,6 +61,35 @@ describe('corrigirDias', () => {
         expect(certo.totais.slice(8)).toEqual(['00:00', '', '00:44'])
     })
 
+    it('ímpar com pré-assinalado: tira o pré-assinalado se há intervalo real e zera extra e negativa', () => {
+        const victor = ['10:55', '15:00', '16:00', '13:19', '14:13', '14:21', '20:53']
+        const totais = ['', '', '', '', '', '', '', '08:48', '16:39', '', '00:10']
+        const dados = {
+            colunas: [...colunas.slice(0, 7), 'Entrada 4', ...colunas.slice(7)],
+            totais: ['', ...totais],
+            dias: [{ dia: '2026-10-29', valores: ['2026-10-29', ...victor, '08:48', '16:39', '', ''] }],
+        }
+        const { dados: certo } = corrigirDias(dados, new Map([['2026-10-29', ['15:00', '16:00']]]), mapeamento)
+        expect(certo.dias![0].valores.slice(1, 8)).toEqual(['10:55', '13:19', '14:13', '14:21', '20:53', '', ''])
+        expect(certo.dias![0].valores.slice(9)).toEqual(['', '', ''])
+        expect(certo.totais.slice(9)).toEqual(['00:00', '', '00:10'])
+
+        // só uma batida real (a saída caiu no dia seguinte): o pré-assinalado fica, mas o dia não conta
+        const rodrigo = { colunas, totais: colunas.map(() => ''), dias: [dia('2026-10-27', ['14:56', '12:09', '13:39'], '12:25')] }
+        const { dados: semPar, corrigidos } = corrigirDias(rodrigo, new Map([['2026-10-27', ['12:09', '13:39']]]), mapeamento)
+        expect(corrigidos).toEqual(['2026-10-27'])
+        expect(semPar.dias![0].valores.slice(1, 4)).toEqual(['14:56', '12:09', '13:39'])
+        expect(semPar.dias![0].valores.slice(8)).toEqual(['', '', ''])
+    })
+
+    it('ímpar que fica em par sem o pré-assinalado: a FriPonto deixou a última batida sem par', () => {
+        // FriPonto: (10:00–15:00) + (12:00–13:00), 19:00 sem par = 6:00, 2:48 de falta; certo: 8:00, 0:48 de falta
+        const dados = { colunas, totais: colunas.map(() => ''), dias: [dia('2026-10-28', ['10:00', '15:00', '12:00', '13:00', '19:00'], '', '02:48')] }
+        const { dados: certo } = corrigirDias(dados, new Map([['2026-10-28', ['15:00']]]), mapeamento)
+        expect(certo.dias![0].valores.slice(1, 7)).toEqual(['10:00', '12:00', '13:00', '19:00', '', ''])
+        expect(certo.dias![0].valores.slice(8)).toEqual(['', '', '00:48'])
+    })
+
     it('dia em ordem, ímpar ou sem pré-assinalado sobrando fica como veio', () => {
         const dados = {
             colunas,

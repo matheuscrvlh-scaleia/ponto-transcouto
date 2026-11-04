@@ -25,7 +25,7 @@ export function trabalhadoDosPares(horarios: string[]) {
 }
 
 /**
- * Batidas que contam no dia: sem o pré-assinalado quando há batida real de intervalo (4 ou mais reais, em par),
+ * Batidas que contam no dia: sem o pré-assinalado quando há batida real de intervalo (4 ou mais reais),
  * em ordem de horário a partir da primeira batida (o que vem antes dela é do dia seguinte: turno da noite).
  */
 export function batidasQueContam(horarios: string[], preAssinaladas: string[]) {
@@ -36,7 +36,7 @@ export function batidasQueContam(horarios: string[], preAssinaladas: string[]) {
         pre.splice(i, 1)
         return false
     })
-    const base = reais.length >= 4 && reais.length % 2 === 0 ? reais : horarios
+    const base = reais.length >= 4 ? reais : horarios
     if (base.length === 0) return base
     const inicio = minutos(base[0])
     return [...base].sort((a, b) => ((minutos(a) - inicio + 1440) % 1440) - ((minutos(b) - inicio + 1440) % 1440))
@@ -46,7 +46,9 @@ const chave = (coluna: string) => coluna.trim().toLowerCase()
 
 /**
  * Dias com batida fora de ordem ou pré-assinalado sobrando refeitos, e os totais do período ajustados pela mesma
- * diferença. Dia ímpar, sem coluna de extra ou negativa, ou já certo fica como a FriPonto mandou.
+ * diferença. Dia que fica ímpar com pré-assinalado no meio (falta batida ou a saída caiu no dia seguinte) não tem
+ * par para calcular: extra e negativa zeradas até o RH acertar (a tela marca "conferir ponto"). Dia ímpar sem
+ * pré-assinalado, sem coluna de extra ou negativa, ou já certo fica como a FriPonto mandou.
  */
 export function corrigirDias(dados: TotaisSecullum, preAssinaladas: Map<string, string[]>, mapeamento: ItemMapeamento[]) {
     if (!dados.dias?.length) return { dados, corrigidos: [] as string[] }
@@ -70,15 +72,17 @@ export function corrigirDias(dados: TotaisSecullum, preAssinaladas: Map<string, 
 
     function corrigirDia(d: NonNullable<TotaisSecullum['dias']>[number]) {
         const horarios = iBatidas.map(i => d.valores[i].trim()).filter(Boolean)
-        // atalho: dia ímpar fica com o cálculo da FriPonto (não dá para saber como ela parou o par)
-        if (horarios.length === 0 || horarios.length % 2 === 1 || !horarios.every(h => HORARIO.test(h))) return d
-        const certas = batidasQueContam(horarios, preAssinaladas.get(d.dia) ?? [])
-        if (certas.length % 2 === 1 || certas.join() === horarios.join()) return d
+        if (horarios.length === 0 || !horarios.every(h => HORARIO.test(h))) return d
+        const pre = preAssinaladas.get(d.dia) ?? []
+        const certas = batidasQueContam(horarios, pre)
+        const impar = certas.length % 2 === 1
+        if (impar ? !pre.some(p => horarios.includes(p)) : certas.join() === horarios.join()) return d
 
         const valores = [...d.valores]
         const soma = (indices: number[]) => indices.reduce((s, i) => s + Math.abs(horaSecullumParaMinutos(valores[i])), 0)
+        // a FriPonto forma os pares em sequência e deixa a última batida sem par (trabalhadoDosPares faz o mesmo)
         // atalho: a diferença vai inteira para extra ou negativa, sem tolerância, adicional noturno ou 50%/100%
-        const saldo = soma(iExtra) - soma(iNegativa) + trabalhadoDosPares(certas) - trabalhadoDosPares(horarios)
+        const saldo = impar ? 0 : soma(iExtra) - soma(iNegativa) + trabalhadoDosPares(certas) - trabalhadoDosPares(horarios)
         const maior = (indices: number[]) => indices.reduce((m, i) => (soma([i]) > soma([m]) ? i : m), indices[0])
         const destinoExtra = maior(iExtra)
         const destinoNegativa = maior(iNegativa)
